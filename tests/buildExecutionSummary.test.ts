@@ -1,12 +1,13 @@
 import { describe, expect, it } from "vitest"
 import { buildExecutionSummary } from "../debug/buildExecutionSummary"
-import type { DebugEntry, OrvaxisContext, Trace } from "../types"
+import type { DebugEntry, OrvaxisContext, Trace, TraceEvent } from "../types"
 
 function makeCtx(
   opts: {
     withDebug?: boolean
     timeline?: DebugEntry[]
     trace?: Partial<Trace>
+    traceEvents?: TraceEvent[]
     route?: OrvaxisContext["meta"]["route"]
   } = {}
 ): OrvaxisContext {
@@ -22,8 +23,13 @@ function makeCtx(
     ctx.meta.debug = { timeline: opts.timeline ?? [] }
   }
 
-  if (opts.trace) {
-    ctx.meta.trace = { requestId: "test", events: [], startTime: 0, ...opts.trace }
+  if (opts.trace || opts.traceEvents) {
+    ctx.meta.trace = {
+      requestId: "test",
+      events: opts.traceEvents ?? [],
+      startTime: 0,
+      ...opts.trace,
+    }
   }
 
   if (opts.route) {
@@ -34,42 +40,61 @@ function makeCtx(
 }
 
 describe("buildExecutionSummary", () => {
-  it("returns null when ctx.meta.debug is absent", () => {
+  it("always returns an object, even without debug or trace", () => {
     const ctx = makeCtx({ withDebug: false })
-    expect(buildExecutionSummary(ctx)).toBeNull()
-  })
-
-  it("returns an object when ctx.meta.debug is present", () => {
-    const ctx = makeCtx()
     expect(buildExecutionSummary(ctx)).not.toBeNull()
   })
 
+  it("includes requestId from trace", () => {
+    const ctx = makeCtx({ trace: { requestId: "req-42", startTime: 0 } })
+    expect(buildExecutionSummary(ctx).requestId).toBe("req-42")
+  })
+
+  it("requestId is undefined when trace is absent", () => {
+    const ctx = makeCtx({ withDebug: false })
+    expect(buildExecutionSummary(ctx).requestId).toBeUndefined()
+  })
+
   it("includes route from ctx.meta.route", () => {
-    const route = { route: { method: "GET", path: "/x", handler: async () => {} }, group: { prefix: "/api", routes: [] }, params: {} }
+    const route = {
+      route: { method: "GET", path: "/x", handler: async () => {} },
+      group: { prefix: "/api", routes: [] },
+      params: {},
+    }
     const ctx = makeCtx({ route })
-    const summary = buildExecutionSummary(ctx)
-    expect(summary?.route).toBe(route)
+    expect(buildExecutionSummary(ctx).route).toBe(route)
   })
 
   it("calculates duration from trace start/endTime", () => {
     const ctx = makeCtx({ trace: { startTime: 1000, endTime: 1050 } })
-    const summary = buildExecutionSummary(ctx)
-    expect(summary?.duration).toBe(50)
+    expect(buildExecutionSummary(ctx).duration).toBe(50)
   })
 
   it("sets duration to null when trace is absent", () => {
-    const ctx = makeCtx()
-    const summary = buildExecutionSummary(ctx)
-    expect(summary?.duration).toBeNull()
+    const ctx = makeCtx({ withDebug: false })
+    expect(buildExecutionSummary(ctx).duration).toBeNull()
   })
 
   it("sets duration to null when endTime is missing", () => {
     const ctx = makeCtx({ trace: { startTime: 1000 } })
-    const summary = buildExecutionSummary(ctx)
-    expect(summary?.duration).toBeNull()
+    expect(buildExecutionSummary(ctx).duration).toBeNull()
   })
 
-  it("groups timeline events by the prefix before ':'", () => {
+  it("includes traceEvents from ctx.meta.trace.events", () => {
+    const events: TraceEvent[] = [
+      { type: "MIDDLEWARE:start", timestamp: 1 },
+      { type: "MIDDLEWARE:end", timestamp: 2, meta: { duration: 1 } },
+    ]
+    const ctx = makeCtx({ traceEvents: events })
+    expect(buildExecutionSummary(ctx).traceEvents).toEqual(events)
+  })
+
+  it("traceEvents is empty when trace is absent", () => {
+    const ctx = makeCtx({ withDebug: false })
+    expect(buildExecutionSummary(ctx).traceEvents).toEqual([])
+  })
+
+  it("groups debug timeline events by the prefix before ':'", () => {
     const ctx = makeCtx({
       timeline: [
         { event: "HOOK:onRequest", time: 1 },
@@ -78,9 +103,9 @@ describe("buildExecutionSummary", () => {
       ],
     })
 
-    const summary = buildExecutionSummary(ctx)
-    expect(summary?.steps.HOOK).toHaveLength(2)
-    expect(summary?.steps.PIPELINE_DONE).toHaveLength(1)
+    const { debugSteps } = buildExecutionSummary(ctx)
+    expect(debugSteps.HOOK).toHaveLength(2)
+    expect(debugSteps.PIPELINE_DONE).toHaveLength(1)
   })
 
   it("groups events without ':' under their full name", () => {
@@ -91,14 +116,18 @@ describe("buildExecutionSummary", () => {
       ],
     })
 
-    const summary = buildExecutionSummary(ctx)
-    expect(summary?.steps.REQUEST_START).toHaveLength(1)
-    expect(summary?.steps.REQUEST_END).toHaveLength(1)
+    const { debugSteps } = buildExecutionSummary(ctx)
+    expect(debugSteps.REQUEST_START).toHaveLength(1)
+    expect(debugSteps.REQUEST_END).toHaveLength(1)
   })
 
-  it("returns empty steps when timeline is empty", () => {
+  it("returns empty debugSteps when debug is not enabled", () => {
+    const ctx = makeCtx({ withDebug: false })
+    expect(buildExecutionSummary(ctx).debugSteps).toEqual({})
+  })
+
+  it("returns empty debugSteps when timeline is empty", () => {
     const ctx = makeCtx({ timeline: [] })
-    const summary = buildExecutionSummary(ctx)
-    expect(summary?.steps).toEqual({})
+    expect(buildExecutionSummary(ctx).debugSteps).toEqual({})
   })
 })

@@ -5,6 +5,9 @@ export { createFastifyServer } from "./http/fastifyAdapter"
 export { Debugger } from "./core/Debugger"
 export { Runtime } from "./core/Runtime"
 export { type Plugin, PluginManager } from "./plugins/PluginManager"
+export { buildExecutionSummary, type ExecutionSummary } from "./debug/buildExecutionSummary"
+export { traceEvent } from "./debug/traceEvent"
+export { traceMiddleware } from "./middleware/traceMiddleware"
 export type {
   ContextMeta,
   DebugEntry,

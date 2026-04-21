@@ -391,8 +391,6 @@ The core execution model is stable and functional.
 
 Current focus:
 
-- improving trace and debug ergonomics
-
 Not production-ready.
 
 ---
