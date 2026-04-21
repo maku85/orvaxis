@@ -5,6 +5,25 @@
   "type": "commonjs",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/maku85/orvaxis.git"
+  },
+  "keywords": [
+    "policy",
+    "middleware",
+    "router",
+    "runtime",
+    "express",
+    "fastify",
+    "nodejs"
+  ],
   "scripts": {
     "dev": "tsx examples/express-server.ts",
     "build": "tsc",
