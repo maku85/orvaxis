@@ -37,7 +37,8 @@ export class Router {
   }
 
   match(req: { path: string; method: string }): RouteMatch | null {
-    const { path, method } = req
+    const path = req.path.replace(/\/+/g, "/")
+    const { method } = req
 
     for (const group of this.groups) {
       const prefix = group.prefix
