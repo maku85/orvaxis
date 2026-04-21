@@ -209,4 +209,19 @@ describe("PolicyEngine", () => {
     expect(ctx.meta.a).toBe(1)
     expect(ctx.meta.b).toBe(2)
   })
+
+  it("ignores __proto__ keys in policy modify to prevent prototype pollution", async () => {
+    const engine = new PolicyEngine()
+    const malicious = JSON.parse('{"__proto__": {"polluted": true}}')
+
+    engine.register(
+      makePolicy({ evaluate: async () => ({ allow: true, modify: malicious }) })
+    )
+
+    const ctx = makeCtx()
+    await engine.evaluate(ctx)
+
+    expect(({} as Record<string, unknown>).polluted).toBeUndefined()
+    expect(Object.prototype.hasOwnProperty.call(ctx.meta, "__proto__")).toBe(false)
+  })
 })

@@ -107,6 +107,15 @@ describe("Router", () => {
     expect(match?.route.path).toBe("/users")
   })
 
+  it("matches routes when group prefix is '/'", () => {
+    const router = new Router()
+    router.group(makeGroup("/", [{ method: "GET", path: "/health" }]))
+
+    const match = router.match({ path: "/health", method: "GET" })
+    expect(match).not.toBeNull()
+    expect(match?.route.path).toBe("/health")
+  })
+
   describe("param routing", () => {
     it("matches a single param segment", () => {
       const router = new Router()

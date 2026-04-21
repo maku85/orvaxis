@@ -43,7 +43,7 @@ export class Router {
     for (const group of this.groups) {
       const prefix = group.prefix
 
-      if (path !== prefix && !path.startsWith(`${prefix}/`)) continue
+      if (prefix !== "/" && path !== prefix && !path.startsWith(`${prefix}/`)) continue
 
       for (const route of group.routes) {
         if (route.method !== method) continue

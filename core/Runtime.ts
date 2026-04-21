@@ -1,4 +1,12 @@
 import type { Middleware, OrvaxisContext, OrvaxisRequest, OrvaxisResponse, Policy } from "../types"
+
+const UNSAFE_KEYS = new Set(["__proto__", "constructor", "prototype"])
+
+function mergeSafe(target: Record<string, unknown>, source: Record<string, unknown>): void {
+  for (const key of Object.keys(source)) {
+    if (!UNSAFE_KEYS.has(key)) target[key] = source[key]
+  }
+}
 import { createContext } from "./Context"
 import { runWithContext } from "./contextStore"
 import { validateRequest } from "./validation"
@@ -90,7 +98,7 @@ export class Runtime {
         })
       }
       if (result.modify) {
-        Object.assign(ctx.meta, result.modify)
+        mergeSafe(ctx.meta, result.modify)
       }
     }
   }
