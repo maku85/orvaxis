@@ -437,7 +437,8 @@ orvaxis/
     express-server.ts        minimal Express setup
     policy-server.ts         global and route-level policies
     hooks-and-plugins.ts     lifecycle hooks and plugin registration
-    debug-trace.ts           debugger and trace output
+    debug-trace.ts           debugger, traceEvent, and buildExecutionSummary
+    typed-context.ts         typed OrvaxisContext, getContext, traceEvent
     fastify-server.ts        Fastify adapter with policies and param routing
 ```
 
