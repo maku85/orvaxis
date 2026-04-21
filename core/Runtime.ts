@@ -1,5 +1,6 @@
 import type { Middleware, OrvaxisContext, OrvaxisRequest, OrvaxisResponse, Policy } from "../types"
 import { createContext } from "./Context"
+import { validateRequest } from "./validation"
 import { Debugger } from "./Debugger"
 import { HookSystem } from "./Hook"
 import { Pipeline } from "./Pipeline"
@@ -19,6 +20,7 @@ export class Runtime {
   readonly router = new Router()
 
   async execute(req: OrvaxisRequest, res: OrvaxisResponse): Promise<OrvaxisContext> {
+    validateRequest(req)
     const ctx = createContext(req, res)
     const tracer = new Tracer(req.id ?? generateId())
     ctx.meta.tracer = tracer

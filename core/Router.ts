@@ -1,4 +1,15 @@
 import type { Group, RouteMatch } from "../types"
+import { validateGroup } from "./validation"
+
+function decodeSafe(segment: string): string {
+  try {
+    return decodeURIComponent(segment)
+  } catch {
+    throw Object.assign(new Error(`Malformed percent-encoding in path segment: "${segment}"`), {
+      status: 400,
+    })
+  }
+}
 
 function matchPath(pattern: string, actual: string): Record<string, string> | null {
   const patParts = pattern.split("/").filter(Boolean)
@@ -9,7 +20,7 @@ function matchPath(pattern: string, actual: string): Record<string, string> | nu
   const params: Record<string, string> = {}
   for (let i = 0; i < patParts.length; i++) {
     if (patParts[i].startsWith(":")) {
-      params[patParts[i].slice(1)] = decodeURIComponent(actParts[i])
+      params[patParts[i].slice(1)] = decodeSafe(actParts[i])
     } else if (patParts[i] !== actParts[i]) {
       return null
     }
@@ -21,6 +32,7 @@ export class Router {
   private groups: Group[] = []
 
   group(group: Group) {
+    validateGroup(group)
     this.groups.push(group)
   }
 
