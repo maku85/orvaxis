@@ -36,7 +36,7 @@ app.group({
 })
 
 const server = createExpressServer(app)
-server.listen(3003)
+server.listen(3003).catch(console.error)
 
 // GET /api/users → response + summary including:
 //   - steps: REQUEST_START, POLICY_*, HOOK:*, PIPELINE_*, MIDDLEWARE_*, HANDLER_*, REQUEST_END

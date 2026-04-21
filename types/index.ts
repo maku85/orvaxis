@@ -85,7 +85,7 @@ export type Route = {
 }
 
 export type ServerAdapter = {
-  listen: (port: number) => void
+  listen: (port: number) => Promise<void>
 }
 
 export type Trace = {

@@ -19,8 +19,9 @@ export function createFastifyServer(app: Orvaxis): ServerAdapter {
   })
 
   return {
-    listen: (port: number) => {
-      fastify.listen({ port }, () => console.log(`Orvaxis running on ${port}`))
+    listen: async (port: number) => {
+      await fastify.listen({ port })
+      console.log(`Orvaxis running on ${port}`)
     },
   }
 }

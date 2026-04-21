@@ -37,4 +37,4 @@ app.group({
 })
 
 const server = createFastifyServer(app)
-server.listen(3004)
+server.listen(3004).catch(console.error)

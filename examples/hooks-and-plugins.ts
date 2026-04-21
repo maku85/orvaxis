@@ -41,7 +41,7 @@ app.group({
 })
 
 const server = createExpressServer(app)
-server.listen(3002)
+server.listen(3002).catch(console.error)
 
 // Each request prints to console:
 // [REQ] /api/fast          ← loggerPlugin (onRequest)

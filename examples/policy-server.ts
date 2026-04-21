@@ -49,7 +49,7 @@ app.group({
 })
 
 const server = createExpressServer(app)
-server.listen(3001)
+server.listen(3001).catch(console.error)
 
 // GET /api/hello              → 403 Missing X-API-Key header
 // GET /api/hello (with key)   → 200

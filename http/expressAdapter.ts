@@ -16,6 +16,15 @@ export function createExpressServer(app: Orvaxis): ServerAdapter {
   })
 
   return {
-    listen: (port: number) => server.listen(port, () => console.log(`Orvaxis running on ${port}`)),
+    listen: (port: number) =>
+      new Promise<void>((resolve, reject) => {
+        server
+          .listen(port)
+          .once("listening", () => {
+            console.log(`Orvaxis running on ${port}`)
+            resolve()
+          })
+          .once("error", reject)
+      }),
   }
 }

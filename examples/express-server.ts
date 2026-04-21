@@ -28,4 +28,4 @@ app.group({
 })
 
 const server = createExpressServer(app)
-server.listen(3000)
+server.listen(3000).catch(console.error)
