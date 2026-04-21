@@ -98,6 +98,15 @@ describe("Router", () => {
     expect(router.match({ path: "/apiX/users", method: "GET" })).toBeNull()
   })
 
+  it("normalizes double slashes in request path", () => {
+    const router = new Router()
+    router.group(makeGroup("/api", [{ method: "GET", path: "/users" }]))
+
+    const match = router.match({ path: "/api//users", method: "GET" })
+    expect(match).not.toBeNull()
+    expect(match?.route.path).toBe("/users")
+  })
+
   describe("param routing", () => {
     it("matches a single param segment", () => {
       const router = new Router()

@@ -93,4 +93,29 @@ describe("HookSystem", () => {
 
     await expect(hooks.trigger("onRequest", emptyCtx)).rejects.toThrow("hook error")
   })
+
+  it("swallows errors thrown by onError hook listeners", async () => {
+    const hooks = new HookSystem()
+    hooks.on("onError", async () => {
+      throw new Error("onError hook exploded")
+    })
+
+    await expect(hooks.trigger("onError", emptyCtx, new Error("original"))).resolves.toBeUndefined()
+  })
+
+  it("runs all onError hooks even if one throws", async () => {
+    const hooks = new HookSystem()
+    const order: number[] = []
+
+    hooks.on("onError", async () => {
+      order.push(1)
+      throw new Error("first fails")
+    })
+    hooks.on("onError", async () => {
+      order.push(2)
+    })
+
+    await hooks.trigger("onError", emptyCtx, new Error("original"))
+    expect(order).toEqual([1, 2])
+  })
 })
