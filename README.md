@@ -186,7 +186,7 @@ export const loggerPlugin: Plugin = {
   name: "logger",
   apply(runtime) {
     runtime.hooks.on("onRequest", (ctx) => {
-      console.log("[REQ]", ctx.req.url)
+      console.log("[REQ]", ctx.req.path)
     })
   }
 }
@@ -332,6 +332,12 @@ Any adapter needs to:
 1. Ensure `req.path` is a plain path string (no query string)
 2. Call `app.handle(req, res)` and catch thrown errors
 3. Return `{ listen(port) }` to satisfy the `ServerAdapter` interface
+
+---
+
+## Documentation
+
+- [Cookbook](docs/cookbook.md) — practical use cases with working examples (authentication, RBAC, rate limiting, tracing, feature flags, and more)
 
 ---
 
