@@ -147,6 +147,34 @@ describe("Runtime", () => {
       const ctx = await runtime.execute(makeReq("/api/resource"), makeRes())
       expect(ctx.meta.userId).toBe(99)
     })
+
+    it("merges modify data from group policy into ctx.meta", async () => {
+      const runtime = new Runtime()
+      runtime.router.group(
+        makeGroup("/api", {
+          groupPolicies: [
+            { name: "gp", evaluate: async () => ({ allow: true, modify: { fromGroup: true } }) },
+          ],
+        })
+      )
+
+      const ctx = await runtime.execute(makeReq("/api/resource"), makeRes())
+      expect(ctx.meta.fromGroup).toBe(true)
+    })
+
+    it("merges modify data from route policy into ctx.meta", async () => {
+      const runtime = new Runtime()
+      runtime.router.group(
+        makeGroup("/api", {
+          policies: [
+            { name: "rp", evaluate: async () => ({ allow: true, modify: { fromRoute: true } }) },
+          ],
+        })
+      )
+
+      const ctx = await runtime.execute(makeReq("/api/resource"), makeRes())
+      expect(ctx.meta.fromRoute).toBe(true)
+    })
   })
 
   describe("hooks", () => {
