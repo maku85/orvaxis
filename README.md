@@ -402,7 +402,6 @@ Not production-ready.
 
 Potential evolutions include:
 
-- `AsyncLocalStorage` support for request-scoped context propagation
 - async job execution layer
 - distributed tracing integration
 - visual execution inspector
