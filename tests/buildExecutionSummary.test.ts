@@ -1,22 +1,29 @@
 import { describe, expect, it } from "vitest"
 import { buildExecutionSummary } from "../debug/buildExecutionSummary"
+import type { DebugEntry, OrvaxisContext, Trace } from "../types"
 
 function makeCtx(
   opts: {
     withDebug?: boolean
-    timeline?: { event: string; time: number; meta?: any }[]
-    trace?: { startTime: number; endTime?: number }
-    route?: any
+    timeline?: DebugEntry[]
+    trace?: Partial<Trace>
+    route?: OrvaxisContext["meta"]["route"]
   } = {}
-) {
-  const ctx: any = { meta: {} }
+): OrvaxisContext {
+  const ctx: OrvaxisContext = {
+    req: { path: "/", method: "GET", headers: {} },
+    res: {},
+    state: {},
+    meta: {},
+    logs: [],
+  }
 
   if (opts.withDebug !== false) {
     ctx.meta.debug = { timeline: opts.timeline ?? [] }
   }
 
   if (opts.trace) {
-    ctx.meta.trace = opts.trace
+    ctx.meta.trace = { requestId: "test", events: [], startTime: 0, ...opts.trace }
   }
 
   if (opts.route) {
@@ -38,28 +45,28 @@ describe("buildExecutionSummary", () => {
   })
 
   it("includes route from ctx.meta.route", () => {
-    const route = { route: { method: "GET", path: "/x" }, group: { prefix: "/api" } }
+    const route = { route: { method: "GET", path: "/x", handler: async () => {} }, group: { prefix: "/api", routes: [] }, params: {} }
     const ctx = makeCtx({ route })
-    const summary = buildExecutionSummary(ctx)!
-    expect(summary.route).toBe(route)
+    const summary = buildExecutionSummary(ctx)
+    expect(summary?.route).toBe(route)
   })
 
   it("calculates duration from trace start/endTime", () => {
     const ctx = makeCtx({ trace: { startTime: 1000, endTime: 1050 } })
-    const summary = buildExecutionSummary(ctx)!
-    expect(summary.duration).toBe(50)
+    const summary = buildExecutionSummary(ctx)
+    expect(summary?.duration).toBe(50)
   })
 
   it("sets duration to null when trace is absent", () => {
     const ctx = makeCtx()
-    const summary = buildExecutionSummary(ctx)!
-    expect(summary.duration).toBeNull()
+    const summary = buildExecutionSummary(ctx)
+    expect(summary?.duration).toBeNull()
   })
 
   it("sets duration to null when endTime is missing", () => {
     const ctx = makeCtx({ trace: { startTime: 1000 } })
-    const summary = buildExecutionSummary(ctx)!
-    expect(summary.duration).toBeNull()
+    const summary = buildExecutionSummary(ctx)
+    expect(summary?.duration).toBeNull()
   })
 
   it("groups timeline events by the prefix before ':'", () => {
@@ -71,9 +78,9 @@ describe("buildExecutionSummary", () => {
       ],
     })
 
-    const summary = buildExecutionSummary(ctx)!
-    expect(summary.steps["HOOK"]).toHaveLength(2)
-    expect(summary.steps["PIPELINE_DONE"]).toHaveLength(1)
+    const summary = buildExecutionSummary(ctx)
+    expect(summary?.steps.HOOK).toHaveLength(2)
+    expect(summary?.steps.PIPELINE_DONE).toHaveLength(1)
   })
 
   it("groups events without ':' under their full name", () => {
@@ -84,14 +91,14 @@ describe("buildExecutionSummary", () => {
       ],
     })
 
-    const summary = buildExecutionSummary(ctx)!
-    expect(summary.steps["REQUEST_START"]).toHaveLength(1)
-    expect(summary.steps["REQUEST_END"]).toHaveLength(1)
+    const summary = buildExecutionSummary(ctx)
+    expect(summary?.steps.REQUEST_START).toHaveLength(1)
+    expect(summary?.steps.REQUEST_END).toHaveLength(1)
   })
 
   it("returns empty steps when timeline is empty", () => {
     const ctx = makeCtx({ timeline: [] })
-    const summary = buildExecutionSummary(ctx)!
-    expect(summary.steps).toEqual({})
+    const summary = buildExecutionSummary(ctx)
+    expect(summary?.steps).toEqual({})
   })
 })

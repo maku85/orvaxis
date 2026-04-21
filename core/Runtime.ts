@@ -1,4 +1,4 @@
-import type { Middleware, OrvaxisContext, Policy } from "../types"
+import type { Middleware, OrvaxisContext, OrvaxisRequest, OrvaxisResponse, Policy } from "../types"
 import { createContext } from "./Context"
 import { Debugger } from "./Debugger"
 import { HookSystem } from "./Hook"
@@ -18,7 +18,7 @@ export class Runtime {
   readonly policies = new PolicyEngine()
   readonly router = new Router()
 
-  async execute(req: any, res: any): Promise<OrvaxisContext> {
+  async execute(req: OrvaxisRequest, res: OrvaxisResponse): Promise<OrvaxisContext> {
     const ctx = createContext(req, res)
     const tracer = new Tracer(req.id ?? generateId())
     ctx.meta.tracer = tracer
@@ -63,7 +63,7 @@ export class Runtime {
     } catch (err) {
       ctx.error = err as Error
       this.debugger.log(ctx, "ERROR", { error: String(err) })
-      await this.hooks.trigger("onError", ctx, err)
+      await this.hooks.trigger("onError", ctx, err as Error)
       throw err
     }
   }

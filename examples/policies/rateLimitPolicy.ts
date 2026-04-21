@@ -1,3 +1,5 @@
+import type { OrvaxisContext } from "../../types"
+
 export const rateLimitPolicy = {
   name: "rate-limit",
   priority: 100,
@@ -7,8 +9,8 @@ export const rateLimitPolicy = {
     method: "GET",
   },
 
-  async evaluate(ctx: any) {
-    const _ip = ctx.req.ip
+  async evaluate(ctx: OrvaxisContext) {
+    const _ip = ctx.req.headers["x-forwarded-for"] ?? ctx.req.headers["x-real-ip"]
 
     const allowed = true // placeholder
 

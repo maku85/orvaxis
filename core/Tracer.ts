@@ -11,7 +11,7 @@ export class Tracer {
     }
   }
 
-  event(type: string, meta?: Record<string, any>) {
+  event(type: string, meta?: Record<string, unknown>) {
     this.trace.events.push({
       type,
       timestamp: Date.now(),

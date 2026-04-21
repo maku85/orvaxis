@@ -1,10 +1,4 @@
-import type { Group, Route } from "../types"
-
-export type RouteMatch = {
-  route: Route
-  group: Group
-  params: Record<string, string>
-}
+import type { Group, RouteMatch } from "../types"
 
 function matchPath(pattern: string, actual: string): Record<string, string> | null {
   const patParts = pattern.split("/").filter(Boolean)

@@ -12,7 +12,7 @@ app.on("onRequest", (ctx) => {
 
 app.on("afterPipeline", (ctx) => {
   const duration = Date.now() - ctx.meta.startedAt
-  console.log(`[DONE] ${(ctx.req as any).method} ${(ctx.req as any).path} — ${duration}ms`)
+  console.log(`[DONE] ${ctx.req.method} ${ctx.req.path} — ${duration}ms`)
 })
 
 app.on("onError", (_ctx, err) => {

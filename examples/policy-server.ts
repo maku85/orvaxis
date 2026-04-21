@@ -6,7 +6,7 @@ const requireApiKey: Policy = {
   name: "require-api-key",
   priority: 100,
   evaluate(ctx) {
-    const key = (ctx.req as any).headers["x-api-key"]
+    const key = ctx.req.headers["x-api-key"]
     if (!key) return { allow: false, reason: "Missing X-API-Key header" }
     return { allow: true, modify: { apiKey: key } }
   },

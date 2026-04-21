@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from "vitest"
 import { Runtime } from "../core/Runtime"
-import type { Group, Middleware, Policy } from "../types"
+import type { Group, Middleware, OrvaxisContext, OrvaxisRequest, Policy } from "../types"
 
-function makeReq(path: string, method = "GET") {
-  return { path, method, url: path }
+function makeReq(path: string, method = "GET"): OrvaxisRequest {
+  return { path, method, url: path, headers: {} }
 }
 
 function makeRes() {
@@ -15,7 +15,7 @@ function makeGroup(
   opts: {
     path?: string
     method?: string
-    handler?: (ctx: any) => void
+    handler?: (ctx: OrvaxisContext) => void
     middleware?: Middleware[]
     policies?: Policy[]
     groupMiddleware?: Middleware[]
@@ -65,7 +65,7 @@ describe("Runtime", () => {
 
       const ctx = await runtime.execute(makeReq("/api/resource"), makeRes())
       expect(ctx.meta.route).toBeDefined()
-      expect(ctx.meta.route.route.path).toBe("/resource")
+      expect(ctx.meta.route?.route.path).toBe("/resource")
     })
   })
 
@@ -176,15 +176,15 @@ describe("Runtime", () => {
 
     it("sets ctx.error when an error occurs", async () => {
       const runtime = new Runtime()
-      let capturedCtx: any
+      let capturedCtx: OrvaxisContext | undefined
 
       runtime.hooks.on("onError", (ctx) => {
         capturedCtx = ctx
       })
 
       await runtime.execute(makeReq("/nope"), makeRes()).catch(() => {})
-      expect(capturedCtx.error).toBeDefined()
-      expect(capturedCtx.error.message).toBe("Not Found")
+      expect(capturedCtx?.error).toBeDefined()
+      expect(capturedCtx?.error?.message).toBe("Not Found")
     })
   })
 
@@ -192,7 +192,7 @@ describe("Runtime", () => {
     it("runs global pipeline middleware", async () => {
       const runtime = new Runtime()
       runtime.router.group(makeGroup("/api"))
-      const fn = vi.fn(async (_ctx: any, next: any) => next())
+      const fn = vi.fn<Middleware>(async (_ctx, next) => next())
       runtime.pipeline.use(fn)
 
       await runtime.execute(makeReq("/api/resource"), makeRes())
@@ -265,7 +265,7 @@ describe("Runtime", () => {
       })
 
       const ctx = await runtime.execute(makeReq("/users/42"), makeRes())
-      expect(ctx.meta.route.params).toEqual({ id: "42" })
+      expect(ctx.meta.route?.params).toEqual({ id: "42" })
     })
   })
 
@@ -276,7 +276,7 @@ describe("Runtime", () => {
 
       const ctx = await runtime.execute(makeReq("/api/resource"), makeRes())
       expect(ctx.meta.trace).toBeDefined()
-      expect(ctx.meta.trace.endTime).toBeDefined()
+      expect(ctx.meta.trace?.endTime).toBeDefined()
     })
 
     it("uses req.id as requestId when available", async () => {
@@ -285,7 +285,7 @@ describe("Runtime", () => {
 
       const req = { ...makeReq("/api/resource"), id: "my-custom-id" }
       const ctx = await runtime.execute(req, makeRes())
-      expect(ctx.meta.trace.requestId).toBe("my-custom-id")
+      expect(ctx.meta.trace?.requestId).toBe("my-custom-id")
     })
   })
 
@@ -296,7 +296,7 @@ describe("Runtime", () => {
       runtime.router.group(makeGroup("/api"))
 
       const ctx = await runtime.execute(makeReq("/api/resource"), makeRes())
-      expect(ctx.meta.debug.timeline.length).toBeGreaterThan(0)
+      expect(ctx.meta.debug?.timeline.length).toBeGreaterThan(0)
     })
 
     it("does not populate debug timeline when debugger is disabled", async () => {

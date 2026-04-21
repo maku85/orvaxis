@@ -1,8 +1,9 @@
 import { describe, expect, it, vi } from "vitest"
 import { Orvaxis } from "../core/Orvaxis"
+import type { OrvaxisRequest } from "../types"
 
-function makeReq(path: string, method = "GET") {
-  return { path, method, url: path }
+function makeReq(path: string, method = "GET"): OrvaxisRequest {
+  return { path, method, url: path, headers: {} }
 }
 
 describe("Orvaxis", () => {

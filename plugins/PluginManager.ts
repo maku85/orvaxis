@@ -1,6 +1,8 @@
+import type { Runtime } from "../core/Runtime"
+
 export type Plugin = {
   name: string
-  apply: (orvaxis: any) => void
+  apply: (runtime: Runtime) => void
 }
 
 export class PluginManager {
@@ -10,9 +12,9 @@ export class PluginManager {
     this.plugins.push(plugin)
   }
 
-  applyAll(orvaxis: any) {
+  applyAll(runtime: Runtime) {
     for (const plugin of this.plugins) {
-      plugin.apply(orvaxis)
+      plugin.apply(runtime)
     }
   }
 }

@@ -1,8 +1,15 @@
 import { describe, expect, it } from "vitest"
 import { Debugger } from "../core/Debugger"
+import type { OrvaxisContext } from "../types"
 
-function makeCtx() {
-  return { meta: {} as Record<string, any> }
+function makeCtx(): OrvaxisContext {
+  return {
+    req: { path: "/", method: "GET", headers: {} },
+    res: {},
+    state: {},
+    meta: {},
+    logs: [],
+  }
 }
 
 describe("Debugger", () => {
@@ -31,7 +38,7 @@ describe("Debugger", () => {
     dbg.log(ctx, "REQUEST_START")
 
     expect(ctx.meta.debug).toBeDefined()
-    expect(Array.isArray(ctx.meta.debug.timeline)).toBe(true)
+    expect(Array.isArray(ctx.meta.debug?.timeline)).toBe(true)
   })
 
   it("appends an entry with event name and time", () => {
@@ -41,9 +48,9 @@ describe("Debugger", () => {
     const before = Date.now()
     dbg.log(ctx, "PIPELINE_DONE")
 
-    const entry = ctx.meta.debug.timeline[0]
-    expect(entry.event).toBe("PIPELINE_DONE")
-    expect(entry.time).toBeGreaterThanOrEqual(before)
+    const entry = ctx.meta.debug?.timeline[0]
+    expect(entry?.event).toBe("PIPELINE_DONE")
+    expect(entry?.time).toBeGreaterThanOrEqual(before)
   })
 
   it("stores optional meta on timeline entries", () => {
@@ -52,7 +59,7 @@ describe("Debugger", () => {
     const ctx = makeCtx()
     dbg.log(ctx, "ERROR", { error: "oops" })
 
-    expect(ctx.meta.debug.timeline[0].meta).toEqual({ error: "oops" })
+    expect(ctx.meta.debug?.timeline[0].meta).toEqual({ error: "oops" })
   })
 
   it("accumulates multiple entries in order", () => {
@@ -64,7 +71,7 @@ describe("Debugger", () => {
     dbg.log(ctx, "B")
     dbg.log(ctx, "C")
 
-    expect(ctx.meta.debug.timeline.map((e: any) => e.event)).toEqual(["A", "B", "C"])
+    expect(ctx.meta.debug?.timeline.map((e) => e.event)).toEqual(["A", "B", "C"])
   })
 
   it("reuses existing debug object across calls", () => {

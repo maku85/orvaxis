@@ -1,20 +1,20 @@
 import Fastify from "fastify"
 import type { Orvaxis } from "../core/Orvaxis"
-import type { ServerAdapter } from "../types"
+import type { OrvaxisRequest, OrvaxisResponse, ServerAdapter } from "../types"
 
 export function createFastifyServer(app: Orvaxis): ServerAdapter {
   const fastify = Fastify()
 
   fastify.all("/*", async (req, reply) => {
-    // Fastify uses req.url (may include query string); the Router expects req.path
     const path = (req.url ?? "/").split("?")[0]
-    ;(req as any).path = path
+    const adapted = Object.assign(req, { path }) as unknown as OrvaxisRequest
 
     try {
-      await app.handle(req as any, reply)
-    } catch (err: any) {
-      const status = err.status ?? 500
-      reply.status(status).send({ error: err.message ?? "Internal Server Error" })
+      await app.handle(adapted, reply as unknown as OrvaxisResponse)
+    } catch (err) {
+      const e = err as { status?: number; message?: string }
+      const status = e.status ?? 500
+      reply.status(status).send({ error: e.message ?? "Internal Server Error" })
     }
   })
 

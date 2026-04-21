@@ -1,8 +1,10 @@
 import { describe, expect, it, vi } from "vitest"
 import { HookSystem } from "../core/Hook"
-import type { HookName } from "../types"
+import type { HookName, OrvaxisContext } from "../types"
 
 const ALL_HOOKS: HookName[] = ["onRequest", "beforePipeline", "afterPipeline", "onError"]
+
+const emptyCtx = {} as unknown as OrvaxisContext
 
 describe("HookSystem", () => {
   it("triggers a registered hook", async () => {
@@ -10,7 +12,7 @@ describe("HookSystem", () => {
     const fn = vi.fn()
     hooks.on("onRequest", fn)
 
-    const ctx = { meta: {} }
+    const ctx = { meta: {} } as unknown as OrvaxisContext
     await hooks.trigger("onRequest", ctx)
 
     expect(fn).toHaveBeenCalledOnce()
@@ -22,7 +24,7 @@ describe("HookSystem", () => {
     const fn = vi.fn()
     hooks.on("onError", fn)
 
-    const ctx = { meta: {} }
+    const ctx = { meta: {} } as unknown as OrvaxisContext
     const err = new Error("boom")
     await hooks.trigger("onError", ctx, err)
 
@@ -33,23 +35,17 @@ describe("HookSystem", () => {
     const hooks = new HookSystem()
     const order: number[] = []
 
-    hooks.on("beforePipeline", async () => {
-      order.push(1)
-    })
-    hooks.on("beforePipeline", async () => {
-      order.push(2)
-    })
-    hooks.on("beforePipeline", async () => {
-      order.push(3)
-    })
+    hooks.on("beforePipeline", async () => { order.push(1) })
+    hooks.on("beforePipeline", async () => { order.push(2) })
+    hooks.on("beforePipeline", async () => { order.push(3) })
 
-    await hooks.trigger("beforePipeline", {})
+    await hooks.trigger("beforePipeline", emptyCtx)
     expect(order).toEqual([1, 2, 3])
   })
 
   it("triggering a hook with no listeners does not throw", async () => {
     const hooks = new HookSystem()
-    await expect(hooks.trigger("afterPipeline", {})).resolves.toBeUndefined()
+    await expect(hooks.trigger("afterPipeline", emptyCtx)).resolves.toBeUndefined()
   })
 
   it("isolates listeners across different hook names", async () => {
@@ -60,7 +56,7 @@ describe("HookSystem", () => {
     hooks.on("onRequest", onRequest)
     hooks.on("onError", onError)
 
-    await hooks.trigger("onRequest", {})
+    await hooks.trigger("onRequest", emptyCtx)
 
     expect(onRequest).toHaveBeenCalledOnce()
     expect(onError).not.toHaveBeenCalled()
@@ -71,7 +67,7 @@ describe("HookSystem", () => {
     for (const name of ALL_HOOKS) {
       const fn = vi.fn()
       hooks.on(name, fn)
-      await hooks.trigger(name, {})
+      await hooks.trigger(name, emptyCtx)
       expect(fn).toHaveBeenCalledOnce()
     }
   })
@@ -85,7 +81,7 @@ describe("HookSystem", () => {
       log.push("async-done")
     })
 
-    await hooks.trigger("onRequest", {})
+    await hooks.trigger("onRequest", emptyCtx)
     expect(log).toEqual(["async-done"])
   })
 
@@ -95,6 +91,6 @@ describe("HookSystem", () => {
       throw new Error("hook error")
     })
 
-    await expect(hooks.trigger("onRequest", {})).rejects.toThrow("hook error")
+    await expect(hooks.trigger("onRequest", emptyCtx)).rejects.toThrow("hook error")
   })
 })

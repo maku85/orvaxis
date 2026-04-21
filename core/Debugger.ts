@@ -1,3 +1,5 @@
+import type { DebugInfo, OrvaxisContext } from "../types"
+
 export class Debugger {
   enabled = false
 
@@ -5,17 +7,12 @@ export class Debugger {
     this.enabled = true
   }
 
-  log(ctx: any, event: string, meta?: any) {
+  log(ctx: OrvaxisContext, event: string, meta?: Record<string, unknown>) {
     if (!this.enabled) return
 
-    ctx.meta.debug ??= {
-      timeline: [],
-    }
+    ctx.meta.debug ??= { timeline: [] } satisfies DebugInfo
 
-    ctx.meta.debug.timeline.push({
-      event,
-      time: Date.now(),
-      meta,
-    })
+    const debug = ctx.meta.debug as DebugInfo
+    debug.timeline.push({ event, time: Date.now(), meta })
   }
 }

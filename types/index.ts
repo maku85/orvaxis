@@ -1,13 +1,27 @@
+export type DebugEntry = {
+  event: string
+  time: number
+  meta?: Record<string, unknown>
+}
+
+export type DebugInfo = {
+  timeline: DebugEntry[]
+}
+
+export interface TracerLike {
+  event: (type: string, meta?: Record<string, unknown>) => void
+}
+
 export interface OrvaxisRequest {
   path: string
   method: string
   headers: Record<string, string | string[] | undefined>
   id?: string
-  [key: string]: any
+  [key: string]: unknown
 }
 
 export interface OrvaxisResponse {
-  [key: string]: any
+  [key: string]: unknown
 }
 
 export type Group = {
@@ -23,11 +37,25 @@ export type Middleware = (ctx: OrvaxisContext, next: NextFunction) => Promise<vo
 
 export type NextFunction = () => Promise<void> | void
 
+export type RouteMatch = {
+  route: Route
+  group: Group
+  params: Record<string, string>
+}
+
+export type ContextMeta = {
+  tracer?: TracerLike
+  route?: RouteMatch
+  trace?: Trace
+  debug?: DebugInfo
+  [key: string]: unknown
+}
+
 export type OrvaxisContext = {
   req: OrvaxisRequest
   res: OrvaxisResponse
-  state: Record<string, any>
-  meta: Record<string, any>
+  state: Record<string, unknown>
+  meta: ContextMeta
   logs: string[]
   error?: Error
 }
@@ -40,7 +68,7 @@ export type Policy = {
 }
 
 export type PolicyResult =
-  | { allow: true; modify?: Record<string, any> }
+  | { allow: true; modify?: Record<string, unknown> }
   | { allow: false; reason?: string }
 
 export type PolicyScope = {
@@ -70,5 +98,5 @@ export type Trace = {
 export type TraceEvent = {
   type: string
   timestamp: number
-  meta?: Record<string, any>
+  meta?: Record<string, unknown>
 }

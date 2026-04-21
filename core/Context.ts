@@ -1,6 +1,6 @@
-import type { OrvaxisContext } from "../types"
+import type { OrvaxisContext, OrvaxisRequest, OrvaxisResponse } from "../types"
 
-export function createContext(req: any, res: any): OrvaxisContext {
+export function createContext(req: OrvaxisRequest, res: OrvaxisResponse): OrvaxisContext {
   return {
     req,
     res,

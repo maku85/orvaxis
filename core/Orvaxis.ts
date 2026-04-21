@@ -1,4 +1,4 @@
-import type { Group, HookName, Middleware, Policy } from "../types"
+import type { Group, HookName, Middleware, OrvaxisContext, OrvaxisRequest, OrvaxisResponse, Policy } from "../types"
 import { Runtime } from "./Runtime"
 
 export class Orvaxis {
@@ -13,7 +13,7 @@ export class Orvaxis {
     return this
   }
 
-  on(name: HookName, fn: (ctx: any, error?: any) => Promise<void> | void) {
+  on(name: HookName, fn: (ctx: OrvaxisContext, error?: Error) => Promise<void> | void) {
     this.runtime.hooks.on(name, fn)
     return this
   }
@@ -33,7 +33,7 @@ export class Orvaxis {
     return this
   }
 
-  async handle(req: any, res: any) {
+  async handle(req: OrvaxisRequest, res: OrvaxisResponse) {
     return this.runtime.execute(req, res)
   }
 }

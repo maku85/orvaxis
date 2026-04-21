@@ -69,6 +69,6 @@ describe("Tracer", () => {
   it("endTime is >= startTime", () => {
     const tracer = new Tracer("id")
     const trace = tracer.end()
-    expect(trace.endTime!).toBeGreaterThanOrEqual(trace.startTime)
+    expect(trace.endTime).toBeGreaterThanOrEqual(trace.startTime)
   })
 })

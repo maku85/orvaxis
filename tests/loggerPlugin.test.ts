@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest"
 import { Runtime } from "../core/Runtime"
 import { loggerPlugin } from "../plugins/loggerPlugin"
+import type { OrvaxisContext } from "../types"
 
 describe("loggerPlugin", () => {
   it("has name 'logger'", () => {
@@ -12,7 +13,10 @@ describe("loggerPlugin", () => {
     const spy = vi.spyOn(console, "log").mockImplementation(() => {})
 
     loggerPlugin.apply(runtime)
-    await runtime.hooks.trigger("onRequest", { req: { url: "/test" }, meta: {} })
+    await runtime.hooks.trigger(
+      "onRequest",
+      { req: { url: "/test", path: "/test", method: "GET", headers: {} }, meta: {} } as unknown as OrvaxisContext
+    )
 
     expect(spy).toHaveBeenCalledWith("[REQ]", "/test")
     spy.mockRestore()
@@ -24,7 +28,7 @@ describe("loggerPlugin", () => {
 
     loggerPlugin.apply(runtime)
     const err = new Error("something failed")
-    await runtime.hooks.trigger("onError", { meta: {} }, err)
+    await runtime.hooks.trigger("onError", { meta: {} } as unknown as OrvaxisContext, err)
 
     expect(spy).toHaveBeenCalledWith("[ERR]", err)
     spy.mockRestore()

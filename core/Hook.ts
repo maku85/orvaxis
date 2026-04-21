@@ -1,6 +1,6 @@
-import type { HookName } from "../types"
+import type { HookName, OrvaxisContext } from "../types"
 
-type HookFn = (ctx: any, error?: any) => Promise<void> | void
+type HookFn = (ctx: OrvaxisContext, error?: Error) => Promise<void> | void
 
 export class HookSystem {
   private hooks: Record<HookName, HookFn[]> = {
@@ -14,7 +14,7 @@ export class HookSystem {
     this.hooks[name].push(fn)
   }
 
-  async trigger(name: HookName, ctx: any, error?: any) {
+  async trigger(name: HookName, ctx: OrvaxisContext, error?: Error) {
     for (const fn of this.hooks[name]) {
       await fn(ctx, error)
     }
