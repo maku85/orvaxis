@@ -30,7 +30,7 @@ app.group({
       method: "GET",
       path: "/users/:id",
       handler: async (ctx) => {
-        ctx.res.send({ id: ctx.meta.route.params.id })
+        ctx.res.send({ id: ctx.meta.route?.params.id })
       },
     },
   ],

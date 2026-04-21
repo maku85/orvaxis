@@ -1,4 +1,14 @@
+import { type Plugin, PluginManager } from "../plugins/PluginManager"
 import type { Middleware, OrvaxisContext, OrvaxisRequest, OrvaxisResponse, Policy } from "../types"
+import { createContext } from "./Context"
+import { Debugger } from "./Debugger"
+import { HookSystem } from "./Hook"
+import { Pipeline } from "./Pipeline"
+import { PolicyEngine } from "./PolicyEngine"
+import { Router } from "./Router"
+import { Tracer } from "./Tracer"
+import { runWithContext } from "./contextStore"
+import { validateRequest } from "./validation"
 
 const UNSAFE_KEYS = new Set(["__proto__", "constructor", "prototype"])
 
@@ -7,16 +17,6 @@ function mergeSafe(target: Record<string, unknown>, source: Record<string, unkno
     if (!UNSAFE_KEYS.has(key)) target[key] = source[key]
   }
 }
-import { createContext } from "./Context"
-import { runWithContext } from "./contextStore"
-import { validateRequest } from "./validation"
-import { Debugger } from "./Debugger"
-import { HookSystem } from "./Hook"
-import { Pipeline } from "./Pipeline"
-import { PolicyEngine } from "./PolicyEngine"
-import { Router } from "./Router"
-import { Tracer } from "./Tracer"
-import { type Plugin, PluginManager } from "../plugins/PluginManager"
 
 function generateId(): string {
   return Date.now().toString(36) + Math.random().toString(36).slice(2)

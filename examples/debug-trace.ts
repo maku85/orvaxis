@@ -1,5 +1,5 @@
-import { Orvaxis, buildExecutionSummary, traceEvent, traceMiddleware } from "../index"
 import { createExpressServer } from "../http/expressAdapter"
+import { Orvaxis, buildExecutionSummary, traceEvent, traceMiddleware } from "../index"
 
 const app = new Orvaxis()
 

@@ -1,10 +1,8 @@
-import express, { type NextFunction, type Request, type Response } from "express"
+import express, { type Application, type NextFunction, type Request, type Response } from "express"
 import type { Orvaxis } from "../core/Orvaxis"
 import type { OrvaxisRequest, OrvaxisResponse, ServerAdapter } from "../types"
 
-export function createExpressServer(app: Orvaxis): ServerAdapter {
-  const server = express()
-
+export function createExpressServer(app: Orvaxis, server: Application = express()): ServerAdapter {
   server.use(async (req: Request, res: Response, _next: NextFunction) => {
     const adapted = Object.assign(req, {
       path: req.path,

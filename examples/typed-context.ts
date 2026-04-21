@@ -1,5 +1,5 @@
-import { Orvaxis, getContext, traceEvent } from "../index"
 import { createExpressServer } from "../http/expressAdapter"
+import { Orvaxis, getContext, traceEvent } from "../index"
 import type { OrvaxisContext, Policy } from "../types"
 
 // --- Typed context definition ---
@@ -57,7 +57,7 @@ app.group({
         ctx.state.user = { id: "u-1", role: "user" }
 
         const id = await getCurrentUserId() // uses getContext() internally
-        await logQuery("users")             // emits trace event without ctx
+        await logQuery("users") // emits trace event without ctx
 
         ctx.res.json({ id, apiKey: ctx.meta.apiKey })
       },

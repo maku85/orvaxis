@@ -2,9 +2,7 @@ import Fastify from "fastify"
 import type { Orvaxis } from "../core/Orvaxis"
 import type { OrvaxisRequest, OrvaxisResponse, ServerAdapter } from "../types"
 
-export function createFastifyServer(app: Orvaxis): ServerAdapter {
-  const fastify = Fastify()
-
+export function createFastifyServer(app: Orvaxis, fastify = Fastify()): ServerAdapter {
   fastify.all("/*", async (req, reply) => {
     const path = (req.url ?? "/").split("?")[0]
     const adapted = Object.assign(req, {
