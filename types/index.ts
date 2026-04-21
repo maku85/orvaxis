@@ -69,7 +69,7 @@ export type Policy = {
 
 export type PolicyResult =
   | { allow: true; modify?: Record<string, unknown> }
-  | { allow: false; reason?: string }
+  | { allow: false; reason?: string; status?: number }
 
 export type PolicyScope = {
   path?: string | RegExp

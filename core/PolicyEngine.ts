@@ -17,7 +17,7 @@ export class PolicyEngine {
 
       if (!result.allow) {
         throw Object.assign(new Error(result.reason ?? `Blocked by ${policy.name}`), {
-          status: 403,
+          status: result.status ?? 403,
         })
       }
 

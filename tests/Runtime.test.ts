@@ -111,6 +111,31 @@ describe("Runtime", () => {
       expect(err.message).toBe("route-denied")
     })
 
+    it("uses custom status from policy result when provided", async () => {
+      const runtime = new Runtime()
+      runtime.router.group(makeGroup("/api"))
+      runtime.policies.register({
+        name: "auth",
+        evaluate: async () => ({ allow: false, reason: "Unauthorized", status: 401 }),
+      })
+
+      const err = await runtime.execute(makeReq("/api/resource"), makeRes()).catch((e) => e)
+      expect(err.message).toBe("Unauthorized")
+      expect(err.status).toBe(401)
+    })
+
+    it("defaults to 403 when policy result has no status", async () => {
+      const runtime = new Runtime()
+      runtime.router.group(makeGroup("/api"))
+      runtime.policies.register({
+        name: "blocker",
+        evaluate: async () => ({ allow: false, reason: "Forbidden" }),
+      })
+
+      const err = await runtime.execute(makeReq("/api/resource"), makeRes()).catch((e) => e)
+      expect(err.status).toBe(403)
+    })
+
     it("merges modify data from global policy into ctx.meta", async () => {
       const runtime = new Runtime()
       runtime.router.group(makeGroup("/api"))

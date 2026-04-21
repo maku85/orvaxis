@@ -76,7 +76,7 @@ export class Runtime {
       const result = await policy.evaluate(ctx)
       if (!result.allow) {
         throw Object.assign(new Error(result.reason ?? `Blocked by ${policy.name}`), {
-          status: 403,
+          status: result.status ?? 403,
         })
       }
       if (result.modify) {
