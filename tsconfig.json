@@ -12,6 +12,14 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true
   },
-  "include": ["index.ts", "core/**/*.ts", "debug/**/*.ts", "http/**/*.ts", "middleware/**/*.ts", "plugins/**/*.ts", "types/**/*.ts"],
+  "include": [
+    "index.ts",
+    "core/**/*.ts",
+    "debug/**/*.ts",
+    "http/**/*.ts",
+    "middleware/**/*.ts",
+    "plugins/**/*.ts",
+    "types/**/*.ts"
+  ],
   "exclude": ["node_modules", "dist", "examples", "tests"]
 }

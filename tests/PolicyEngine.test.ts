@@ -214,9 +214,7 @@ describe("PolicyEngine", () => {
     const engine = new PolicyEngine()
     const malicious = JSON.parse('{"__proto__": {"polluted": true}}')
 
-    engine.register(
-      makePolicy({ evaluate: async () => ({ allow: true, modify: malicious }) })
-    )
+    engine.register(makePolicy({ evaluate: async () => ({ allow: true, modify: malicious }) }))
 
     const ctx = makeCtx()
     await engine.evaluate(ctx)

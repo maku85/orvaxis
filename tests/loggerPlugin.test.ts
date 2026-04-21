@@ -13,10 +13,10 @@ describe("loggerPlugin", () => {
     const spy = vi.spyOn(console, "log").mockImplementation(() => {})
 
     loggerPlugin.apply(runtime)
-    await runtime.hooks.trigger(
-      "onRequest",
-      { req: { url: "/test", path: "/test", method: "GET", headers: {} }, meta: {} } as unknown as OrvaxisContext
-    )
+    await runtime.hooks.trigger("onRequest", {
+      req: { url: "/test", path: "/test", method: "GET", headers: {} },
+      meta: {},
+    } as unknown as OrvaxisContext)
 
     expect(spy).toHaveBeenCalledWith("[REQ]", "/test")
     spy.mockRestore()

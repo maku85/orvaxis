@@ -35,9 +35,15 @@ describe("HookSystem", () => {
     const hooks = new HookSystem()
     const order: number[] = []
 
-    hooks.on("beforePipeline", async () => { order.push(1) })
-    hooks.on("beforePipeline", async () => { order.push(2) })
-    hooks.on("beforePipeline", async () => { order.push(3) })
+    hooks.on("beforePipeline", async () => {
+      order.push(1)
+    })
+    hooks.on("beforePipeline", async () => {
+      order.push(2)
+    })
+    hooks.on("beforePipeline", async () => {
+      order.push(3)
+    })
 
     await hooks.trigger("beforePipeline", emptyCtx)
     expect(order).toEqual([1, 2, 3])

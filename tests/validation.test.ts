@@ -74,16 +74,12 @@ describe("validateGroup", () => {
   })
 
   it("accepts prefix of exactly /", () => {
-    expect(() =>
-      validateGroup(makeGroup({ prefix: "/" }))
-    ).not.toThrow()
+    expect(() => validateGroup(makeGroup({ prefix: "/" }))).not.toThrow()
   })
 
   it("accepts empty route.path (matches prefix exactly)", () => {
     expect(() =>
-      validateGroup(
-        makeGroup({ routes: [{ method: "GET", path: "", handler: async () => {} }] })
-      )
+      validateGroup(makeGroup({ routes: [{ method: "GET", path: "", handler: async () => {} }] }))
     ).not.toThrow()
   })
 

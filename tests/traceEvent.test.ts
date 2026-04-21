@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
-import { traceEvent } from "../debug/traceEvent"
 import { Runtime } from "../core/Runtime"
+import { traceEvent } from "../debug/traceEvent"
 import type { OrvaxisRequest } from "../types"
 
 function makeReq(path = "/api/resource"): OrvaxisRequest {
