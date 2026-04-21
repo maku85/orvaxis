@@ -6,8 +6,14 @@ export function createExpressServer(app: Orvaxis): ServerAdapter {
   const server = express()
 
   server.use(async (req: Request, res: Response, _next: NextFunction) => {
+    const adapted = Object.assign(req, {
+      path: req.path,
+      method: req.method,
+      headers: req.headers,
+    }) as unknown as OrvaxisRequest
+
     try {
-      await app.handle(req as unknown as OrvaxisRequest, res as unknown as OrvaxisResponse)
+      await app.handle(adapted, res as unknown as OrvaxisResponse)
     } catch (err) {
       const e = err as { status?: number; message?: string }
       const status = e.status ?? 500

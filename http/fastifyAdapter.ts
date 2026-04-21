@@ -7,7 +7,11 @@ export function createFastifyServer(app: Orvaxis): ServerAdapter {
 
   fastify.all("/*", async (req, reply) => {
     const path = (req.url ?? "/").split("?")[0]
-    const adapted = Object.assign(req, { path }) as unknown as OrvaxisRequest
+    const adapted = Object.assign(req, {
+      path,
+      method: req.method ?? "GET",
+      headers: req.headers,
+    }) as unknown as OrvaxisRequest
 
     try {
       await app.handle(adapted, reply as unknown as OrvaxisResponse)

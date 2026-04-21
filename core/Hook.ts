@@ -16,7 +16,15 @@ export class HookSystem {
 
   async trigger(name: HookName, ctx: OrvaxisContext, error?: Error) {
     for (const fn of this.hooks[name]) {
-      await fn(ctx, error)
+      if (name === "onError") {
+        try {
+          await fn(ctx, error)
+        } catch (hookErr) {
+          console.error("[orvaxis] onError hook threw:", hookErr)
+        }
+      } else {
+        await fn(ctx, error)
+      }
     }
   }
 }

@@ -6,7 +6,7 @@ export const loggerPlugin = {
 
   apply(runtime: Runtime) {
     runtime.hooks.on("onRequest", (ctx: OrvaxisContext) => {
-      console.log("[REQ]", ctx.req.url)
+      console.log("[REQ]", ctx.req.path)
     })
 
     runtime.hooks.on("onError", (_ctx: OrvaxisContext, err?: Error) => {
