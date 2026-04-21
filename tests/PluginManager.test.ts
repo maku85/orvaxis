@@ -1,44 +1,66 @@
 import { describe, expect, it, vi } from "vitest"
+import { Runtime } from "../core/Runtime"
 import { PluginManager } from "../plugins/PluginManager"
-import type { Runtime } from "../core/Runtime"
+import type { Plugin } from "../plugins/PluginManager"
 
-const emptyRuntime = {} as unknown as Runtime
+function makePlugin(name: string, apply = vi.fn()): Plugin {
+  return { name, apply }
+}
 
 describe("PluginManager", () => {
-  it("applies a registered plugin", () => {
+  it("register adds the plugin to the list", () => {
     const manager = new PluginManager()
-    const apply = vi.fn()
+    const plugin = makePlugin("test")
 
-    manager.register({ name: "test", apply })
-    manager.applyAll(emptyRuntime)
+    manager.register(plugin)
 
-    expect(apply).toHaveBeenCalledOnce()
+    expect(manager.list()).toContain(plugin)
   })
 
-  it("passes the runtime instance to apply()", () => {
+  it("list returns plugins in registration order", () => {
     const manager = new PluginManager()
-    const runtime = { hooks: {} } as unknown as Runtime
-    const apply = vi.fn()
+    const first = makePlugin("first")
+    const second = makePlugin("second")
 
-    manager.register({ name: "p", apply })
-    manager.applyAll(runtime)
+    manager.register(first)
+    manager.register(second)
 
-    expect(apply).toHaveBeenCalledWith(runtime)
-  })
-
-  it("applies multiple plugins in registration order", () => {
-    const manager = new PluginManager()
-    const order: string[] = []
-
-    manager.register({ name: "first", apply: () => order.push("first") })
-    manager.register({ name: "second", apply: () => order.push("second") })
-    manager.applyAll(emptyRuntime)
-
-    expect(order).toEqual(["first", "second"])
+    expect(manager.list()).toEqual([first, second])
   })
 
   it("does nothing when no plugins are registered", () => {
     const manager = new PluginManager()
-    expect(() => manager.applyAll(emptyRuntime)).not.toThrow()
+    expect(manager.list()).toHaveLength(0)
+  })
+})
+
+describe("Runtime.addPlugin", () => {
+  it("applies the plugin immediately", () => {
+    const runtime = new Runtime()
+    const apply = vi.fn()
+
+    runtime.addPlugin({ name: "p", apply })
+
+    expect(apply).toHaveBeenCalledOnce()
+    expect(apply).toHaveBeenCalledWith(runtime)
+  })
+
+  it("tracks the plugin in runtime.plugins", () => {
+    const runtime = new Runtime()
+    const plugin = makePlugin("tracked", vi.fn())
+
+    runtime.addPlugin(plugin)
+
+    expect(runtime.plugins.list()).toContain(plugin)
+  })
+
+  it("applies multiple plugins in registration order", () => {
+    const runtime = new Runtime()
+    const order: string[] = []
+
+    runtime.addPlugin({ name: "a", apply: () => order.push("a") })
+    runtime.addPlugin({ name: "b", apply: () => order.push("b") })
+
+    expect(order).toEqual(["a", "b"])
   })
 })

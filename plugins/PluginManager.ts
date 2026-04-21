@@ -12,9 +12,7 @@ export class PluginManager {
     this.plugins.push(plugin)
   }
 
-  applyAll(runtime: Runtime) {
-    for (const plugin of this.plugins) {
-      plugin.apply(runtime)
-    }
+  list(): readonly Plugin[] {
+    return this.plugins
   }
 }

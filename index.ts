@@ -4,6 +4,7 @@ export { createExpressServer } from "./http/expressAdapter"
 export { createFastifyServer } from "./http/fastifyAdapter"
 export { Debugger } from "./core/Debugger"
 export { Runtime } from "./core/Runtime"
+export { type Plugin, PluginManager } from "./plugins/PluginManager"
 export type {
   ContextMeta,
   DebugEntry,

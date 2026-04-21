@@ -391,7 +391,6 @@ The core execution model is stable and functional.
 
 Current focus:
 
-- refining plugin/policy separation
 - improving trace and debug ergonomics
 
 Not production-ready.

@@ -1,4 +1,5 @@
 import type { Group, HookName, Middleware, OrvaxisContext, OrvaxisRequest, OrvaxisResponse, Policy } from "../types"
+import type { Plugin } from "../plugins/PluginManager"
 import { Runtime } from "./Runtime"
 
 export class Orvaxis {
@@ -28,8 +29,8 @@ export class Orvaxis {
     return this
   }
 
-  register(plugin: { name: string; apply: (runtime: Runtime) => void }) {
-    plugin.apply(this.runtime)
+  register(plugin: Plugin) {
+    this.runtime.addPlugin(plugin)
     return this
   }
 

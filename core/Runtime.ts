@@ -8,6 +8,7 @@ import { Pipeline } from "./Pipeline"
 import { PolicyEngine } from "./PolicyEngine"
 import { Router } from "./Router"
 import { Tracer } from "./Tracer"
+import { type Plugin, PluginManager } from "../plugins/PluginManager"
 
 function generateId(): string {
   return Date.now().toString(36) + Math.random().toString(36).slice(2)
@@ -17,8 +18,14 @@ export class Runtime {
   readonly debugger = new Debugger()
   readonly hooks = new HookSystem()
   readonly pipeline = new Pipeline()
+  readonly plugins = new PluginManager()
   readonly policies = new PolicyEngine()
   readonly router = new Router()
+
+  addPlugin(plugin: Plugin) {
+    this.plugins.register(plugin)
+    plugin.apply(this)
+  }
 
   async execute(req: OrvaxisRequest, res: OrvaxisResponse): Promise<OrvaxisContext> {
     validateRequest(req)
