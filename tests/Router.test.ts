@@ -139,5 +139,21 @@ describe("Router", () => {
       const match = router.match({ path: "/items/hello%20world", method: "GET" })
       expect(match?.params.name).toBe("hello world")
     })
+
+    it("throws 400 for malformed percent-encoding in param segment", () => {
+      const router = new Router()
+      router.group(makeGroup("/items", [{ method: "GET", path: "/:name" }]))
+
+      const err = (() => {
+        try {
+          router.match({ path: "/items/%ZZ", method: "GET" })
+        } catch (e) {
+          return e as { status: number; message: string }
+        }
+      })()
+
+      expect(err?.status).toBe(400)
+      expect(err?.message).toMatch(/percent-encoding/)
+    })
   })
 })

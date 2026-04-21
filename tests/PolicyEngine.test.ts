@@ -37,12 +37,23 @@ describe("PolicyEngine", () => {
     await expect(engine.evaluate(makeCtx())).rejects.toThrow("forbidden")
   })
 
-  it("throws with status 403 when a policy denies", async () => {
+  it("throws with status 403 when a policy denies without a custom status", async () => {
     const engine = new PolicyEngine()
     engine.register(makePolicy({ evaluate: async () => ({ allow: false, reason: "forbidden" }) }))
 
     const err = await engine.evaluate(makeCtx()).catch((e) => e)
     expect(err.status).toBe(403)
+  })
+
+  it("throws with the custom status provided by the policy", async () => {
+    const engine = new PolicyEngine()
+    engine.register(
+      makePolicy({ evaluate: async () => ({ allow: false, reason: "Unauthorized", status: 401 }) })
+    )
+
+    const err = await engine.evaluate(makeCtx()).catch((e) => e)
+    expect(err.status).toBe(401)
+    expect(err.message).toBe("Unauthorized")
   })
 
   it("uses policy name as fallback error message", async () => {

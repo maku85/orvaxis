@@ -88,12 +88,27 @@ describe("Orvaxis", () => {
     expect(applied).toHaveBeenCalledOnce()
   })
 
+  it("register() wires the plugin into the runtime lifecycle", async () => {
+    const app = new Orvaxis()
+    const fn = vi.fn()
+
+    app.register({
+      name: "hook-plugin",
+      apply: (runtime) => runtime.hooks.on("onRequest", fn),
+    })
+    app.group({ prefix: "/v1", routes: [{ method: "GET", path: "/x", handler: async () => {} }] })
+
+    await app.handle(makeReq("/v1/x"), {})
+    expect(fn).toHaveBeenCalledOnce()
+  })
+
   it("fluent methods return the Orvaxis instance", () => {
     const app = new Orvaxis()
     expect(app.use(async (_ctx, next) => next())).toBe(app)
     expect(app.on("onRequest", async () => {})).toBe(app)
     expect(app.group({ prefix: "/x", routes: [] })).toBe(app)
     expect(app.policy({ name: "p", evaluate: async () => ({ allow: true }) })).toBe(app)
+    expect(app.register({ name: "p", apply: () => {} })).toBe(app)
   })
 
   it("exposes the debugger from the runtime", () => {
