@@ -402,7 +402,6 @@ Not production-ready.
 
 Potential evolutions include:
 
-- generic typed context (`ctx.state` and `ctx.meta` via generics)
 - `AsyncLocalStorage` support for request-scoped context propagation
 - async job execution layer
 - distributed tracing integration

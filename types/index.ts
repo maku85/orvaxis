@@ -24,16 +24,22 @@ export interface OrvaxisResponse {
   [key: string]: unknown
 }
 
-export type Group = {
+export type Group<
+  TState extends Record<string, unknown> = Record<string, unknown>,
+  TMeta extends Record<string, unknown> = Record<never, never>,
+> = {
   prefix: string
-  middleware?: Middleware[]
-  policies?: Policy[]
-  routes: Route[]
+  middleware?: Middleware<TState, TMeta>[]
+  policies?: Policy<TState, TMeta>[]
+  routes: Route<TState, TMeta>[]
 }
 
 export type HookName = "onRequest" | "beforePipeline" | "afterPipeline" | "onError"
 
-export type Middleware = (ctx: OrvaxisContext, next: NextFunction) => Promise<void> | void
+export type Middleware<
+  TState extends Record<string, unknown> = Record<string, unknown>,
+  TMeta extends Record<string, unknown> = Record<never, never>,
+> = (ctx: OrvaxisContext<TState, TMeta>, next: NextFunction) => Promise<void> | void
 
 export type NextFunction = () => Promise<void> | void
 
@@ -51,20 +57,26 @@ export type ContextMeta = {
   [key: string]: unknown
 }
 
-export type OrvaxisContext = {
+export type OrvaxisContext<
+  TState extends Record<string, unknown> = Record<string, unknown>,
+  TMeta extends Record<string, unknown> = Record<never, never>,
+> = {
   req: OrvaxisRequest
   res: OrvaxisResponse
-  state: Record<string, unknown>
-  meta: ContextMeta
+  state: TState
+  meta: ContextMeta & TMeta
   logs: string[]
   error?: Error
 }
 
-export type Policy = {
+export type Policy<
+  TState extends Record<string, unknown> = Record<string, unknown>,
+  TMeta extends Record<string, unknown> = Record<never, never>,
+> = {
   name: string
   priority?: number
   scope?: PolicyScope
-  evaluate: (ctx: OrvaxisContext) => PolicyResult | Promise<PolicyResult>
+  evaluate: (ctx: OrvaxisContext<TState, TMeta>) => PolicyResult | Promise<PolicyResult>
 }
 
 export type PolicyResult =
@@ -76,12 +88,15 @@ export type PolicyScope = {
   method?: "GET" | "POST" | "PUT" | "DELETE" | "PATCH" | "HEAD" | "OPTIONS"
 }
 
-export type Route = {
+export type Route<
+  TState extends Record<string, unknown> = Record<string, unknown>,
+  TMeta extends Record<string, unknown> = Record<never, never>,
+> = {
   method: string
   path: string
-  handler: (ctx: OrvaxisContext) => Promise<void> | void
-  middleware?: Middleware[]
-  policies?: Policy[]
+  handler: (ctx: OrvaxisContext<TState, TMeta>) => Promise<void> | void
+  middleware?: Middleware<TState, TMeta>[]
+  policies?: Policy<TState, TMeta>[]
 }
 
 export type ServerAdapter = {
