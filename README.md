@@ -338,6 +338,7 @@ Any adapter needs to:
 ## Documentation
 
 - [Cookbook](docs/cookbook.md) — practical use cases with working examples (authentication, RBAC, rate limiting, tracing, feature flags, and more)
+- [Benchmarks](docs/benchmarks.md) — microbenchmark results for each execution layer, plus instructions to run them locally
 
 ---
 

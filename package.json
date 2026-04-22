@@ -20,7 +20,11 @@
     "check": "biome check .",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "bench": "vitest bench benchmarks/",
+    "bench:run": "vitest bench run benchmarks/",
+    "bench:save": "tsx benchmarks/compare.ts --save",
+    "bench:compare": "tsx benchmarks/compare.ts --compare"
   },
   "peerDependencies": {
     "express": "^4.19.0",
