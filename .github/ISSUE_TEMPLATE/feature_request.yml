@@ -1,0 +1,59 @@
+name: Feature Request
+description: Propose a new feature or improvement
+labels: ["enhancement", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Before opening a feature request, please check that there isn't already an open issue for it.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem / motivation
+      description: What problem does this feature solve? What are you trying to do that you currently can't?
+      placeholder: "I'm trying to... but..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed solution
+      description: Describe the feature you'd like, including any proposed API shape.
+      render: typescript
+      placeholder: |
+        // e.g. new Policy option, new hook, new adapter method...
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Have you found any workarounds or alternative approaches?
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      description: Which part of Orvaxis is most relevant?
+      options:
+        - Core runtime
+        - Policy engine
+        - Middleware / hooks
+        - Router
+        - HTTP adapters
+        - Plugins
+        - Observability / tracing
+        - Types / DX
+        - Documentation
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional context
+      description: Links, prior art, related issues, or anything else useful.

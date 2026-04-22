@@ -3,10 +3,32 @@
 </p>
 
 <h1 align="center">Orvaxis</h1>
+
 <p align="center">
-**Orvaxis** is a lightweight, policy-driven execution runtime for Node.js applications.
+  <a href="https://www.npmjs.com/package/orvaxis"><img src="https://img.shields.io/npm/v/orvaxis" alt="npm version"/></a>
+  <a href="https://github.com/maku85/orvaxis/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/maku85/orvaxis/ci.yml?label=CI" alt="CI"/></a>
+  <a href="LICENSE"><img src="https://img.shields.io/npm/l/orvaxis" alt="license"/></a>
+  <a href="https://www.npmjs.com/package/orvaxis"><img src="https://img.shields.io/node/v/orvaxis" alt="node version"/></a>
 </p>
 
+<p align="center">
+  Lightweight, policy-driven execution runtime for Node.js applications.
+</p>
+
+---
+
+## Installation
+
+```bash
+npm install orvaxis
+```
+
+Install the HTTP adapter peer dependency you intend to use:
+
+```bash
+npm install express   # Express adapter
+npm install fastify   # Fastify adapter
+```
 
 It is not a framework in the traditional sense.
 It is an **execution orchestration layer** designed to control, observe, and structure backend request flows in a predictable and composable way.
@@ -166,19 +188,31 @@ Hooks do not modify flow; they observe and react.
 
 Plugins extend runtime capabilities by registering hooks, middleware, or policies.
 
+Orvaxis ships with a built-in logger plugin:
+
+```ts
+import { Orvaxis, loggerPlugin } from "orvaxis"
+
+const app = new Orvaxis()
+app.register(loggerPlugin)
+```
+
+To write a custom plugin:
+
 ```ts
 import type { Plugin } from "orvaxis"
 
-export const loggerPlugin: Plugin = {
-  name: "logger",
+const metricsPlugin: Plugin = {
+  name: "metrics",
   apply(runtime) {
-    runtime.hooks.on("onRequest", (ctx) => {
-      console.log("[REQ]", ctx.req.path)
+    runtime.hooks.on("afterPipeline", (ctx) => {
+      const duration = ctx.meta.trace?.endTime - ctx.meta.trace?.startTime
+      recordMetric("request.duration", duration)
     })
   }
 }
 
-app.register(loggerPlugin)
+app.register(metricsPlugin)
 ```
 
 Registered plugins are tracked in `runtime.plugins` and applied immediately on registration. `PluginManager` is also exported for custom orchestration.
@@ -479,6 +513,12 @@ Graceful shutdown is supported via `server.close()` on the `ServerAdapter`.
 - **Test harness** — a `testRequest(app, { path, method, headers, body })` helper that runs the full execution cycle without an HTTP server, building on the existing `createMockResponse`
 - **Route introspection** — an `app.routes()` API to list all registered routes programmatically, enabling OpenAPI generation and admin tooling
 - **Schema validation layer** — a first-class `route.schema` interface (Zod / TypeBox) for declarative body, params, and header validation, consistent with the policy-driven approach
+
+## Contributing
+
+Contributions are welcome. Please read [CONTRIBUTING.md](CONTRIBUTING.md) for setup instructions, code conventions, and the PR process. To report a bug or propose a feature, use the [GitHub issue templates](https://github.com/maku85/orvaxis/issues/new/choose).
+
+---
 
 ## License
 

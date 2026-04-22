@@ -24,7 +24,10 @@
     "bench": "vitest bench benchmarks/",
     "bench:run": "vitest bench run benchmarks/",
     "bench:save": "tsx benchmarks/compare.ts --save",
-    "bench:compare": "tsx benchmarks/compare.ts --compare"
+    "bench:compare": "tsx benchmarks/compare.ts --compare",
+    "prepublishOnly": "npm run check && tsc --noEmit && npm run test && npm run build",
+    "release": "npm publish",
+    "release:alpha": "npm publish --tag alpha"
   },
   "peerDependencies": {
     "express": "^4.19.0",
