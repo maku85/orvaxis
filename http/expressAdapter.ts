@@ -5,15 +5,18 @@ import type { OrvaxisRequest, OrvaxisResponse, ServerAdapter } from "../types"
 function wrapExpressResponse(res: Response): OrvaxisResponse {
   const wrapped: OrvaxisResponse = {
     statusCode: 200,
+    sent: false,
     status(code) {
       wrapped.statusCode = code
       res.status(code)
       return wrapped
     },
     json(body) {
+      wrapped.sent = true
       res.json(body)
     },
     send(body) {
+      wrapped.sent = true
       res.send(body as string)
     },
     setHeader(name, value) {
@@ -36,21 +39,30 @@ export function createExpressServer(app: Orvaxis, server: Application = express(
     try {
       await app.handle(adapted, wrapped)
     } catch (err) {
-      const e = err as { status?: number; message?: string }
-      wrapped.status(e.status ?? 500).json({ error: e.message ?? "Internal Server Error" })
+      if (!wrapped.sent) {
+        const e = err as { status?: number; message?: string }
+        wrapped.status(e.status ?? 500).json({ error: e.message ?? "Internal Server Error" })
+      }
     }
   })
 
+  let httpServer: ReturnType<typeof server.listen> | null = null
+
   return {
-    listen: (port: number) =>
+    listen: (port: number, onListen?: (port: number) => void) =>
       new Promise<void>((resolve, reject) => {
-        server
+        httpServer = server
           .listen(port)
           .once("listening", () => {
-            console.log(`Orvaxis running on ${port}`)
+            onListen?.(port)
             resolve()
           })
           .once("error", reject)
+      }),
+    close: () =>
+      new Promise<void>((resolve, reject) => {
+        if (!httpServer) return resolve()
+        httpServer.close((err) => (err ? reject(err) : resolve()))
       }),
   }
 }

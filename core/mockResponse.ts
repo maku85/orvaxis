@@ -8,6 +8,7 @@ export type MockResponse = OrvaxisResponse & {
 export function createMockResponse(): MockResponse {
   const mock: MockResponse = {
     statusCode: 200,
+    sent: false,
     body: undefined,
     sentHeaders: {},
     status(code) {
@@ -15,9 +16,11 @@ export function createMockResponse(): MockResponse {
       return mock
     },
     json(body) {
+      mock.sent = true
       mock.body = body
     },
     send(body) {
+      mock.sent = true
       mock.body = body
     },
     setHeader(name, value) {

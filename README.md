@@ -331,7 +331,7 @@ Install only the framework you intend to use — both peer dependencies are opti
 Any adapter needs to:
 1. Ensure `req.path` is a plain path string (no query string)
 2. Call `app.handle(req, res)` and catch thrown errors
-3. Return `{ listen(port) }` to satisfy the `ServerAdapter` interface
+3. Return `{ listen(port, onListen?) }` to satisfy the `ServerAdapter` interface
 
 ---
 
@@ -469,21 +469,27 @@ It favors:
 
 ## Current Status
 
-The core execution model is stable and functional.
+The core execution model is stable, tested, and covered by 156 passing tests.
 
-Not production-ready.
+Not yet recommended for production. Known gaps before production use:
+
+| Gap | Detail |
+|-----|--------|
+| **No request timeout** | Handlers that hang are never terminated. Wrap `app.handle()` in a timeout at the adapter level if needed. |
+| **API stability** | Pre-1.0 — breaking changes may occur between minor versions. |
+
+Graceful shutdown is supported via `server.close()` on the `ServerAdapter`.
 
 ---
 
 ## Future Directions
 
-Potential evolutions include:
-
-- async job execution layer
-- distributed tracing integration
-- visual execution inspector
-- advanced plugin lifecycle hooks
-- route-level execution graphs
+- **OpenTelemetry export** — the trace system already produces structured spans; a plugin exporting to OTLP/Zipkin is a natural next step
+- **`beforeHandler` / `afterHandler` hooks** — finer-grained lifecycle events to wrap only the route handler, independent from the global pipeline
+- **Response body interception** — a middleware-level API to transform or wrap outgoing response bodies before they are sent
+- **Test harness** — a `testRequest(app, { path, method, headers, body })` helper that runs the full execution cycle without an HTTP server, building on the existing `createMockResponse`
+- **Route introspection** — an `app.routes()` API to list all registered routes programmatically, enabling OpenAPI generation and admin tooling
+- **Schema validation layer** — a first-class `route.schema` interface (Zod / TypeBox) for declarative body, params, and header validation, consistent with the policy-driven approach
 
 ## License
 

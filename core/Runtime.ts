@@ -19,7 +19,7 @@ function mergeSafe(target: Record<string, unknown>, source: Record<string, unkno
 }
 
 function generateId(): string {
-  return Date.now().toString(36) + Math.random().toString(36).slice(2)
+  return crypto.randomUUID()
 }
 
 export class Runtime {
@@ -36,7 +36,6 @@ export class Runtime {
   }
 
   async execute(req: OrvaxisRequest, res: OrvaxisResponse): Promise<OrvaxisContext> {
-    validateRequest(req)
     const ctx = createContext(req, res)
     const tracer = new Tracer(req.id ?? generateId())
     ctx.meta.tracer = tracer
@@ -45,6 +44,8 @@ export class Runtime {
       this.debugger.log(ctx, "REQUEST_START")
 
       try {
+        validateRequest(req)
+
         const match = this.router.match(req)
         if (!match) {
           throw Object.assign(new Error("Not Found"), { status: 404 })

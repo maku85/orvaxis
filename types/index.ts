@@ -22,6 +22,7 @@ export interface OrvaxisRequest {
 
 export interface OrvaxisResponse {
   statusCode: number
+  sent: boolean
   status(code: number): OrvaxisResponse
   json(body: unknown): void
   send(body: unknown): void
@@ -104,7 +105,8 @@ export type Route<
 }
 
 export type ServerAdapter = {
-  listen: (port: number) => Promise<void>
+  listen: (port: number, onListen?: (port: number) => void) => Promise<void>
+  close: () => Promise<void>
 }
 
 export type Trace = {

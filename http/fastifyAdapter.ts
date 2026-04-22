@@ -5,15 +5,18 @@ import type { OrvaxisRequest, OrvaxisResponse, ServerAdapter } from "../types"
 function wrapFastifyResponse(reply: FastifyReply): OrvaxisResponse {
   const wrapped: OrvaxisResponse = {
     statusCode: 200,
+    sent: false,
     status(code) {
       wrapped.statusCode = code
       reply.status(code)
       return wrapped
     },
     json(body) {
+      wrapped.sent = true
       reply.send(body)
     },
     send(body) {
+      wrapped.sent = true
       reply.send(body)
     },
     setHeader(name, value) {
@@ -37,15 +40,18 @@ export function createFastifyServer(app: Orvaxis, fastify = Fastify()): ServerAd
     try {
       await app.handle(adapted, wrapped)
     } catch (err) {
-      const e = err as { status?: number; message?: string }
-      wrapped.status(e.status ?? 500).send({ error: e.message ?? "Internal Server Error" })
+      if (!wrapped.sent) {
+        const e = err as { status?: number; message?: string }
+        wrapped.status(e.status ?? 500).send({ error: e.message ?? "Internal Server Error" })
+      }
     }
   })
 
   return {
-    listen: async (port: number) => {
+    listen: async (port: number, onListen?: (port: number) => void) => {
       await fastify.listen({ port })
-      console.log(`Orvaxis running on ${port}`)
+      onListen?.(port)
     },
+    close: () => fastify.close(),
   }
 }
