@@ -36,6 +36,6 @@
     }
   },
   "files": {
-    "ignore": ["dist", "node_modules", "coverage", ".claude", "docs"]
+    "ignore": ["dist", "node_modules", "coverage", ".claude", "docs", ".vemora", "benchmarks"]
   }
 }
