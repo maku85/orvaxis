@@ -1,11 +1,12 @@
 import { describe, expect, it } from "vitest"
 import { Debugger } from "../core/Debugger"
+import { createMockResponse } from "../core/mockResponse"
 import type { OrvaxisContext } from "../types"
 
 function makeCtx(): OrvaxisContext {
   return {
     req: { path: "/", method: "GET", headers: {} },
-    res: {},
+    res: createMockResponse(),
     state: {},
     meta: {},
     logs: [],

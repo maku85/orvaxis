@@ -1,14 +1,15 @@
 import { describe, expect, it } from "vitest"
 import { createContext } from "../core/Context"
-import type { OrvaxisRequest, OrvaxisResponse } from "../types"
+import { createMockResponse } from "../core/mockResponse"
+import type { OrvaxisRequest } from "../types"
 
 const emptyReq: OrvaxisRequest = { path: "/", method: "GET", headers: {} }
-const emptyRes: OrvaxisResponse = {}
+const emptyRes = createMockResponse()
 
 describe("createContext", () => {
   it("sets req and res from arguments", () => {
     const req: OrvaxisRequest = { path: "/test", method: "GET", headers: {} }
-    const res: OrvaxisResponse = { send: () => {} }
+    const res = createMockResponse()
 
     const ctx = createContext(req, res)
 

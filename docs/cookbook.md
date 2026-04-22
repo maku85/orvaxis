@@ -209,7 +209,7 @@ app.on("onRequest", (ctx) => {
 
 app.on("afterPipeline", (ctx) => {
   const ms = Date.now() - (ctx.meta.startedAt as number)
-  console.log(`[OK]  ${ctx.req.method} ${ctx.req.path} ${ms}ms — ${ctx.meta.trace?.requestId}`)
+  console.log(`[OK]  ${ctx.req.method} ${ctx.req.path} ${ctx.res.statusCode} ${ms}ms — ${ctx.meta.trace?.requestId}`)
 })
 
 app.on("onError", (ctx, err) => {
@@ -219,7 +219,7 @@ app.on("onError", (ctx, err) => {
 })
 ```
 
-**Limitation:** the runtime does not track HTTP response status codes for successful responses, because `OrvaxisResponse` is framework-agnostic and opaque. If you need response status logging, set it explicitly in handlers: `ctx.meta.status = 201` and read it in `afterPipeline`.
+`ctx.res.statusCode` reflects the last value set via `ctx.res.status(code)`. Defaults to `200` if `status()` was never called.
 
 ---
 
@@ -382,8 +382,7 @@ async function getCurrentUser() {
 
 | Area | Detail |
 |------|--------|
-| **Response status** | The runtime does not track HTTP response status codes. Set `ctx.meta.status` manually in handlers if you need it in hooks. |
 | **Body parsing** | No built-in body parsing. Use `createExpressServer(app, expressApp)` with `express.json()` pre-registered (see [use case 7](#7-group-level-middleware-body-parsing-correlation-ids)). |
 | **Rate limiting** | No built-in counter/storage. Implement using any in-memory map or Redis client inside a policy. |
 | **Policy scope `path: string`** | Exact match only. Use a `RegExp` (e.g. `/^\/admin/`) to match subtree paths. |
-| **Response interception** | Handlers write directly to the framework response (`ctx.res.json()`, `ctx.res.send()`). Orvaxis does not intercept or transform responses. |
+| **Response body interception** | Orvaxis does not intercept or transform outgoing response bodies. Handlers write the body directly via `ctx.res.json()` / `ctx.res.send()`. Response headers, however, can be set from any middleware via `ctx.res.setHeader()`. |

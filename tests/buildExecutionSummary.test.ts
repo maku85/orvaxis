@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest"
+import { createMockResponse } from "../core/mockResponse"
 import { buildExecutionSummary } from "../debug/buildExecutionSummary"
 import type { DebugEntry, OrvaxisContext, Trace, TraceEvent } from "../types"
 
@@ -13,7 +14,7 @@ function makeCtx(
 ): OrvaxisContext {
   const ctx: OrvaxisContext = {
     req: { path: "/", method: "GET", headers: {} },
-    res: {},
+    res: createMockResponse(),
     state: {},
     meta: {},
     logs: [],

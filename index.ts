@@ -1,4 +1,5 @@
 export { Orvaxis } from "./core/Orvaxis"
+export { createMockResponse, type MockResponse } from "./core/mockResponse"
 export { getContext } from "./core/contextStore"
 export { createExpressServer } from "./http/expressAdapter"
 export { createFastifyServer } from "./http/fastifyAdapter"

@@ -1,11 +1,12 @@
 import { describe, expect, it } from "vitest"
 import { PolicyEngine } from "../core/PolicyEngine"
+import { createMockResponse } from "../core/mockResponse"
 import type { OrvaxisContext, Policy } from "../types"
 
 function makeCtx(path = "/api/test", method = "GET"): OrvaxisContext {
   return {
     req: { path, method, headers: {} },
-    res: {},
+    res: createMockResponse(),
     state: {},
     meta: {},
     logs: [],

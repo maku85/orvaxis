@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest"
 import { Runtime } from "../core/Runtime"
 import { getContext } from "../core/contextStore"
+import { createMockResponse } from "../core/mockResponse"
 import type { OrvaxisRequest } from "../types"
 
 function makeReq(path = "/api/resource"): OrvaxisRequest {
@@ -38,7 +39,7 @@ describe("getContext", () => {
       ],
     })
 
-    const ctx = await runtime.execute(makeReq("/ctx/check"), {})
+    const ctx = await runtime.execute(makeReq("/ctx/check"), createMockResponse())
     expect(captured).toBe(ctx)
   })
 
@@ -55,7 +56,7 @@ describe("getContext", () => {
       routes: [{ method: "GET", path: "/resource", handler: async () => {} }],
     })
 
-    const ctx = await runtime.execute(makeReq(), {})
+    const ctx = await runtime.execute(makeReq(), createMockResponse())
     expect(captured).toBe(ctx)
   })
 
@@ -67,7 +68,7 @@ describe("getContext", () => {
       captured = getContext()
     })
 
-    const ctx = await runtime.execute(makeReq(), {})
+    const ctx = await runtime.execute(makeReq(), createMockResponse())
     expect(captured).toBe(ctx)
   })
 
@@ -92,8 +93,8 @@ describe("getContext", () => {
     })
 
     await Promise.all([
-      runtime.execute({ path: "/items/a", method: "GET", headers: {} }, {}),
-      runtime.execute({ path: "/items/b", method: "GET", headers: {} }, {}),
+      runtime.execute({ path: "/items/a", method: "GET", headers: {} }, createMockResponse()),
+      runtime.execute({ path: "/items/b", method: "GET", headers: {} }, createMockResponse()),
     ])
 
     // Each request must see its own context, not the other's
@@ -105,7 +106,7 @@ describe("getContext", () => {
 
   it("returns undefined again after the request scope ends", async () => {
     const runtime = makeRuntime()
-    await runtime.execute(makeReq(), {})
+    await runtime.execute(makeReq(), createMockResponse())
     expect(getContext()).toBeUndefined()
   })
 })

@@ -21,7 +21,11 @@ export interface OrvaxisRequest {
 }
 
 export interface OrvaxisResponse {
-  [key: string]: unknown
+  statusCode: number
+  status(code: number): OrvaxisResponse
+  json(body: unknown): void
+  send(body: unknown): void
+  setHeader(name: string, value: string | string[]): OrvaxisResponse
 }
 
 export type Group<

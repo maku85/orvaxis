@@ -1,9 +1,16 @@
 import { describe, expect, it, vi } from "vitest"
 import { Pipeline } from "../core/Pipeline"
+import { createMockResponse } from "../core/mockResponse"
 import type { NextFunction, OrvaxisContext } from "../types"
 
 function makeCtx(): OrvaxisContext {
-  return { req: { path: "", method: "", headers: {} }, res: {}, state: {}, meta: {}, logs: [] }
+  return {
+    req: { path: "", method: "", headers: {} },
+    res: createMockResponse(),
+    state: {},
+    meta: {},
+    logs: [],
+  }
 }
 
 describe("Pipeline", () => {

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest"
 import { Runtime } from "../core/Runtime"
+import { createMockResponse } from "../core/mockResponse"
 import { traceEvent } from "../debug/traceEvent"
 import type { OrvaxisRequest } from "../types"
 
@@ -28,7 +29,7 @@ describe("traceEvent", () => {
       ],
     })
 
-    const ctx = await runtime.execute(makeReq(), {})
+    const ctx = await runtime.execute(makeReq(), createMockResponse())
     const events = ctx.meta.trace?.events ?? []
     const custom = events.find((e) => e.type === "CUSTOM:db_query")
 
@@ -50,7 +51,7 @@ describe("traceEvent", () => {
       routes: [{ method: "GET", path: "/resource", handler: async () => {} }],
     })
 
-    const ctx = await runtime.execute(makeReq(), {})
+    const ctx = await runtime.execute(makeReq(), createMockResponse())
     const types = (ctx.meta.trace?.events ?? []).map((e) => e.type)
 
     expect(types).toContain("MW:before")
@@ -64,7 +65,7 @@ describe("traceEvent", () => {
       routes: [{ method: "GET", path: "/resource", handler: async () => {} }],
     })
 
-    const ctx = await runtime.execute(makeReq(), {})
+    const ctx = await runtime.execute(makeReq(), createMockResponse())
     const countBefore = ctx.meta.trace?.events.length ?? 0
 
     traceEvent("LATE_EVENT")

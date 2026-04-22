@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest"
 import { Runtime } from "../core/Runtime"
+import { createMockResponse } from "../core/mockResponse"
 import type { Group, Middleware, OrvaxisContext, OrvaxisRequest, Policy } from "../types"
 
 function makeReq(path: string, method = "GET"): OrvaxisRequest {
@@ -7,7 +8,7 @@ function makeReq(path: string, method = "GET"): OrvaxisRequest {
 }
 
 function makeRes() {
-  return {}
+  return createMockResponse()
 }
 
 function makeGroup(
