@@ -15,22 +15,9 @@ It is an **execution orchestration layer** designed to control, observe, and str
 
 ## Why Orvaxis
 
-Modern backend frameworks tend to fall into one of two extremes:
+Minimal frameworks like Express are flexible but unstructured at scale. Opinionated frameworks like NestJS are structured but heavy. Orvaxis is a third option: a **runtime execution layer** that brings explicit ordering, declarative control, and built-in observability without replacing your framework.
 
-- **Minimal frameworks (Express/Fastify)** → flexible but unstructured at scale
-- **Opinionated frameworks (NestJS)** → structured but heavy and tightly coupled
-
-Orvaxis explores a different approach:
-
-> A **runtime execution engine** that separates concerns into explicit layers:
-- control (policies)
-- flow (middleware)
-- lifecycle (hooks)
-- composition (plugins)
-- observability (tracing & debugging)
-- structure (routing & grouping)
-
-The goal is not to replace existing frameworks, but to provide a **lower-level orchestration layer** that makes backend execution predictable and inspectable.
+[See a concrete side-by-side comparison →](docs/why-orvaxis.md)
 
 ---
 
@@ -337,6 +324,7 @@ Any adapter needs to:
 
 ## Documentation
 
+- [Why Orvaxis](docs/why-orvaxis.md) — side-by-side comparison with plain Express: auth, rate limiting, and observability with and without Orvaxis
 - [Cookbook](docs/cookbook.md) — practical use cases with working examples (authentication, RBAC, rate limiting, tracing, feature flags, and more)
 - [Benchmarks](docs/benchmarks.md) — microbenchmark results for each execution layer, plus instructions to run them locally
 
