@@ -19,7 +19,7 @@ export type TestResponse = {
 
 export async function testRequest(
   app: { handle(req: OrvaxisRequest, res: OrvaxisResponse): Promise<OrvaxisContext> },
-  init: TestRequestInit,
+  init: TestRequestInit
 ): Promise<TestResponse> {
   const { path, method = "GET", headers = {}, ...rest } = init
   const req: OrvaxisRequest = { path, method, headers, ...rest }

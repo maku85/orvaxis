@@ -103,9 +103,7 @@ describe("validateGroup", () => {
     expect(() =>
       validateGroup(
         makeGroup({
-          routes: [
-            { method: "GET", path: 42 as unknown as string, handler: async () => {} },
-          ],
+          routes: [{ method: "GET", path: 42 as unknown as string, handler: async () => {} }],
         })
       )
     ).toThrow(/route.path must be a string/)

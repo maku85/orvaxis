@@ -51,7 +51,7 @@ describe("schemaValidationPlugin", () => {
           {
             method: "POST",
             path: "/items",
-            schema: { body: coerce((d) => ({ ...( d as object), extra: true })) },
+            schema: { body: coerce((d) => ({ ...(d as object), extra: true })) },
             handler: async (ctx) => {
               seen = ctx.req.body
               ctx.res.json({ ok: true })
@@ -140,7 +140,7 @@ describe("schemaValidationPlugin", () => {
           {
             method: "GET",
             path: "/search",
-            schema: { query: coerce((d) => ({ ...( d as object), page: 1 })) },
+            schema: { query: coerce((d) => ({ ...(d as object), page: 1 })) },
             handler: async (ctx) => {
               seen = ctx.req.query
               ctx.res.json({ ok: true })
