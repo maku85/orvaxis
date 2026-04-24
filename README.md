@@ -393,6 +393,33 @@ const notFound = await testRequest(app, { path: "/api/missing" })
 
 `TestRequestInit` accepts `path`, `method` (defaults to `"GET"`), `headers`, `id`, and any additional field (e.g. `body`) which is forwarded directly onto `req`. `testRequest` never throws — errors thrown during execution are captured in `result.error` and their `.status` property (if present) is reflected in `result.status`.
 
+### Route introspection
+
+`app.routes()` returns the flat list of all registered routes as `RouteInfo[]`, useful for OpenAPI generation and admin tooling:
+
+```ts
+import { Orvaxis } from "orvaxis"
+import type { RouteInfo } from "orvaxis"
+
+const app = new Orvaxis()
+
+app.group({
+  prefix: "/api",
+  routes: [
+    { method: "GET",  path: "/users",     handler: async () => {} },
+    { method: "POST", path: "/users",     handler: async () => {} },
+    { method: "GET",  path: "/users/:id", handler: async () => {} },
+  ],
+})
+
+const routes: RouteInfo[] = app.routes()
+// [
+//   { method: "GET",  path: "/api/users",     prefix: "/api" },
+//   { method: "POST", path: "/api/users",     prefix: "/api" },
+//   { method: "GET",  path: "/api/users/:id", prefix: "/api" },
+// ]
+```
+
 ---
 
 ## Documentation
@@ -474,7 +501,7 @@ orvaxis/
   core/
     Orvaxis.ts               public-facing class
     Runtime.ts               execution engine
-    Router.ts                route matching and groups
+    Router.ts                route matching, groups, and introspection (routes())
     Pipeline.ts              global middleware chain
     PolicyEngine.ts          policy evaluation
     Hook.ts                  hook system
@@ -550,7 +577,6 @@ Graceful shutdown is supported via `server.close()` on the `ServerAdapter`.
 - **OpenTelemetry export** — the trace system already produces structured spans; a plugin exporting to OTLP/Zipkin is a natural next step
 - **`beforeHandler` / `afterHandler` hooks** — finer-grained lifecycle events to wrap only the route handler, independent from the global pipeline
 - **Response body interception** — a middleware-level API to transform or wrap outgoing response bodies before they are sent
-- **Route introspection** — an `app.routes()` API to list all registered routes programmatically, enabling OpenAPI generation and admin tooling
 - **Schema validation layer** — a first-class `route.schema` interface (Zod / TypeBox) for declarative body, params, and header validation, consistent with the policy-driven approach
 
 ## Contributing

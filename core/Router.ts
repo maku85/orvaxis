@@ -1,4 +1,4 @@
-import type { Group, RouteMatch } from "../types"
+import type { Group, RouteInfo, RouteMatch } from "../types"
 import { validateGroup } from "./validation"
 
 function decodeSafe(segment: string): string {
@@ -34,6 +34,22 @@ export class Router {
   group(group: Group) {
     validateGroup(group)
     this.groups.push(group)
+  }
+
+  routes(): RouteInfo[] {
+    const result: RouteInfo[] = []
+    for (const group of this.groups) {
+      for (const route of group.routes) {
+        const path =
+          group.prefix === "/"
+            ? route.path || "/"
+            : route.path
+              ? group.prefix + route.path
+              : group.prefix
+        result.push({ method: route.method, path, prefix: group.prefix })
+      }
+    }
+    return result
   }
 
   match(req: { path: string; method: string }): RouteMatch | null {

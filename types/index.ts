@@ -48,6 +48,12 @@ export type Middleware<
 
 export type NextFunction = () => Promise<void> | void
 
+export type RouteInfo = {
+  method: string
+  path: string
+  prefix: string
+}
+
 export type RouteMatch = {
   route: Route
   group: Group

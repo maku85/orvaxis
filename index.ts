@@ -26,6 +26,7 @@ export type {
   PolicyResult,
   PolicyScope,
   Route,
+  RouteInfo,
   RouteMatch,
   ServerAdapter,
   Trace,

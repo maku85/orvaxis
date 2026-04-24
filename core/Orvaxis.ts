@@ -42,6 +42,10 @@ export class Orvaxis {
     return this
   }
 
+  routes() {
+    return this.runtime.router.routes()
+  }
+
   async handle(req: OrvaxisRequest, res: OrvaxisResponse) {
     return this.runtime.execute(req, res)
   }
