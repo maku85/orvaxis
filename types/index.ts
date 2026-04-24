@@ -105,6 +105,17 @@ export type PolicyScope = {
   method?: "GET" | "POST" | "PUT" | "DELETE" | "PATCH" | "HEAD" | "OPTIONS"
 }
 
+export type SchemaField = {
+  parse(data: unknown): unknown
+}
+
+export type RouteSchema = {
+  body?: SchemaField
+  params?: SchemaField
+  query?: SchemaField
+  headers?: SchemaField
+}
+
 export type Route<
   TState extends Record<string, unknown> = Record<string, unknown>,
   TMeta extends Record<string, unknown> = Record<never, never>,
@@ -114,6 +125,7 @@ export type Route<
   handler: (ctx: OrvaxisContext<TState, TMeta>) => Promise<void> | void
   middleware?: Middleware<TState, TMeta>[]
   policies?: Policy<TState, TMeta>[]
+  schema?: RouteSchema
 }
 
 export type ServerAdapter = {

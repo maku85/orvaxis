@@ -192,7 +192,9 @@ Hooks do not modify flow; they observe and react.
 
 Plugins extend runtime capabilities by registering hooks, middleware, or policies.
 
-Orvaxis ships with a built-in logger plugin:
+Orvaxis ships with two built-in plugins:
+
+**`loggerPlugin`** — logs incoming requests and unhandled errors to the console:
 
 ```ts
 import { Orvaxis, loggerPlugin } from "orvaxis"
@@ -200,6 +202,35 @@ import { Orvaxis, loggerPlugin } from "orvaxis"
 const app = new Orvaxis()
 app.register(loggerPlugin)
 ```
+
+**`schemaValidationPlugin`** — validates `body`, `params`, `query`, and `headers` against a `route.schema` before the handler runs. Any library whose objects expose a `.parse(data)` method works (Zod, TypeBox, custom validators):
+
+```ts
+import { Orvaxis, schemaValidationPlugin } from "orvaxis"
+import { z } from "zod"
+
+const app = new Orvaxis()
+app.register(schemaValidationPlugin)
+
+app.group({
+  prefix: "/api",
+  routes: [
+    {
+      method: "POST",
+      path: "/users",
+      schema: {
+        body: z.object({ name: z.string(), age: z.number().int().min(0) }),
+      },
+      handler: async (ctx) => {
+        // ctx.req.body is the parsed, coerced value
+        ctx.res.status(201).json(ctx.req.body)
+      },
+    },
+  ],
+})
+```
+
+On validation failure the plugin throws an error with `status: 422`, a `field` property indicating which part failed (`"body"`, `"params"`, `"query"`, or `"headers"`), and the original validator error as `cause`. The plugin is opt-in — routes with a `schema` field are silently ignored unless `schemaValidationPlugin` is registered.
 
 To write a custom plugin:
 
@@ -531,6 +562,7 @@ orvaxis/
   plugins/
     PluginManager.ts         plugin registry (Plugin type + PluginManager class)
     loggerPlugin.ts          built-in logger plugin
+    schemaValidationPlugin.ts body/params/query/headers validation via route.schema
 
   types/
     index.ts                 all shared types
@@ -582,8 +614,6 @@ Graceful shutdown is supported via `server.close()` on the `ServerAdapter`.
 
 - **OpenTelemetry export** — the trace system already produces structured spans; a plugin exporting to OTLP/Zipkin is a natural next step
 - **Response body interception** — a middleware-level API to transform or wrap outgoing response bodies before they are sent
-- **Schema validation layer** — a first-class `route.schema` interface (Zod / TypeBox) for declarative body, params, and header validation, consistent with the policy-driven approach
-
 ## Contributing
 
 Contributions are welcome. Please read [CONTRIBUTING.md](CONTRIBUTING.md) for setup instructions, code conventions, and the PR process. To report a bug or propose a feature, use the [GitHub issue templates](https://github.com/maku85/orvaxis/issues/new/choose).

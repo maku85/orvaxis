@@ -8,6 +8,7 @@ export { Debugger } from "./core/Debugger"
 export { Runtime } from "./core/Runtime"
 export { type Plugin, PluginManager } from "./plugins/PluginManager"
 export { loggerPlugin } from "./plugins/loggerPlugin"
+export { schemaValidationPlugin } from "./plugins/schemaValidationPlugin"
 export { buildExecutionSummary, type ExecutionSummary } from "./debug/buildExecutionSummary"
 export { traceEvent } from "./debug/traceEvent"
 export { traceMiddleware } from "./middleware/traceMiddleware"
@@ -27,6 +28,8 @@ export type {
   PolicyScope,
   Route,
   RouteInfo,
+  RouteSchema,
+  SchemaField,
   RouteMatch,
   ServerAdapter,
   Trace,
