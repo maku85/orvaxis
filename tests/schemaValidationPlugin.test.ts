@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest"
 import { Orvaxis } from "../core/Orvaxis"
-import { schemaValidationPlugin } from "../plugins/schemaValidationPlugin"
 import { testRequest } from "../core/testHarness"
+import { schemaValidationPlugin } from "../plugins/schemaValidationPlugin"
 import type { SchemaField } from "../types"
 
 // Minimal schema helpers — no external library required

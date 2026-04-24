@@ -1,6 +1,6 @@
 import { z } from "zod"
-import { Orvaxis, schemaValidationPlugin } from "../index"
 import { createExpressServer } from "../http/expressAdapter"
+import { Orvaxis, schemaValidationPlugin } from "../index"
 
 const app = new Orvaxis()
 app.register(schemaValidationPlugin)
