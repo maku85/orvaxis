@@ -98,4 +98,16 @@ describe("validateGroup", () => {
       )
     ).toThrow(/method/)
   })
+
+  it("throws when route.path is not a string", () => {
+    expect(() =>
+      validateGroup(
+        makeGroup({
+          routes: [
+            { method: "GET", path: 42 as unknown as string, handler: async () => {} },
+          ],
+        })
+      )
+    ).toThrow(/route.path must be a string/)
+  })
 })

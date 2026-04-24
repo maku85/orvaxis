@@ -158,6 +158,14 @@ describe("Router", () => {
       expect(match?.params.name).toBe("hello world")
     })
 
+    it("returns null when a static segment in a mixed pattern does not match", () => {
+      const router = new Router()
+      router.group(makeGroup("/users", [{ method: "GET", path: "/:id/posts" }]))
+
+      // segment count matches (3 parts each) but the static "posts" ≠ "comments"
+      expect(router.match({ path: "/users/42/comments", method: "GET" })).toBeNull()
+    })
+
     it("throws 400 for malformed percent-encoding in param segment", () => {
       const router = new Router()
       router.group(makeGroup("/items", [{ method: "GET", path: "/:name" }]))

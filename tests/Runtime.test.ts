@@ -361,4 +361,126 @@ describe("Runtime", () => {
       expect(ctx.meta.debug).toBeUndefined()
     })
   })
+
+  describe("policy edge cases", () => {
+    it("uses fallback 'Blocked by <name>' when group policy denies without reason", async () => {
+      const runtime = new Runtime()
+      runtime.router.group(
+        makeGroup("/api", {
+          groupPolicies: [{ name: "silent-blocker", evaluate: async () => ({ allow: false }) }],
+        })
+      )
+
+      const err = await runtime.execute(makeReq("/api/resource"), makeRes()).catch((e) => e)
+      expect(err.message).toBe("Blocked by silent-blocker")
+      expect(err.status).toBe(403)
+    })
+
+    it("propagates custom status from a group policy deny", async () => {
+      const runtime = new Runtime()
+      runtime.router.group(
+        makeGroup("/api", {
+          groupPolicies: [
+            {
+              name: "auth",
+              evaluate: async () => ({ allow: false, reason: "Unauthorized", status: 401 }),
+            },
+          ],
+        })
+      )
+
+      const err = await runtime.execute(makeReq("/api/resource"), makeRes()).catch((e) => e)
+      expect(err.message).toBe("Unauthorized")
+      expect(err.status).toBe(401)
+    })
+
+    it("respects priority ordering among group policies", async () => {
+      const order: string[] = []
+      const runtime = new Runtime()
+      runtime.router.group(
+        makeGroup("/api", {
+          groupPolicies: [
+            // Two unprioritised + one prioritised forces the sort comparator to be called with
+            // (a=defined, b=undefined) AND (a=undefined, b=defined), covering both ?? branches.
+            {
+              name: "np-1",
+              evaluate: async () => {
+                order.push("np-1")
+                return { allow: true }
+              },
+            },
+            {
+              name: "high",
+              priority: 10,
+              evaluate: async () => {
+                order.push("high")
+                return { allow: true }
+              },
+            },
+            {
+              name: "np-2",
+              evaluate: async () => {
+                order.push("np-2")
+                return { allow: true }
+              },
+            },
+          ],
+        })
+      )
+
+      await runtime.execute(makeReq("/api/resource"), makeRes())
+      expect(order[0]).toBe("high")
+    })
+
+    it("does not copy unsafe prototype-pollution keys from group policy modify", async () => {
+      const runtime = new Runtime()
+      runtime.router.group(
+        makeGroup("/api", {
+          groupPolicies: [
+            {
+              name: "polluter",
+              evaluate: async () => ({
+                allow: true,
+                // "constructor" is an own enumerable key — blocked by UNSAFE_KEYS in mergeSafe
+                modify: { constructor: "evil", safe: "yes" },
+              }),
+            },
+          ],
+        })
+      )
+
+      const ctx = await runtime.execute(makeReq("/api/resource"), makeRes())
+      expect((ctx.meta as Record<string, unknown>).safe).toBe("yes")
+      expect(Object.prototype.hasOwnProperty.call(ctx.meta, "constructor")).toBe(false)
+    })
+  })
+
+  describe("middleware chain guard", () => {
+    it("ignores redundant next() calls (double-next guard)", async () => {
+      const handlerCallCount = { n: 0 }
+      const runtime = new Runtime()
+
+      runtime.router.group({
+        prefix: "/api",
+        routes: [
+          {
+            method: "GET",
+            path: "/resource",
+            middleware: [
+              async (_ctx, next) => {
+                await next()
+                await next()
+              },
+            ],
+            handler: async () => {
+              handlerCallCount.n++
+            },
+          },
+        ],
+      })
+
+      await runtime.execute(makeReq("/api/resource"), makeRes())
+      expect(handlerCallCount.n).toBe(1)
+    })
+  })
 })
