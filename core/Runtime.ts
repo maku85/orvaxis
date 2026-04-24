@@ -72,8 +72,12 @@ export class Runtime {
         await this.runMiddlewareChain(match.route.middleware ?? [], ctx)
         this.debugger.log(ctx, "ROUTE_MIDDLEWARE_DONE")
 
+        await this.hooks.trigger("beforeHandler", ctx)
+        this.debugger.log(ctx, "HOOK:beforeHandler")
         await match.route.handler(ctx)
         this.debugger.log(ctx, "HANDLER_EXECUTED")
+        await this.hooks.trigger("afterHandler", ctx)
+        this.debugger.log(ctx, "HOOK:afterHandler")
 
         ctx.meta.trace = tracer.end()
         await this.hooks.trigger("afterPipeline", ctx)

@@ -39,7 +39,13 @@ export type Group<
   routes: Route<TState, TMeta>[]
 }
 
-export type HookName = "onRequest" | "beforePipeline" | "afterPipeline" | "onError"
+export type HookName =
+  | "onRequest"
+  | "beforePipeline"
+  | "beforeHandler"
+  | "afterHandler"
+  | "afterPipeline"
+  | "onError"
 
 export type Middleware<
   TState extends Record<string, unknown> = Record<string, unknown>,

@@ -2,7 +2,14 @@ import { describe, expect, it, vi } from "vitest"
 import { HookSystem } from "../core/Hook"
 import type { HookName, OrvaxisContext } from "../types"
 
-const ALL_HOOKS: HookName[] = ["onRequest", "beforePipeline", "afterPipeline", "onError"]
+const ALL_HOOKS: HookName[] = [
+  "onRequest",
+  "beforePipeline",
+  "beforeHandler",
+  "afterHandler",
+  "afterPipeline",
+  "onError",
+]
 
 const emptyCtx = {} as unknown as OrvaxisContext
 

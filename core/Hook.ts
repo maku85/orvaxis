@@ -6,6 +6,8 @@ export class HookSystem {
   private hooks: Record<HookName, HookFn[]> = {
     onRequest: [],
     beforePipeline: [],
+    beforeHandler: [],
+    afterHandler: [],
     afterPipeline: [],
     onError: [],
   }

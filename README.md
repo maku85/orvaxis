@@ -177,8 +177,12 @@ Lifecycle events that allow observation of execution:
 
 - `onRequest` — fired after policy evaluation, before middleware
 - `beforePipeline` — fired before the global pipeline runs
-- `afterPipeline` — fired after the route handler, trace already finalized
+- `beforeHandler` — fired after all middleware, immediately before the route handler
+- `afterHandler` — fired immediately after the route handler completes
+- `afterPipeline` — fired after the handler and trace finalization
 - `onError` — fired on any unhandled error
+
+`beforeHandler` / `afterHandler` wrap only the handler itself, independent from the pipeline. Use them for per-handler timing, logging, or auditing without interfering with middleware. They do not fire when the handler throws — use `onError` for that case.
 
 Hooks do not modify flow; they observe and react.
 
@@ -282,16 +286,18 @@ app.on("afterPipeline", (ctx) => {
 A request lifecycle is deterministic:
 
 ```
-1  Policy evaluation     global → group → route, sorted by priority
-2  onRequest hook
-3  beforePipeline hook
-4  Global pipeline       middleware registered via app.use()
-5  Group middleware
-6  Route middleware
-7  Route handler
-8  Trace finalization    ctx.meta.trace is set
-9  afterPipeline hook
-10 Debug output          if app.debugger.enable() was called
+1   Policy evaluation     global → group → route, sorted by priority
+2   onRequest hook
+3   beforePipeline hook
+4   Global pipeline       middleware registered via app.use()
+5   Group middleware
+6   Route middleware
+7   beforeHandler hook
+8   Route handler
+9   afterHandler hook
+10  Trace finalization    ctx.meta.trace is set
+11  afterPipeline hook
+12  Debug output          if app.debugger.enable() was called
 ```
 
 ---
@@ -575,7 +581,6 @@ Graceful shutdown is supported via `server.close()` on the `ServerAdapter`.
 ## Future Directions
 
 - **OpenTelemetry export** — the trace system already produces structured spans; a plugin exporting to OTLP/Zipkin is a natural next step
-- **`beforeHandler` / `afterHandler` hooks** — finer-grained lifecycle events to wrap only the route handler, independent from the global pipeline
 - **Response body interception** — a middleware-level API to transform or wrap outgoing response bodies before they are sent
 - **Schema validation layer** — a first-class `route.schema` interface (Zod / TypeBox) for declarative body, params, and header validation, consistent with the policy-driven approach
 

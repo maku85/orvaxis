@@ -218,6 +218,76 @@ describe("Runtime", () => {
       expect(order).toEqual(["handler", "afterPipeline"])
     })
 
+    it("triggers beforeHandler hook before the route handler", async () => {
+      const order: string[] = []
+      const runtime = new Runtime()
+      runtime.router.group(
+        makeGroup("/api", {
+          handler: async () => {
+            order.push("handler")
+          },
+        })
+      )
+      runtime.hooks.on("beforeHandler", async () => {
+        order.push("beforeHandler")
+      })
+
+      await runtime.execute(makeReq("/api/resource"), makeRes())
+      expect(order).toEqual(["beforeHandler", "handler"])
+    })
+
+    it("triggers afterHandler hook after the route handler", async () => {
+      const order: string[] = []
+      const runtime = new Runtime()
+      runtime.router.group(
+        makeGroup("/api", {
+          handler: async () => {
+            order.push("handler")
+          },
+        })
+      )
+      runtime.hooks.on("afterHandler", async () => {
+        order.push("afterHandler")
+      })
+
+      await runtime.execute(makeReq("/api/resource"), makeRes())
+      expect(order).toEqual(["handler", "afterHandler"])
+    })
+
+    it("fires hooks in order: beforeHandler → handler → afterHandler → afterPipeline", async () => {
+      const order: string[] = []
+      const runtime = new Runtime()
+      runtime.router.group(
+        makeGroup("/api", {
+          handler: async () => {
+            order.push("handler")
+          },
+        })
+      )
+      runtime.hooks.on("beforeHandler", async () => order.push("beforeHandler"))
+      runtime.hooks.on("afterHandler", async () => order.push("afterHandler"))
+      runtime.hooks.on("afterPipeline", async () => order.push("afterPipeline"))
+
+      await runtime.execute(makeReq("/api/resource"), makeRes())
+      expect(order).toEqual(["beforeHandler", "handler", "afterHandler", "afterPipeline"])
+    })
+
+    it("afterHandler does not fire when the handler throws", async () => {
+      const runtime = new Runtime()
+      const afterHandler = vi.fn()
+      runtime.hooks.on("afterHandler", afterHandler)
+      runtime.router.group(
+        makeGroup("/api", {
+          handler: async () => {
+            throw new Error("boom")
+          },
+        })
+      )
+
+      await runtime.execute(makeReq("/api/resource"), makeRes()).catch(() => {})
+      expect(afterHandler).not.toHaveBeenCalled()
+    })
+
     it("triggers onError hook and re-throws on error", async () => {
       const runtime = new Runtime()
       const onError = vi.fn()
