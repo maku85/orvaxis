@@ -356,6 +356,45 @@ Any adapter needs to:
 
 ---
 
+## Testing
+
+`testRequest` runs the full execution cycle — policies, pipeline, middleware, handler — against an `Orvaxis` instance, with no HTTP server required.
+
+```ts
+import { Orvaxis, testRequest } from "orvaxis"
+
+const app = new Orvaxis()
+
+app.group({
+  prefix: "/api",
+  routes: [
+    {
+      method: "GET",
+      path: "/users/:id",
+      handler: async (ctx) => {
+        ctx.res.json({ id: ctx.meta.route?.params.id })
+      },
+    },
+  ],
+})
+
+// successful request
+const res = await testRequest(app, { path: "/api/users/42" })
+// res.status  → 200
+// res.body    → { id: "42" }
+// res.ctx     → full OrvaxisContext
+// res.error   → undefined
+
+// route not found
+const notFound = await testRequest(app, { path: "/api/missing" })
+// notFound.status  → 404
+// notFound.error   → Error("Not Found")
+```
+
+`TestRequestInit` accepts `path`, `method` (defaults to `"GET"`), `headers`, `id`, and any additional field (e.g. `body`) which is forwarded directly onto `req`. `testRequest` never throws — errors thrown during execution are captured in `result.error` and their `.status` property (if present) is reflected in `result.status`.
+
+---
+
 ## Documentation
 
 - [Why Orvaxis](docs/why-orvaxis.md) — side-by-side comparison with plain Express: auth, rate limiting, and observability with and without Orvaxis
@@ -443,6 +482,7 @@ orvaxis/
     Debugger.ts              debug timeline
     Context.ts               context factory
     contextStore.ts          AsyncLocalStorage store (getContext)
+    testHarness.ts           testRequest helper for unit testing
 
   debug/
     buildExecutionSummary.ts combined trace + debug summary
@@ -510,7 +550,6 @@ Graceful shutdown is supported via `server.close()` on the `ServerAdapter`.
 - **OpenTelemetry export** — the trace system already produces structured spans; a plugin exporting to OTLP/Zipkin is a natural next step
 - **`beforeHandler` / `afterHandler` hooks** — finer-grained lifecycle events to wrap only the route handler, independent from the global pipeline
 - **Response body interception** — a middleware-level API to transform or wrap outgoing response bodies before they are sent
-- **Test harness** — a `testRequest(app, { path, method, headers, body })` helper that runs the full execution cycle without an HTTP server, building on the existing `createMockResponse`
 - **Route introspection** — an `app.routes()` API to list all registered routes programmatically, enabling OpenAPI generation and admin tooling
 - **Schema validation layer** — a first-class `route.schema` interface (Zod / TypeBox) for declarative body, params, and header validation, consistent with the policy-driven approach
 
