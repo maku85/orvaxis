@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest"
-import { Runtime } from "../core/Runtime"
 import { createMockResponse } from "../core/mockResponse"
+import { Runtime } from "../core/Runtime"
 import type { Group, Middleware, OrvaxisContext, OrvaxisRequest, Policy } from "../types"
 
 function makeReq(path: string, method = "GET"): OrvaxisRequest {
@@ -521,7 +521,7 @@ describe("Runtime", () => {
 
       const ctx = await runtime.execute(makeReq("/api/resource"), makeRes())
       expect((ctx.meta as Record<string, unknown>).safe).toBe("yes")
-      expect(Object.prototype.hasOwnProperty.call(ctx.meta, "constructor")).toBe(false)
+      expect(Object.hasOwn(ctx.meta, "constructor")).toBe(false)
     })
   })
 

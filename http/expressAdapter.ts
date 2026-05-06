@@ -42,6 +42,8 @@ export function createExpressServer(app: Orvaxis, server: Application = express(
       if (!wrapped.sent) {
         const e = err as { status?: number; message?: string }
         wrapped.status(e.status ?? 500).json({ error: e.message ?? "Internal Server Error" })
+      } else {
+        console.error("[orvaxis] unhandled error after response sent:", err)
       }
     }
   })
@@ -51,13 +53,19 @@ export function createExpressServer(app: Orvaxis, server: Application = express(
   return {
     listen: (port: number, onListen?: (port: number) => void) =>
       new Promise<void>((resolve, reject) => {
+        if (httpServer) {
+          return reject(new Error("Server is already listening. Call close() first."))
+        }
         httpServer = server
           .listen(port)
           .once("listening", () => {
             onListen?.(port)
             resolve()
           })
-          .once("error", reject)
+          .once("error", (err) => {
+            httpServer = null
+            reject(err)
+          })
       }),
     close: () =>
       new Promise<void>((resolve, reject) => {

@@ -5,6 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **`HttpError`** — new exported class (`extends Error`) for throwing errors with an explicit HTTP status code. Accepts `status`, an optional `message`, and an optional `ErrorOptions` third argument for error chaining (`{ cause }`). Replaces all internal `Object.assign(new Error(), { status })` usages. Supports `instanceof` checks in `onError` hooks.
+
+### Fixed
+
+- **`schemaValidationPlugin`** — `headers` schema validation result is now applied back to `ctx.req.headers`. Previously the parsed/transformed value was discarded.
+- **`HookSystem.trigger`** — all hooks in a trigger call now run even when an earlier one throws. The first error is collected and re-thrown after the loop completes, preventing cleanup hooks from being silently skipped.
+- **`createExpressServer`** — errors caught after the response is already sent are now logged via `console.error` instead of being silently swallowed. `listen()` now rejects immediately if the server is already listening, and resets the internal reference on bind failure, preventing a leaked server from blocking future calls.
+- **`createFastifyServer`** — same silent-error fix applied to the catch block.
+
+### Changed
+
+- Extracted `mergeSafe` and `UNSAFE_KEYS` into `core/utils.ts` to eliminate the duplicate definitions that existed in both `PolicyEngine` and `Runtime`.
+- **`peerDependencies`** — Express range updated to `^4.20.0 || ^5.0.0`. The lower bound was raised from `4.19.0` to exclude versions affected by GHSA-rv95-896h-c2vc (Open Redirect) and GHSA-qw6h-vgh9-j6wx (XSS via `response.redirect()`), both fixed in `4.20.0`. Express 5 is now officially supported.
+- **`tsconfig.json`** — `module` and `moduleResolution` updated from `CommonJS`/`node` to `node16`, removing the TypeScript 6 deprecation warning.
+
+### Dependencies
+
+- `@biomejs/biome` 1.9.4 → 2.4.14 (major — config migrated via `biome migrate`)
+- `@types/express` 4.17.25 → 5.0.6
+- `typescript` 5.9.3 → 6.0.3
+- `zod` 4.3.6 → 4.4.3
+
 ## [0.2.0] - 2026-04-24
 
 ### Added

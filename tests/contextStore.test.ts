@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest"
-import { Runtime } from "../core/Runtime"
 import { getContext } from "../core/contextStore"
 import { createMockResponse } from "../core/mockResponse"
+import { Runtime } from "../core/Runtime"
 import type { OrvaxisRequest } from "../types"
 
 function makeReq(path = "/api/resource"): OrvaxisRequest {

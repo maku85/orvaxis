@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest"
+import { HttpError } from "../core/HttpError"
 import { Orvaxis } from "../core/Orvaxis"
 import { testRequest } from "../core/testHarness"
 
@@ -106,7 +107,7 @@ describe("testRequest", () => {
             method: "GET",
             path: "/fail",
             handler: async () => {
-              throw Object.assign(new Error("Gone"), { status: 410 })
+              throw new HttpError(410, "Gone")
             },
           },
         ],

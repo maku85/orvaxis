@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest"
 import { Runtime } from "../core/Runtime"
-import { PluginManager } from "../plugins/PluginManager"
 import type { Plugin } from "../plugins/PluginManager"
+import { PluginManager } from "../plugins/PluginManager"
 
 function makePlugin(name: string, apply = vi.fn()): Plugin {
   return { name, apply }

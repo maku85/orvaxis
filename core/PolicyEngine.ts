@@ -1,12 +1,6 @@
 import type { OrvaxisContext, Policy, PolicyResult, PolicyScope } from "../types"
-
-const UNSAFE_KEYS = new Set(["__proto__", "constructor", "prototype"])
-
-function mergeSafe(target: Record<string, unknown>, source: Record<string, unknown>): void {
-  for (const key of Object.keys(source)) {
-    if (!UNSAFE_KEYS.has(key)) target[key] = source[key]
-  }
-}
+import { HttpError } from "./HttpError"
+import { mergeSafe } from "./utils"
 
 export class PolicyEngine {
   private policies: Policy[] = []
@@ -24,9 +18,7 @@ export class PolicyEngine {
       const result: PolicyResult = await policy.evaluate(ctx)
 
       if (!result.allow) {
-        throw Object.assign(new Error(result.reason ?? `Blocked by ${policy.name}`), {
-          status: result.status ?? 403,
-        })
+        throw new HttpError(result.status ?? 403, result.reason ?? `Blocked by ${policy.name}`)
       }
 
       if (result.modify) {

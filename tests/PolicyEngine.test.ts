@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
-import { PolicyEngine } from "../core/PolicyEngine"
 import { createMockResponse } from "../core/mockResponse"
+import { PolicyEngine } from "../core/PolicyEngine"
 import type { OrvaxisContext, Policy } from "../types"
 
 function makeCtx(path = "/api/test", method = "GET"): OrvaxisContext {
@@ -221,6 +221,6 @@ describe("PolicyEngine", () => {
     await engine.evaluate(ctx)
 
     expect(({} as Record<string, unknown>).polluted).toBeUndefined()
-    expect(Object.prototype.hasOwnProperty.call(ctx.meta, "__proto__")).toBe(false)
+    expect(Object.hasOwn(ctx.meta, "__proto__")).toBe(false)
   })
 })

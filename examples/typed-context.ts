@@ -1,5 +1,5 @@
 import { createExpressServer } from "../http/expressAdapter"
-import { Orvaxis, getContext, traceEvent } from "../index"
+import { getContext, Orvaxis, traceEvent } from "../index"
 import type { OrvaxisContext, Policy } from "../types"
 
 // --- Typed context definition ---

@@ -1,14 +1,15 @@
 import type { Group, OrvaxisRequest } from "../types"
+import { HttpError } from "./HttpError"
 
 export function validateRequest(req: OrvaxisRequest): void {
   if (typeof req.path !== "string" || req.path === "") {
-    throw Object.assign(new Error("req.path must be a non-empty string"), { status: 400 })
+    throw new HttpError(400, "req.path must be a non-empty string")
   }
   if (!req.path.startsWith("/")) {
-    throw Object.assign(new Error(`req.path must start with '/': "${req.path}"`), { status: 400 })
+    throw new HttpError(400, `req.path must start with '/': "${req.path}"`)
   }
   if (typeof req.method !== "string" || req.method === "") {
-    throw Object.assign(new Error("req.method must be a non-empty string"), { status: 400 })
+    throw new HttpError(400, "req.method must be a non-empty string")
   }
 }
 

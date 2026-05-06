@@ -43,6 +43,8 @@ export function createFastifyServer(app: Orvaxis, fastify = Fastify()): ServerAd
       if (!wrapped.sent) {
         const e = err as { status?: number; message?: string }
         wrapped.status(e.status ?? 500).send({ error: e.message ?? "Internal Server Error" })
+      } else {
+        console.error("[orvaxis] unhandled error after response sent:", err)
       }
     }
   })

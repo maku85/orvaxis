@@ -17,16 +17,18 @@ export class HookSystem {
   }
 
   async trigger(name: HookName, ctx: OrvaxisContext, error?: Error) {
+    let firstError: unknown
     for (const fn of this.hooks[name]) {
-      if (name === "onError") {
-        try {
-          await fn(ctx, error)
-        } catch (hookErr) {
-          console.error("[orvaxis] onError hook threw:", hookErr)
-        }
-      } else {
+      try {
         await fn(ctx, error)
+      } catch (hookErr) {
+        if (name === "onError") {
+          console.error("[orvaxis] onError hook threw:", hookErr)
+        } else if (firstError === undefined) {
+          firstError = hookErr
+        }
       }
     }
+    if (firstError !== undefined) throw firstError
   }
 }

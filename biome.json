@@ -1,8 +1,6 @@
 {
-  "$schema": "https://biomejs.dev/schemas/1.9.0/schema.json",
-  "organizeImports": {
-    "enabled": true
-  },
+  "$schema": "https://biomejs.dev/schemas/2.4.14/schema.json",
+  "assist": { "actions": { "source": { "organizeImports": "on" } } },
   "formatter": {
     "enabled": true,
     "indentStyle": "space",
@@ -27,15 +25,24 @@
       },
       "style": {
         "useConst": "error",
-        "noVar": "error",
         "useImportType": "error"
       },
       "suspicious": {
-        "noExplicitAny": "warn"
+        "noExplicitAny": "warn",
+        "noVar": "error"
       }
     }
   },
   "files": {
-    "ignore": ["dist", "node_modules", "coverage", ".claude", "docs", ".vemora", "benchmarks"]
+    "includes": [
+      "**",
+      "!**/dist",
+      "!**/node_modules",
+      "!**/coverage",
+      "!**/.claude",
+      "!**/docs",
+      "!**/.vemora",
+      "!**/benchmarks"
+    ]
   }
 }

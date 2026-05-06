@@ -97,7 +97,11 @@ Group Middleware (inherited)
 ↓
 Route Middleware (scoped)
 ↓
+beforeHandler hook
+↓
 Route Handler
+↓
+afterHandler hook
 ↓
 Trace finalization
 ↓
@@ -185,6 +189,24 @@ Lifecycle events that allow observation of execution:
 `beforeHandler` / `afterHandler` wrap only the handler itself, independent from the pipeline. Use them for per-handler timing, logging, or auditing without interfering with middleware. They do not fire when the handler throws — use `onError` for that case.
 
 Hooks do not modify flow; they observe and react.
+
+Use `HttpError` to throw errors with an explicit HTTP status code from anywhere in the lifecycle — handlers, middleware, policies, or hooks:
+
+```ts
+import { HttpError } from "orvaxis"
+
+// in a handler
+throw new HttpError(404, "User not found")
+
+// in onError — check the type before accessing .status
+app.on("onError", (ctx) => {
+  if (ctx.error instanceof HttpError) {
+    console.error(`[${ctx.error.status}] ${ctx.error.message}`)
+  }
+})
+```
+
+`HttpError` extends the native `Error` class and accepts an optional `ErrorOptions` third argument (e.g. `{ cause }` for error chaining).
 
 ---
 
@@ -379,7 +401,7 @@ Two adapters are included out of the box:
 
 | Adapter | Import | Peer dependency |
 |---|---|---|
-| Express | `createExpressServer` | `express ^4` |
+| Express | `createExpressServer` | `express ^4.20 \|\| ^5` |
 | Fastify | `createFastifyServer` | `fastify ^5` |
 
 Install only the framework you intend to use — both peer dependencies are optional.
@@ -546,7 +568,9 @@ orvaxis/
     Debugger.ts              debug timeline
     Context.ts               context factory
     contextStore.ts          AsyncLocalStorage store (getContext)
+    HttpError.ts             HttpError class (status + message + cause)
     testHarness.ts           testRequest helper for unit testing
+    utils.ts                 shared utilities (mergeSafe, UNSAFE_KEYS)
 
   debug/
     buildExecutionSummary.ts combined trace + debug summary
@@ -597,7 +621,7 @@ It favors:
 
 ## Current Status
 
-The core execution model is stable, tested, and covered by 156 passing tests.
+The core execution model is stable, tested, and covered by 203 passing tests.
 
 Not yet recommended for production. Known gaps before production use:
 
@@ -614,6 +638,7 @@ Graceful shutdown is supported via `server.close()` on the `ServerAdapter`.
 
 - **OpenTelemetry export** — the trace system already produces structured spans; a plugin exporting to OTLP/Zipkin is a natural next step
 - **Response body interception** — a middleware-level API to transform or wrap outgoing response bodies before they are sent
+
 ## Contributing
 
 Contributions are welcome. Please read [CONTRIBUTING.md](CONTRIBUTING.md) for setup instructions, code conventions, and the PR process. To report a bug or propose a feature, use the [GitHub issue templates](https://github.com/maku85/orvaxis/issues/new/choose).

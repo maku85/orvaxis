@@ -1,13 +1,12 @@
 import type { Group, RouteInfo, RouteMatch } from "../types"
+import { HttpError } from "./HttpError"
 import { validateGroup } from "./validation"
 
 function decodeSafe(segment: string): string {
   try {
     return decodeURIComponent(segment)
   } catch {
-    throw Object.assign(new Error(`Malformed percent-encoding in path segment: "${segment}"`), {
-      status: 400,
-    })
+    throw new HttpError(400, `Malformed percent-encoding in path segment: "${segment}"`)
   }
 }
 

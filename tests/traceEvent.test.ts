@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
-import { Runtime } from "../core/Runtime"
 import { createMockResponse } from "../core/mockResponse"
+import { Runtime } from "../core/Runtime"
 import { traceEvent } from "../debug/traceEvent"
 import type { OrvaxisRequest } from "../types"
 

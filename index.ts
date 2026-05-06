@@ -1,17 +1,18 @@
-export { Orvaxis } from "./core/Orvaxis"
-export { createMockResponse, type MockResponse } from "./core/mockResponse"
-export { testRequest, type TestRequestInit, type TestResponse } from "./core/testHarness"
 export { getContext } from "./core/contextStore"
-export { createExpressServer } from "./http/expressAdapter"
-export { createFastifyServer } from "./http/fastifyAdapter"
 export { Debugger } from "./core/Debugger"
+export { HttpError } from "./core/HttpError"
+export { createMockResponse, type MockResponse } from "./core/mockResponse"
+export { Orvaxis } from "./core/Orvaxis"
 export { Runtime } from "./core/Runtime"
-export { type Plugin, PluginManager } from "./plugins/PluginManager"
-export { loggerPlugin } from "./plugins/loggerPlugin"
-export { schemaValidationPlugin } from "./plugins/schemaValidationPlugin"
+export { type TestRequestInit, type TestResponse, testRequest } from "./core/testHarness"
 export { buildExecutionSummary, type ExecutionSummary } from "./debug/buildExecutionSummary"
 export { traceEvent } from "./debug/traceEvent"
+export { createExpressServer } from "./http/expressAdapter"
+export { createFastifyServer } from "./http/fastifyAdapter"
 export { traceMiddleware } from "./middleware/traceMiddleware"
+export { loggerPlugin } from "./plugins/loggerPlugin"
+export { type Plugin, PluginManager } from "./plugins/PluginManager"
+export { schemaValidationPlugin } from "./plugins/schemaValidationPlugin"
 export type {
   ContextMeta,
   DebugEntry,
@@ -28,9 +29,9 @@ export type {
   PolicyScope,
   Route,
   RouteInfo,
+  RouteMatch,
   RouteSchema,
   SchemaField,
-  RouteMatch,
   ServerAdapter,
   Trace,
   TraceEvent,
