@@ -16,7 +16,7 @@ const adminOnly: Policy = {
   name: "admin-only",
   priority: 50,
   evaluate(ctx) {
-    if (ctx.meta.apiKey !== "admin-secret") {
+    if (ctx.meta.apiKey !== process.env.ADMIN_API_KEY) {
       return { allow: false, reason: "Admin access required" }
     }
     return { allow: true }
