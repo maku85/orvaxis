@@ -475,6 +475,29 @@ import { sanitizeErrorMessage } from "orvaxis"
 res.status(err.status ?? 500).json({ error: sanitizeErrorMessage(err) })
 ```
 
+### Request ID
+
+Both adapters automatically assign a request ID on every request and return it in the `X-Request-ID` response header. The ID is also available as `ctx.req.id` throughout the entire execution lifecycle.
+
+Priority order for the ID value:
+
+1. `X-Request-ID` header from the incoming request — honours upstream propagation (API gateway, service mesh, distributed tracing)
+2. Fastify's native request ID (Fastify adapter only)
+3. `crypto.randomUUID()` — generated if none of the above is present
+
+```ts
+app.on("afterPipeline", (ctx) => {
+  console.log(ctx.req.id) // always defined — e.g. "550e8400-e29b-41d4-a716-446655440000"
+})
+```
+
+`loggerPlugin` automatically includes the ID in every log line:
+
+```
+[REQ] GET /api/users 550e8400-e29b-41d4-a716-446655440000
+[ERR] 550e8400-e29b-41d4-a716-446655440000 Error: something failed
+```
+
 ### Writing a custom adapter
 
 Any adapter needs to:

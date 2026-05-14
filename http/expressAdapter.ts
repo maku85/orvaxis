@@ -36,12 +36,15 @@ export function createExpressServer(
   const timeoutMs = options.timeout ?? 30_000
   const logger = options.logger ?? console
   server.use(async (req: Request, res: Response, _next: NextFunction) => {
+    const requestId = (req.headers["x-request-id"] as string) || crypto.randomUUID()
     const adapted = Object.assign(req, {
       path: req.path,
       method: req.method,
       headers: req.headers,
+      id: requestId,
     }) as unknown as OrvaxisRequest
     const wrapped = wrapExpressResponse(res)
+    wrapped.setHeader("X-Request-ID", requestId)
 
     try {
       const handlePromise = app.handle(adapted, wrapped)

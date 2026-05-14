@@ -16,33 +16,40 @@ function makeLogger(): Logger & { calls: { method: string; args: unknown[] }[] }
   }
 }
 
+function makeCtx(path: string, id = "req-123"): OrvaxisContext {
+  return {
+    req: { url: path, path, method: "GET", headers: {}, id },
+    meta: {},
+  } as unknown as OrvaxisContext
+}
+
 describe("loggerPlugin", () => {
   it("has name 'logger'", () => {
     expect(loggerPlugin().name).toBe("logger")
   })
 
-  it("logs [REQ] via logger.info on onRequest hook", async () => {
+  it("logs method, path, and requestId via logger.info on onRequest hook", async () => {
     const logger = makeLogger()
     const runtime = new Runtime()
     loggerPlugin({ logger }).apply(runtime)
 
-    await runtime.hooks.trigger("onRequest", {
-      req: { url: "/test", path: "/test", method: "GET", headers: {} },
-      meta: {},
-    } as unknown as OrvaxisContext)
+    await runtime.hooks.trigger("onRequest", makeCtx("/test", "req-abc"))
 
-    expect(logger.calls).toContainEqual({ method: "info", args: ["[REQ]", "/test"] })
+    expect(logger.calls).toContainEqual({
+      method: "info",
+      args: ["[REQ]", "GET", "/test", "req-abc"],
+    })
   })
 
-  it("logs [ERR] via logger.error on onError hook", async () => {
+  it("logs requestId and error via logger.error on onError hook", async () => {
     const logger = makeLogger()
     const runtime = new Runtime()
     loggerPlugin({ logger }).apply(runtime)
 
     const err = new Error("something failed")
-    await runtime.hooks.trigger("onError", { meta: {} } as unknown as OrvaxisContext, err)
+    await runtime.hooks.trigger("onError", makeCtx("/test", "req-xyz"), err)
 
-    expect(logger.calls).toContainEqual({ method: "error", args: ["[ERR]", err] })
+    expect(logger.calls).toContainEqual({ method: "error", args: ["[ERR]", "req-xyz", err] })
   })
 
   it("falls back to console when no logger is provided", async () => {
@@ -50,12 +57,9 @@ describe("loggerPlugin", () => {
     const runtime = new Runtime()
     loggerPlugin().apply(runtime)
 
-    await runtime.hooks.trigger("onRequest", {
-      req: { path: "/x", method: "GET", headers: {} },
-      meta: {},
-    } as unknown as OrvaxisContext)
+    await runtime.hooks.trigger("onRequest", makeCtx("/x", "req-fallback"))
 
-    expect(infoSpy).toHaveBeenCalledWith("[REQ]", "/x")
+    expect(infoSpy).toHaveBeenCalledWith("[REQ]", "GET", "/x", "req-fallback")
     infoSpy.mockRestore()
   })
 })

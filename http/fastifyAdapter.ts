@@ -37,12 +37,16 @@ export function createFastifyServer(
   const logger = options.logger ?? console
   fastify.all("/*", async (req, reply) => {
     const path = (req.url ?? "/").split("?")[0]
+    const requestId =
+      (req.headers["x-request-id"] as string) || (req.id as string) || crypto.randomUUID()
     const adapted = Object.assign(req, {
       path,
       method: req.method ?? "GET",
       headers: req.headers,
+      id: requestId,
     }) as unknown as OrvaxisRequest
     const wrapped = wrapFastifyResponse(reply)
+    wrapped.setHeader("X-Request-ID", requestId)
 
     try {
       const handlePromise = app.handle(adapted, wrapped)

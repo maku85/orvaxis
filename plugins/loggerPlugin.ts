@@ -9,11 +9,11 @@ export function loggerPlugin(options: { logger?: Logger } = {}) {
 
     apply(runtime: Runtime) {
       runtime.hooks.on("onRequest", (ctx: OrvaxisContext) => {
-        logger.info("[REQ]", ctx.req.path)
+        logger.info("[REQ]", ctx.req.method, ctx.req.path, ctx.req.id)
       })
 
-      runtime.hooks.on("onError", (_ctx: OrvaxisContext, err?: Error) => {
-        logger.error("[ERR]", err)
+      runtime.hooks.on("onError", (ctx: OrvaxisContext, err?: Error) => {
+        logger.error("[ERR]", ctx.req.id, err)
       })
     },
   }
