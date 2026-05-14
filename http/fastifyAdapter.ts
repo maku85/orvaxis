@@ -1,7 +1,7 @@
 import Fastify, { type FastifyReply } from "fastify"
 import type { Orvaxis } from "../core/Orvaxis"
 import type { OrvaxisRequest, OrvaxisResponse, ServerAdapter } from "../types"
-import { type AdapterOptions, withTimeout } from "./timeout"
+import { type AdapterOptions, sanitizeErrorMessage, withTimeout } from "./timeout"
 
 function wrapFastifyResponse(reply: FastifyReply): OrvaxisResponse {
   const wrapped: OrvaxisResponse = {
@@ -48,8 +48,8 @@ export function createFastifyServer(
       await (timeoutMs > 0 ? withTimeout(handlePromise, timeoutMs) : handlePromise)
     } catch (err) {
       if (!wrapped.sent) {
-        const e = err as { status?: number; message?: string }
-        wrapped.status(e.status ?? 500).send({ error: e.message ?? "Internal Server Error" })
+        const e = err as { status?: number }
+        wrapped.status(e.status ?? 500).send({ error: sanitizeErrorMessage(err) })
       } else {
         console.error("[orvaxis] unhandled error after response sent:", err)
       }

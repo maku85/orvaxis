@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { HttpError } from "../core/HttpError"
-import { withTimeout } from "../http/timeout"
+import { sanitizeErrorMessage, withTimeout } from "../http/timeout"
 
 describe("withTimeout", () => {
   beforeEach(() => {
@@ -52,5 +52,37 @@ describe("withTimeout", () => {
     await withTimeout(Promise.resolve("done"), 5000)
     expect(clearTimeoutSpy).toHaveBeenCalled()
     clearTimeoutSpy.mockRestore()
+  })
+})
+
+describe("sanitizeErrorMessage", () => {
+  it("always exposes the message of an HttpError regardless of NODE_ENV", () => {
+    vi.stubEnv("NODE_ENV", "production")
+    expect(sanitizeErrorMessage(new HttpError(403, "Forbidden"))).toBe("Forbidden")
+    vi.unstubAllEnvs()
+  })
+
+  it("exposes the message of a generic Error in non-production", () => {
+    vi.stubEnv("NODE_ENV", "development")
+    expect(sanitizeErrorMessage(new Error("DB connection failed"))).toBe("DB connection failed")
+    vi.unstubAllEnvs()
+  })
+
+  it("replaces the message of a generic Error in production", () => {
+    vi.stubEnv("NODE_ENV", "production")
+    expect(sanitizeErrorMessage(new Error("DB connection failed"))).toBe("Internal Server Error")
+    vi.unstubAllEnvs()
+  })
+
+  it("falls back to 'Internal Server Error' when the error has no message", () => {
+    vi.stubEnv("NODE_ENV", "development")
+    expect(sanitizeErrorMessage(new Error())).toBe("Internal Server Error")
+    vi.unstubAllEnvs()
+  })
+
+  it("falls back to 'Internal Server Error' for non-Error values in production", () => {
+    vi.stubEnv("NODE_ENV", "production")
+    expect(sanitizeErrorMessage({ code: 42 })).toBe("Internal Server Error")
+    vi.unstubAllEnvs()
   })
 })

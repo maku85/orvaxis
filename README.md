@@ -431,11 +431,31 @@ When the deadline expires the adapter rejects with `HttpError(408, "Request Time
 import { withTimeout, type AdapterOptions } from "orvaxis"
 ```
 
+### Error responses
+
+Adapters sanitize error messages based on `NODE_ENV`:
+
+| Environment | Generic `Error` | `HttpError` |
+|---|---|---|
+| `production` | `"Internal Server Error"` | original message |
+| anything else | original message | original message |
+
+`HttpError` messages are always forwarded because they are intentional user-facing responses. All other error messages are hidden in production to avoid leaking internal details such as stack traces, file paths, or database error text.
+
+`sanitizeErrorMessage` is exported for custom adapters:
+
+```ts
+import { sanitizeErrorMessage } from "orvaxis"
+
+// in a custom adapter's catch block:
+res.status(err.status ?? 500).json({ error: sanitizeErrorMessage(err) })
+```
+
 ### Writing a custom adapter
 
 Any adapter needs to:
 1. Ensure `req.path` is a plain path string (no query string)
-2. Call `app.handle(req, res)` (wrapped in `withTimeout` if a deadline is needed) and catch thrown errors
+2. Call `app.handle(req, res)` (wrapped in `withTimeout` if a deadline is needed) and catch thrown errors, using `sanitizeErrorMessage` to build the response body
 3. Return `{ listen(port, onListen?) }` to satisfy the `ServerAdapter` interface
 
 ---
@@ -647,7 +667,7 @@ It favors:
 
 ## Current Status
 
-The core execution model is stable, tested, and covered by 208 passing tests.
+The core execution model is stable, tested, and covered by 213 passing tests.
 
 Not yet recommended for production. Known gaps before production use:
 
