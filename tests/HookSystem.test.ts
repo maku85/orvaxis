@@ -107,6 +107,19 @@ describe("HookSystem", () => {
     await expect(hooks.trigger("onRequest", emptyCtx)).rejects.toThrow("hook error")
   })
 
+  it("re-throws only the first error when multiple listeners throw", async () => {
+    const hooks = new HookSystem()
+    hooks.on("onRequest", async () => {
+      throw new Error("first")
+    })
+    hooks.on("onRequest", async () => {
+      throw new Error("second")
+    })
+
+    const err = await hooks.trigger("onRequest", emptyCtx).catch((e) => e)
+    expect(err.message).toBe("first")
+  })
+
   it("swallows errors thrown by onError hook listeners", async () => {
     const hooks = new HookSystem()
     hooks.on("onError", async () => {
