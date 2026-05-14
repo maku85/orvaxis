@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.2] - 2026-05-15
+
+### Added
+
+- **Request timeout** — both `createExpressServer` and `createFastifyServer` now accept an optional third argument `AdapterOptions`. The `timeout` field (number, milliseconds) sets a per-request deadline: when a handler takes longer than the limit, the adapter rejects with an `HttpError(408, "Request Timeout")`. Default: `30 000 ms`. Set to `0` to disable. `AdapterOptions` and `withTimeout` are exported from the main entry point for use in custom adapters.
+- **Pluggable logger** — a `Logger` interface (`{ info, error }`) is now part of the public API. Pass a logger instance through three independent entry points: `new Orvaxis({ logger })` (routes it to the hook system for meta-errors), `createExpressServer / createFastifyServer` third-arg options (`{ logger }`) (routes it to post-response error logging), and `loggerPlugin({ logger })` (routes it to request and error log lines). All three default to `console` when omitted. `Logger` and `OrvaxisOptions` are exported from the main entry point.
+- **Request ID propagation** — both adapters now generate a `X-Request-ID` automatically on every request and expose it on `ctx.req.id`. If the incoming request already carries a `X-Request-ID` header (e.g. from an API gateway or upstream service), that value is reused instead of generating a new one. Fastify's native request ID is used as a secondary fallback before falling back to `crypto.randomUUID()`. The header is always present in the response.
+
+### Fixed
+
+- **Error response sanitization** — adapter error responses no longer leak internal error messages to the client when `NODE_ENV=production`. Generic errors return `{ error: "Internal Server Error" }`; `HttpError` messages are always forwarded as-is since they are intentional user-facing responses. Outside production all messages are preserved for debugging. `sanitizeErrorMessage` is exported for custom adapters.
+- **Hardcoded secret in example** — `examples/policy-server.ts` now reads the admin key from `process.env.ADMIN_API_KEY` instead of the literal string `"admin-secret"`.
+
+### Changed
+
+- **`loggerPlugin`** — changed from a plain plugin object to a factory function `loggerPlugin(options?)`. Update call sites from `app.register(loggerPlugin)` to `app.register(loggerPlugin())`. Accepts an optional `{ logger?: Logger }` argument to inject a custom logger. Log lines now include method, path, and request ID: `[REQ] GET /api/users req-abc-123` / `[ERR] req-abc-123 Error: …`.
+
+### Chore
+
+- **`.gitattributes`** — added `* text=auto eol=lf` to enforce consistent LF line endings across Windows and Linux development environments, preventing Biome formatter failures in CI.
+
 ## [0.2.1] - 2026-05-06
 
 ### Added
