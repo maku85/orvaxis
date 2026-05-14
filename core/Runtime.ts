@@ -1,5 +1,12 @@
 import { type Plugin, PluginManager } from "../plugins/PluginManager"
-import type { Middleware, OrvaxisContext, OrvaxisOptions, OrvaxisRequest, OrvaxisResponse, Policy } from "../types"
+import type {
+  Middleware,
+  OrvaxisContext,
+  OrvaxisOptions,
+  OrvaxisRequest,
+  OrvaxisResponse,
+  Policy,
+} from "../types"
 import { createContext } from "./Context"
 import { runWithContext } from "./contextStore"
 import { Debugger } from "./Debugger"
