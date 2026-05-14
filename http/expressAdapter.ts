@@ -34,6 +34,7 @@ export function createExpressServer(
   options: AdapterOptions = {}
 ): ServerAdapter {
   const timeoutMs = options.timeout ?? 30_000
+  const logger = options.logger ?? console
   server.use(async (req: Request, res: Response, _next: NextFunction) => {
     const adapted = Object.assign(req, {
       path: req.path,
@@ -50,7 +51,7 @@ export function createExpressServer(
         const e = err as { status?: number }
         wrapped.status(e.status ?? 500).json({ error: sanitizeErrorMessage(err) })
       } else {
-        console.error("[orvaxis] unhandled error after response sent:", err)
+        logger.error("[orvaxis] unhandled error after response sent:", err)
       }
     }
   })

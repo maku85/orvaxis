@@ -8,6 +8,15 @@ export type DebugInfo = {
   timeline: DebugEntry[]
 }
 
+export interface Logger {
+  info(...args: unknown[]): void
+  error(...args: unknown[]): void
+}
+
+export type OrvaxisOptions = {
+  logger?: Logger
+}
+
 export interface TracerLike {
   event: (type: string, meta?: Record<string, unknown>) => void
 }

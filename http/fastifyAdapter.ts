@@ -34,6 +34,7 @@ export function createFastifyServer(
   options: AdapterOptions = {}
 ): ServerAdapter {
   const timeoutMs = options.timeout ?? 30_000
+  const logger = options.logger ?? console
   fastify.all("/*", async (req, reply) => {
     const path = (req.url ?? "/").split("?")[0]
     const adapted = Object.assign(req, {
@@ -51,7 +52,7 @@ export function createFastifyServer(
         const e = err as { status?: number }
         wrapped.status(e.status ?? 500).send({ error: sanitizeErrorMessage(err) })
       } else {
-        console.error("[orvaxis] unhandled error after response sent:", err)
+        logger.error("[orvaxis] unhandled error after response sent:", err)
       }
     }
   })

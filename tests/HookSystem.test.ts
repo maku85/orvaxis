@@ -131,4 +131,18 @@ describe("HookSystem", () => {
     await hooks.trigger("onError", emptyCtx, new Error("original"))
     expect(order).toEqual([1, 2])
   })
+
+  it("uses the injected logger when an onError hook throws", async () => {
+    const errors: unknown[] = []
+    const logger = { info: () => {}, error: (...args: unknown[]) => errors.push(args) }
+    const hooks = new HookSystem(logger)
+
+    hooks.on("onError", async () => {
+      throw new Error("meta-error")
+    })
+
+    await hooks.trigger("onError", emptyCtx, new Error("original"))
+    expect(errors).toHaveLength(1)
+    expect((errors[0] as unknown[])[0]).toBe("[orvaxis] onError hook threw:")
+  })
 })

@@ -1,8 +1,9 @@
-import type { HookName, OrvaxisContext } from "../types"
+import type { HookName, Logger, OrvaxisContext } from "../types"
 
 type HookFn = (ctx: OrvaxisContext, error?: Error) => Promise<void> | void
 
 export class HookSystem {
+  private readonly logger: Logger
   private hooks: Record<HookName, HookFn[]> = {
     onRequest: [],
     beforePipeline: [],
@@ -10,6 +11,10 @@ export class HookSystem {
     afterHandler: [],
     afterPipeline: [],
     onError: [],
+  }
+
+  constructor(logger: Logger = console) {
+    this.logger = logger
   }
 
   on(name: HookName, fn: HookFn) {
@@ -23,7 +28,7 @@ export class HookSystem {
         await fn(ctx, error)
       } catch (hookErr) {
         if (name === "onError") {
-          console.error("[orvaxis] onError hook threw:", hookErr)
+          this.logger.error("[orvaxis] onError hook threw:", hookErr)
         } else if (firstError === undefined) {
           firstError = hookErr
         }

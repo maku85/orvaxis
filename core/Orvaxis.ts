@@ -4,6 +4,7 @@ import type {
   HookName,
   Middleware,
   OrvaxisContext,
+  OrvaxisOptions,
   OrvaxisRequest,
   OrvaxisResponse,
   Policy,
@@ -11,7 +12,11 @@ import type {
 import { Runtime } from "./Runtime"
 
 export class Orvaxis {
-  private runtime = new Runtime()
+  private runtime: Runtime
+
+  constructor(options: OrvaxisOptions = {}) {
+    this.runtime = new Runtime(options)
+  }
 
   get debugger() {
     return this.runtime.debugger

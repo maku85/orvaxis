@@ -1,7 +1,9 @@
 import { HttpError } from "../core/HttpError"
+import type { Logger } from "../types"
 
 export type AdapterOptions = {
   timeout?: number
+  logger?: Logger
 }
 
 export function sanitizeErrorMessage(err: unknown): string {

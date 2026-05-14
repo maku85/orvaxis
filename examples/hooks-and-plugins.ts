@@ -4,7 +4,7 @@ import { loggerPlugin } from "../plugins/loggerPlugin"
 
 const app = new Orvaxis()
 
-app.register(loggerPlugin)
+app.register(loggerPlugin())
 
 app.on("onRequest", (ctx) => {
   ctx.meta.startedAt = Date.now()

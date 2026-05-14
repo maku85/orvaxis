@@ -216,13 +216,37 @@ Plugins extend runtime capabilities by registering hooks, middleware, or policie
 
 Orvaxis ships with two built-in plugins:
 
-**`loggerPlugin`** — logs incoming requests and unhandled errors to the console:
+**`loggerPlugin`** — logs incoming requests and unhandled errors. It is a factory function that accepts an optional `{ logger }` argument:
 
 ```ts
 import { Orvaxis, loggerPlugin } from "orvaxis"
 
+// default: uses console
 const app = new Orvaxis()
-app.register(loggerPlugin)
+app.register(loggerPlugin())
+
+// custom logger (pino, winston, or any object satisfying Logger)
+app.register(loggerPlugin({ logger: pinoInstance }))
+```
+
+The `Logger` interface requires only `info` and `error` methods, making it compatible with `console`, pino, winston, and most structured loggers:
+
+```ts
+import type { Logger } from "orvaxis"
+
+const myLogger: Logger = {
+  info: (...args) => pino.info(args),
+  error: (...args) => pino.error(args),
+}
+```
+
+The same logger can be passed to `new Orvaxis({ logger })` to capture hook system meta-errors, and to the adapter options to capture post-response errors:
+
+```ts
+const logger = pinoInstance
+const app = new Orvaxis({ logger })
+const server = createExpressServer(app, undefined, { logger })
+app.register(loggerPlugin({ logger }))
 ```
 
 **`schemaValidationPlugin`** — validates `body`, `params`, `query`, and `headers` against a `route.schema` before the handler runs. Any library whose objects expose a `.parse(data)` method works (Zod, TypeBox, custom validators):
@@ -667,7 +691,7 @@ It favors:
 
 ## Current Status
 
-The core execution model is stable, tested, and covered by 213 passing tests.
+The core execution model is stable, tested, and covered by 215 passing tests.
 
 Not yet recommended for production. Known gaps before production use:
 

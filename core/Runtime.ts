@@ -1,5 +1,5 @@
 import { type Plugin, PluginManager } from "../plugins/PluginManager"
-import type { Middleware, OrvaxisContext, OrvaxisRequest, OrvaxisResponse, Policy } from "../types"
+import type { Middleware, OrvaxisContext, OrvaxisOptions, OrvaxisRequest, OrvaxisResponse, Policy } from "../types"
 import { createContext } from "./Context"
 import { runWithContext } from "./contextStore"
 import { Debugger } from "./Debugger"
@@ -18,11 +18,15 @@ function generateId(): string {
 
 export class Runtime {
   readonly debugger = new Debugger()
-  readonly hooks = new HookSystem()
+  readonly hooks: HookSystem
   readonly pipeline = new Pipeline()
   readonly plugins = new PluginManager()
   readonly policies = new PolicyEngine()
   readonly router = new Router()
+
+  constructor(options: OrvaxisOptions = {}) {
+    this.hooks = new HookSystem(options.logger)
+  }
 
   addPlugin(plugin: Plugin) {
     this.plugins.register(plugin)
