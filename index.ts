@@ -9,6 +9,7 @@ export { buildExecutionSummary, type ExecutionSummary } from "./debug/buildExecu
 export { traceEvent } from "./debug/traceEvent"
 export { createExpressServer } from "./http/expressAdapter"
 export { createFastifyServer } from "./http/fastifyAdapter"
+export { type AdapterOptions, withTimeout } from "./http/timeout"
 export { traceMiddleware } from "./middleware/traceMiddleware"
 export { loggerPlugin } from "./plugins/loggerPlugin"
 export { type Plugin, PluginManager } from "./plugins/PluginManager"

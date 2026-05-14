@@ -1,6 +1,7 @@
 import express, { type Application, type NextFunction, type Request, type Response } from "express"
 import type { Orvaxis } from "../core/Orvaxis"
 import type { OrvaxisRequest, OrvaxisResponse, ServerAdapter } from "../types"
+import { type AdapterOptions, withTimeout } from "./timeout"
 
 function wrapExpressResponse(res: Response): OrvaxisResponse {
   const wrapped: OrvaxisResponse = {
@@ -27,7 +28,12 @@ function wrapExpressResponse(res: Response): OrvaxisResponse {
   return wrapped
 }
 
-export function createExpressServer(app: Orvaxis, server: Application = express()): ServerAdapter {
+export function createExpressServer(
+  app: Orvaxis,
+  server: Application = express(),
+  options: AdapterOptions = {}
+): ServerAdapter {
+  const timeoutMs = options.timeout ?? 30_000
   server.use(async (req: Request, res: Response, _next: NextFunction) => {
     const adapted = Object.assign(req, {
       path: req.path,
@@ -37,7 +43,8 @@ export function createExpressServer(app: Orvaxis, server: Application = express(
     const wrapped = wrapExpressResponse(res)
 
     try {
-      await app.handle(adapted, wrapped)
+      const handlePromise = app.handle(adapted, wrapped)
+      await (timeoutMs > 0 ? withTimeout(handlePromise, timeoutMs) : handlePromise)
     } catch (err) {
       if (!wrapped.sent) {
         const e = err as { status?: number; message?: string }

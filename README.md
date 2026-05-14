@@ -406,11 +406,36 @@ Two adapters are included out of the box:
 
 Install only the framework you intend to use — both peer dependencies are optional.
 
+### Timeout
+
+Both adapters accept an optional `AdapterOptions` third argument:
+
+```ts
+import { createExpressServer } from "orvaxis"
+
+// default: 30 000 ms
+const server = createExpressServer(app)
+
+// custom deadline
+const server = createExpressServer(app, undefined, { timeout: 10_000 })
+
+// disabled (long-running handlers, streaming, etc.)
+const server = createExpressServer(app, undefined, { timeout: 0 })
+```
+
+When the deadline expires the adapter rejects with `HttpError(408, "Request Timeout")` and the normal error path sends a 408 response to the client. The same option is available on `createFastifyServer`.
+
+`withTimeout` and `AdapterOptions` are exported from the main entry point so custom adapters can reuse them:
+
+```ts
+import { withTimeout, type AdapterOptions } from "orvaxis"
+```
+
 ### Writing a custom adapter
 
 Any adapter needs to:
 1. Ensure `req.path` is a plain path string (no query string)
-2. Call `app.handle(req, res)` and catch thrown errors
+2. Call `app.handle(req, res)` (wrapped in `withTimeout` if a deadline is needed) and catch thrown errors
 3. Return `{ listen(port, onListen?) }` to satisfy the `ServerAdapter` interface
 
 ---
@@ -579,6 +604,7 @@ orvaxis/
   http/
     expressAdapter.ts        Express adapter
     fastifyAdapter.ts        Fastify adapter
+    timeout.ts               withTimeout helper and AdapterOptions type
 
   middleware/
     traceMiddleware.ts       trace timing around middleware execution
@@ -621,13 +647,12 @@ It favors:
 
 ## Current Status
 
-The core execution model is stable, tested, and covered by 203 passing tests.
+The core execution model is stable, tested, and covered by 208 passing tests.
 
 Not yet recommended for production. Known gaps before production use:
 
 | Gap | Detail |
 |-----|--------|
-| **No request timeout** | Handlers that hang are never terminated. Wrap `app.handle()` in a timeout at the adapter level if needed. |
 | **API stability** | Pre-1.0 — breaking changes may occur between minor versions. |
 
 Graceful shutdown is supported via `server.close()` on the `ServerAdapter`.

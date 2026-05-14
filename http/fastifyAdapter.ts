@@ -1,6 +1,7 @@
 import Fastify, { type FastifyReply } from "fastify"
 import type { Orvaxis } from "../core/Orvaxis"
 import type { OrvaxisRequest, OrvaxisResponse, ServerAdapter } from "../types"
+import { type AdapterOptions, withTimeout } from "./timeout"
 
 function wrapFastifyResponse(reply: FastifyReply): OrvaxisResponse {
   const wrapped: OrvaxisResponse = {
@@ -27,7 +28,12 @@ function wrapFastifyResponse(reply: FastifyReply): OrvaxisResponse {
   return wrapped
 }
 
-export function createFastifyServer(app: Orvaxis, fastify = Fastify()): ServerAdapter {
+export function createFastifyServer(
+  app: Orvaxis,
+  fastify = Fastify(),
+  options: AdapterOptions = {}
+): ServerAdapter {
+  const timeoutMs = options.timeout ?? 30_000
   fastify.all("/*", async (req, reply) => {
     const path = (req.url ?? "/").split("?")[0]
     const adapted = Object.assign(req, {
@@ -38,7 +44,8 @@ export function createFastifyServer(app: Orvaxis, fastify = Fastify()): ServerAd
     const wrapped = wrapFastifyResponse(reply)
 
     try {
-      await app.handle(adapted, wrapped)
+      const handlePromise = app.handle(adapted, wrapped)
+      await (timeoutMs > 0 ? withTimeout(handlePromise, timeoutMs) : handlePromise)
     } catch (err) {
       if (!wrapped.sent) {
         const e = err as { status?: number; message?: string }
