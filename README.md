@@ -235,6 +235,23 @@ Lifecycle events that allow observation of execution:
 
 Hooks do not modify flow; they observe and react.
 
+All registered listeners for a hook always run, even if an earlier one throws. If exactly one listener throws, that error is re-thrown as-is. If more than one throws, a native `AggregateError` is raised with all errors available in `.errors[]`:
+
+```ts
+app.on("afterPipeline", async (ctx) => {
+  // inspect all hook errors when multiple listeners fail
+  try {
+    // ...
+  } catch (err) {
+    if (err instanceof AggregateError) {
+      for (const e of err.errors) console.error(e)
+    }
+  }
+})
+```
+
+`onError` hook listeners that throw are logged via the injected logger and never re-thrown.
+
 Use `HttpError` to throw errors with an explicit HTTP status code from anywhere in the lifecycle — handlers, middleware, policies, or hooks:
 
 ```ts
@@ -832,7 +849,7 @@ It favors:
 
 ## Current Status
 
-The core execution model is stable, tested, and covered by 258 passing tests.
+The core execution model is stable, tested, and covered by 260 passing tests.
 
 Not yet recommended for production. Known gaps before production use:
 

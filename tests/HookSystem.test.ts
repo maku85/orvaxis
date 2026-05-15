@@ -107,7 +107,7 @@ describe("HookSystem", () => {
     await expect(hooks.trigger("onRequest", emptyCtx)).rejects.toThrow("hook error")
   })
 
-  it("re-throws only the first error when multiple listeners throw", async () => {
+  it("throws AggregateError when multiple listeners throw, preserving all errors", async () => {
     const hooks = new HookSystem()
     hooks.on("onRequest", async () => {
       throw new Error("first")
@@ -117,7 +117,45 @@ describe("HookSystem", () => {
     })
 
     const err = await hooks.trigger("onRequest", emptyCtx).catch((e) => e)
-    expect(err.message).toBe("first")
+    expect(err).toBeInstanceOf(AggregateError)
+    expect((err as AggregateError).errors).toHaveLength(2)
+    expect((err as AggregateError).errors[0]).toBeInstanceOf(Error)
+    expect(((err as AggregateError).errors[0] as Error).message).toBe("first")
+    expect(((err as AggregateError).errors[1] as Error).message).toBe("second")
+    expect((err as AggregateError).message).toBe("Multiple hook errors")
+  })
+
+  it("throws the original error directly when only one listener throws", async () => {
+    const hooks = new HookSystem()
+    const original = new Error("solo")
+    hooks.on("onRequest", async () => {
+      throw original
+    })
+
+    const err = await hooks.trigger("onRequest", emptyCtx).catch((e) => e)
+    expect(err).toBe(original)
+    expect(err).not.toBeInstanceOf(AggregateError)
+  })
+
+  it("collects errors from all throwing listeners even when a middle one succeeds", async () => {
+    const hooks = new HookSystem()
+    const ran: number[] = []
+    hooks.on("afterPipeline", async () => {
+      ran.push(1)
+      throw new Error("err-1")
+    })
+    hooks.on("afterPipeline", async () => {
+      ran.push(2)
+    })
+    hooks.on("afterPipeline", async () => {
+      ran.push(3)
+      throw new Error("err-3")
+    })
+
+    const err = await hooks.trigger("afterPipeline", emptyCtx).catch((e) => e)
+    expect(ran).toEqual([1, 2, 3])
+    expect(err).toBeInstanceOf(AggregateError)
+    expect((err as AggregateError).errors).toHaveLength(2)
   })
 
   it("swallows errors thrown by onError hook listeners", async () => {

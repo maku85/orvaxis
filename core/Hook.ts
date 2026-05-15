@@ -22,18 +22,19 @@ export class HookSystem {
   }
 
   async trigger(name: HookName, ctx: OrvaxisContext, error?: Error) {
-    let firstError: unknown
+    const errors: unknown[] = []
     for (const fn of this.hooks[name]) {
       try {
         await fn(ctx, error)
       } catch (hookErr) {
         if (name === "onError") {
           this.logger.error("[orvaxis] onError hook threw:", hookErr)
-        } else if (firstError === undefined) {
-          firstError = hookErr
+        } else {
+          errors.push(hookErr)
         }
       }
     }
-    if (firstError !== undefined) throw firstError
+    if (errors.length === 1) throw errors[0]
+    if (errors.length > 1) throw new AggregateError(errors, "Multiple hook errors")
   }
 }
