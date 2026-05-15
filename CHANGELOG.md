@@ -5,7 +5,34 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.2.2] - 2026-05-15
+## [Unreleased]
+
+### Added
+
+- **Streaming response support** — `OrvaxisResponse` now includes three streaming methods: `write(chunk)` sends a chunk without closing the connection, `end(chunk?)` flushes an optional final chunk and closes it, and `pipe(stream)` delegates to a `node:stream.Readable` for full stream piping. Both built-in adapters (Express and Fastify) implement these methods on the underlying response. The Fastify adapter calls `reply.hijack()` before writing to bypass Fastify's own response lifecycle and writes directly to `reply.raw`. The mock response used in `testRequest` captures chunks in a `chunks: unknown[]` array and exposes an `ended: boolean` flag, so streaming handlers are fully testable without a live server.
+
+### Fixed
+
+- **`query` typed on `OrvaxisRequest`** — a new `query?: Record<string, string | string[]>` field is now part of the `OrvaxisRequest` interface. Both built-in adapters populate it from the framework's already-parsed query object (`req.query` on Express, `req.query` on Fastify). `TestRequestInit` exposes the same field so query params can be passed directly to `testRequest`. `schemaValidationPlugin` correctly assigns the validated value back to the typed field. Custom adapters can populate `req.query` by parsing `req.url` or forwarding from their underlying framework.
+
+- **Automatic HEAD → GET fallback** — `HEAD` requests now automatically fall back to the matching `GET` route when no dedicated `HEAD` route is registered. The `GET` handler runs in full (policies, middleware, hooks), but the response body is suppressed: `json()`, `send()`, and `pipe()` call `res.end()` without writing bytes, and `write()` is a no-op. Response headers set by the handler (e.g. `Content-Type`, `X-Version`) are forwarded to the client normally. A dedicated `HEAD` route always takes priority over the fallback. The fallback also works with param and wildcard routes.
+
+- **Graceful shutdown now drains idle keep-alive connections** — both adapters now call `server.closeIdleConnections()` (Node.js ≥ 18.2) immediately before closing, so idle HTTP/1.1 keep-alive connections are released at once rather than holding the server open indefinitely. Active in-flight requests are still allowed to complete before the close callback fires. The Express adapter additionally resets its internal server reference to `null` inside the close callback, fixing a pre-existing bug that prevented calling `listen()` again on the same adapter instance after a `close()`.
+
+- **Hook errors after the first are no longer silently lost** — `HookSystem.trigger` previously captured only the first error thrown by a lifecycle hook listener and silently discarded any subsequent ones. It now collects all errors: if exactly one listener throws the original error is re-thrown unwrapped (no change to the common case, `instanceof HttpError` still works); if more than one listener throws, a native `AggregateError` is thrown with all errors available in `.errors[]` and the message `"Multiple hook errors"`. `onError` hook failures continue to be logged and not re-thrown.
+
+- **`exports` field in `package.json`** — added a `"exports"` map with `"types"`, `"require"`, and `"default"` conditions pointing to `dist/index.js` and `dist/index.d.ts`. Modern bundlers (webpack 5, Rollup, esbuild, Vite) and Node.js ≥ 12.7 now resolve the package through `exports` rather than `main`, which seals the public surface: importing internal paths such as `orvaxis/core/Router` now throws `ERR_PACKAGE_PATH_NOT_EXPORTED`. The legacy `main` and `types` fields are kept for tools that do not yet understand `exports`. No ESM build is introduced — `import()` of a CJS package works via the `"default"` fallback.
+
+- **Fastify adapter double-listen guard** — `createFastifyServer` now tracks a `listening` flag and rejects with `"Server is already listening. Call close() first."` if `listen()` is called while the server is already bound, matching the existing behaviour of the Express adapter. The flag is reset on `close()` and also on any bind failure so that a retry after an `EADDRINUSE` error is not blocked by the guard itself.
+
+- **Duplicate route detection** — registering two routes with the same HTTP method and path pattern now throws a `TypeError` immediately at registration time rather than silently overwriting the first route. Three cases are caught: identical static or param patterns (e.g. two `GET /api/users`), conflicting parameter names at the same trie position (e.g. `/:id` then `/:userId`), and duplicate wildcard patterns (e.g. two `GET /files/*`). Routes that share a path but differ in HTTP method, or that share a pattern across different group prefixes, are not affected.
+
+- **Request timeout now aborts in-flight work** — both adapters create an `AbortController` per request and pass it to `withTimeout`. When the deadline expires the controller is aborted before the 408 is sent, so the `AbortSignal` available as `ctx.req.signal` transitions to `aborted: true`. Handlers, middleware, and any downstream code (fetch, database drivers, node:http) that accept a signal are cancelled immediately rather than continuing to consume resources after the client has already received the timeout response. Custom adapters can replicate this behaviour by passing their own `AbortController` as the third argument to `withTimeout`.
+- **Radix trie router** — `Router` now builds a per-method trie at registration time. Route matching is `O(d)` in the depth of the path (number of segments) rather than `O(n)` in the total number of registered routes. Static segments always take priority over param segments at the same level, with automatic backtracking when a static branch fails deeper in the tree. The public API (`Router.group`, `Router.match`, `Router.routes`) is unchanged.
+- **`HttpMethod` type** — a new exported union type `"GET" | "POST" | "PUT" | "DELETE" | "PATCH" | "HEAD" | "OPTIONS"` replaces the inline literal in `PolicyScope` and is now used for `Route.method` and `RouteInfo.method`. Both `validateGroup` and the router trie normalise method strings to uppercase, so registering a route with `"get"` or matching a request that carries `"get"` both work correctly. Unknown methods (e.g. `"FOOBAR"`) are rejected at registration time with a `TypeError`.
+- **Wildcard / catch-all routes** — route paths may now end with `*` (unnamed, captured as `params["*"]`) or `*name` (named, captured as `params["name"]`). A wildcard segment must be the last segment in the pattern; placing it in the middle throws a `TypeError` at registration time. Priority is static > param > wildcard, so more specific routes always win. Each captured segment is URL-decoded individually before being joined with `/`. See `examples/wildcard-routing.ts` for a working demonstration.
+
+## [0.2.3] - 2026-05-15
 
 ### Added
 
