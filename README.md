@@ -631,7 +631,8 @@ Any adapter needs to:
 1. Ensure `req.path` is a plain path string (no query string)
 2. Create an `AbortController`, attach its `signal` to the request, and pass the controller as the third argument to `withTimeout` so that in-flight work is cancelled when the deadline expires
 3. Call `app.handle(req, res)` (wrapped in `withTimeout` if a deadline is needed) and catch thrown errors, using `sanitizeErrorMessage` to build the response body
-4. Return `{ listen(port, onListen?) }` to satisfy the `ServerAdapter` interface
+4. Return `{ listen(port, onListen?), close() }` to satisfy the `ServerAdapter` interface
+5. In `close()`, call `server.closeIdleConnections()` before `server.close()` to release idle HTTP keep-alive connections immediately, allowing the close callback to fire as soon as active requests complete rather than waiting indefinitely
 
 ---
 
@@ -849,7 +850,7 @@ It favors:
 
 ## Current Status
 
-The core execution model is stable, tested, and covered by 260 passing tests.
+The core execution model is stable, tested, and covered by 267 passing tests.
 
 Not yet recommended for production. Known gaps before production use:
 

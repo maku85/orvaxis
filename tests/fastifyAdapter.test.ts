@@ -1,5 +1,5 @@
 import Fastify from "fastify"
-import { describe, expect, it } from "vitest"
+import { describe, expect, it, vi } from "vitest"
 import { Orvaxis } from "../core/Orvaxis"
 import { createFastifyServer } from "../http/fastifyAdapter"
 
@@ -47,6 +47,15 @@ describe("createFastifyServer — listen() guard", () => {
   it("close() resolves even when the server is not listening", async () => {
     const server = createFastifyServer(makeApp(), Fastify())
     await expect(server.close()).resolves.toBeUndefined()
+  })
+
+  it("calls closeIdleConnections() on the underlying server when closing", async () => {
+    const fastifyInstance = Fastify()
+    const server = createFastifyServer(makeApp(), fastifyInstance)
+    await server.listen(0)
+    const spy = vi.spyOn(fastifyInstance.server, "closeIdleConnections")
+    await server.close()
+    expect(spy).toHaveBeenCalled()
   })
 
   it("invokes the onListen callback with the port after a successful listen", async () => {

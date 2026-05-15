@@ -110,6 +110,7 @@ export function createFastifyServer(
       }
     },
     close: async () => {
+      if (listening) fastify.server.closeIdleConnections()
       await fastify.close()
       listening = false
     },

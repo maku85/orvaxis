@@ -96,7 +96,12 @@ export function createExpressServer(
     close: () =>
       new Promise<void>((resolve, reject) => {
         if (!httpServer) return resolve()
-        httpServer.close((err) => (err ? reject(err) : resolve()))
+        httpServer.closeIdleConnections()
+        httpServer.close((err) => {
+          httpServer = null
+          if (err) reject(err)
+          else resolve()
+        })
       }),
   }
 }
