@@ -143,7 +143,9 @@ describe("buildExecutionSummary", () => {
         traceEvents: [{ type: "db:query", timestamp: 10, meta: { table: "users" } }],
       })
       const { combinedTimeline } = buildExecutionSummary(ctx)
-      expect(combinedTimeline).toEqual([{ kind: "trace", name: "db:query", timestamp: 10, meta: { table: "users" } }])
+      expect(combinedTimeline).toEqual([
+        { kind: "trace", name: "db:query", timestamp: 10, meta: { table: "users" } },
+      ])
     })
 
     it("includes debug entries with kind 'debug'", () => {
@@ -151,7 +153,9 @@ describe("buildExecutionSummary", () => {
         timeline: [{ event: "HOOK:onRequest", time: 5 }],
       })
       const { combinedTimeline } = buildExecutionSummary(ctx)
-      expect(combinedTimeline).toEqual([{ kind: "debug", name: "HOOK:onRequest", timestamp: 5, meta: undefined }])
+      expect(combinedTimeline).toEqual([
+        { kind: "debug", name: "HOOK:onRequest", timestamp: 5, meta: undefined },
+      ])
     })
 
     it("merges and sorts events from both sources by timestamp", () => {
