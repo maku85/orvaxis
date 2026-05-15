@@ -134,6 +134,17 @@ Route paths support three segment types:
 
 The wildcard must be the last segment in the pattern. More specific routes always win: `/users/me` beats `/:id`, which beats `/*`.
 
+`HEAD` requests automatically fall back to the matching `GET` route when no dedicated `HEAD` route is registered. The `GET` handler executes in full — policies, middleware, and hooks all run — but the response body is suppressed and the connection is closed cleanly. Headers set by the handler (e.g. `Content-Type`, custom headers) are forwarded normally. A dedicated `HEAD` route always takes priority over the fallback.
+
+```ts
+// GET /api/users → { users: [] }
+// HEAD /api/users → 200, correct headers, no body  (automatic, no extra code needed)
+app.group({
+  prefix: "/api",
+  routes: [{ method: "GET", path: "/users", handler: async (ctx) => ctx.res.json({ users: [] }) }],
+})
+```
+
 Registering two routes with the same method and pattern throws a `TypeError` immediately at registration time:
 
 ```ts
@@ -850,7 +861,7 @@ It favors:
 
 ## Current Status
 
-The core execution model is stable, tested, and covered by 267 passing tests.
+The core execution model is stable, tested, and covered by 276 passing tests.
 
 Not yet recommended for production. Known gaps before production use:
 

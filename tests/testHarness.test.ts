@@ -146,6 +146,70 @@ describe("testRequest", () => {
     })
   })
 
+  describe("HEAD → GET fallback", () => {
+    it("returns 200 and no body for HEAD when a GET route exists", async () => {
+      const res = await testRequest(makeApp(), { path: "/api/ping", method: "HEAD" })
+      expect(res.status).toBe(200)
+      expect(res.body).toBeUndefined()
+      expect(res.error).toBeUndefined()
+    })
+
+    it("preserves response headers set by the GET handler for HEAD requests", async () => {
+      const app = new Orvaxis()
+      app.group({
+        prefix: "/api",
+        routes: [
+          {
+            method: "GET",
+            path: "/versioned",
+            handler: async (ctx) => {
+              ctx.res.setHeader("x-version", "42")
+              ctx.res.json({ version: 42 })
+            },
+          },
+        ],
+      })
+
+      const res = await testRequest(app, { path: "/api/versioned", method: "HEAD" })
+      expect(res.status).toBe(200)
+      expect(res.body).toBeUndefined()
+      expect(res.headers["x-version"]).toBe("42")
+    })
+
+    it("returns 404 for HEAD when no GET route matches", async () => {
+      const res = await testRequest(makeApp(), { path: "/api/missing", method: "HEAD" })
+      expect(res.status).toBe(404)
+    })
+
+    it("a dedicated HEAD route takes priority over the GET fallback", async () => {
+      const app = new Orvaxis()
+      app.group({
+        prefix: "/api",
+        routes: [
+          {
+            method: "GET",
+            path: "/resource",
+            handler: async (ctx) => {
+              ctx.res.setHeader("x-source", "get")
+              ctx.res.json({})
+            },
+          },
+          {
+            method: "HEAD",
+            path: "/resource",
+            handler: async (ctx) => {
+              ctx.res.setHeader("x-source", "head")
+              ctx.res.end()
+            },
+          },
+        ],
+      })
+
+      const res = await testRequest(app, { path: "/api/resource", method: "HEAD" })
+      expect(res.headers["x-source"]).toBe("head")
+    })
+  })
+
   describe("streaming", () => {
     it("exposes chunks written via ctx.res.write and ctx.res.end", async () => {
       const app = new Orvaxis()

@@ -23,6 +23,42 @@ function generateId(): string {
   return crypto.randomUUID()
 }
 
+function wrapForHead(res: OrvaxisResponse): OrvaxisResponse {
+  const wrapper: OrvaxisResponse = {
+    statusCode: res.statusCode,
+    sent: false,
+    status(code) {
+      wrapper.statusCode = code
+      res.status(code)
+      return wrapper
+    },
+    setHeader(name, value) {
+      res.setHeader(name, value)
+      return wrapper
+    },
+    json(_body) {
+      wrapper.sent = true
+      res.end()
+    },
+    send(_body) {
+      wrapper.sent = true
+      res.end()
+    },
+    write(_chunk) {
+      wrapper.sent = true
+    },
+    end(_chunk?) {
+      wrapper.sent = true
+      res.end()
+    },
+    pipe(_stream) {
+      wrapper.sent = true
+      res.end()
+    },
+  }
+  return wrapper
+}
+
 export class Runtime {
   readonly debugger = new Debugger()
   readonly hooks: HookSystem
@@ -57,6 +93,10 @@ export class Runtime {
         }
 
         ctx.meta.route = match
+
+        if (req.method.toUpperCase() === "HEAD" && match.route.method === "GET") {
+          ctx.res = wrapForHead(res)
+        }
 
         this.debugger.log(ctx, "POLICY_START")
         await this.policies.evaluate(ctx)

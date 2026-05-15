@@ -160,6 +160,9 @@ export class Router {
 
   match(req: { path: string; method: string }): RouteMatch | null {
     const path = req.path.replace(/\/+/g, "/")
-    return this.trie.match(req.method, path)
+    const result = this.trie.match(req.method, path)
+    if (result) return result
+    if (req.method.toUpperCase() === "HEAD") return this.trie.match("GET", path)
+    return null
   }
 }

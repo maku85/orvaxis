@@ -423,4 +423,48 @@ describe("Router", () => {
       )
     })
   })
+
+  describe("HEAD → GET fallback", () => {
+    it("matches a HEAD request against a GET route when no HEAD route is registered", () => {
+      const router = new Router()
+      router.group(makeGroup("/api", [{ method: "GET", path: "/users" }]))
+      const match = router.match({ path: "/api/users", method: "HEAD" })
+      expect(match).not.toBeNull()
+      expect(match?.route.method).toBe("GET")
+    })
+
+    it("prefers a dedicated HEAD route over the GET fallback", () => {
+      const router = new Router()
+      router.group(
+        makeGroup("/api", [
+          { method: "GET", path: "/users" },
+          { method: "HEAD", path: "/users" },
+        ])
+      )
+      const match = router.match({ path: "/api/users", method: "HEAD" })
+      expect(match?.route.method).toBe("HEAD")
+    })
+
+    it("returns null for HEAD when no GET route exists either", () => {
+      const router = new Router()
+      router.group(makeGroup("/api", [{ method: "POST", path: "/users" }]))
+      expect(router.match({ path: "/api/users", method: "HEAD" })).toBeNull()
+    })
+
+    it("HEAD fallback works with param routes", () => {
+      const router = new Router()
+      router.group(makeGroup("/users", [{ method: "GET", path: "/:id" }]))
+      const match = router.match({ path: "/users/42", method: "HEAD" })
+      expect(match).not.toBeNull()
+      expect(match?.params).toEqual({ id: "42" })
+    })
+
+    it("HEAD fallback works with wildcard routes", () => {
+      const router = new Router()
+      router.group(makeGroup("/files", [{ method: "GET", path: "/*filepath" }]))
+      const match = router.match({ path: "/files/docs/readme.md", method: "HEAD" })
+      expect(match).not.toBeNull()
+      expect(match?.params.filepath).toBe("docs/readme.md")
+    })
+  })
 })
