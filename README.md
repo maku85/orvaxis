@@ -119,7 +119,8 @@ The central execution engine responsible for orchestrating the full request life
 
 ### Router
 Handles route resolution and grouping:
-- method + path matching
+- method + path matching via a per-method radix trie — `O(d)` in path depth, independent of total route count
+- static segments always take priority over param segments at the same level; backtracking is automatic when a static branch fails deeper in the tree
 - group-based inheritance
 - route metadata resolution
 
@@ -728,7 +729,7 @@ It favors:
 
 ## Current Status
 
-The core execution model is stable, tested, and covered by 215 passing tests.
+The core execution model is stable, tested, and covered by 227 passing tests.
 
 Not yet recommended for production. Known gaps before production use:
 

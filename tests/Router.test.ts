@@ -182,4 +182,66 @@ describe("Router", () => {
       expect(err?.message).toMatch(/percent-encoding/)
     })
   })
+
+  describe("trie priority and backtracking", () => {
+    it("prefers a static segment over a param segment when both could match", () => {
+      const router = new Router()
+      router.group(
+        makeGroup("/users", [
+          { method: "GET", path: "/:id" },
+          { method: "GET", path: "/me" },
+        ])
+      )
+
+      const match = router.match({ path: "/users/me", method: "GET" })
+      expect(match?.route.path).toBe("/me")
+      expect(match?.params).toEqual({})
+    })
+
+    it("falls back to a param segment when the static branch fails deeper in the tree", () => {
+      const router = new Router()
+      router.group(
+        makeGroup("/api", [
+          { method: "GET", path: "/a/b" },
+          { method: "GET", path: "/:x/c" },
+        ])
+      )
+
+      // "a/b" matches the static route; "a/c" must fall back to the param route
+      expect(router.match({ path: "/api/a/b", method: "GET" })?.route.path).toBe("/a/b")
+
+      const match = router.match({ path: "/api/a/c", method: "GET" })
+      expect(match?.route.path).toBe("/:x/c")
+      expect(match?.params).toEqual({ x: "a" })
+    })
+
+    it("does not leak params from a failed branch into the successful match", () => {
+      const router = new Router()
+      router.group(
+        makeGroup("/", [
+          { method: "GET", path: "/a/:x/b" },
+          { method: "GET", path: "/a/c/:y" },
+        ])
+      )
+
+      // /a/c/d matches the static-preferred route /a/c/:y — no "x" in params
+      const match = router.match({ path: "/a/c/d", method: "GET" })
+      expect(match?.route.path).toBe("/a/c/:y")
+      expect(match?.params).toEqual({ y: "d" })
+      expect(match?.params).not.toHaveProperty("x")
+    })
+
+    it("matches correctly across many registered routes (no linear regression)", () => {
+      const router = new Router()
+      const routes = Array.from({ length: 100 }, (_, i) => ({
+        method: "GET",
+        path: `/item${i}`,
+      }))
+      router.group(makeGroup("/api", routes))
+
+      const match = router.match({ path: "/api/item99", method: "GET" })
+      expect(match?.route.path).toBe("/item99")
+      expect(match?.params).toEqual({})
+    })
+  })
 })
