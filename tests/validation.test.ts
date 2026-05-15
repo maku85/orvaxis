@@ -94,9 +94,35 @@ describe("validateGroup", () => {
   it("throws when route.method is empty", () => {
     expect(() =>
       validateGroup(
-        makeGroup({ routes: [{ method: "", path: "/resource", handler: async () => {} }] })
+        makeGroup({
+          routes: [{ method: "" as unknown as "GET", path: "/resource", handler: async () => {} }],
+        })
       )
     ).toThrow(/method/)
+  })
+
+  it("throws when route.method is not a recognised HTTP method", () => {
+    expect(() =>
+      validateGroup(
+        makeGroup({
+          routes: [
+            { method: "FOOBAR" as unknown as "GET", path: "/resource", handler: async () => {} },
+          ],
+        })
+      )
+    ).toThrow(/not a valid HTTP method/)
+  })
+
+  it("accepts lowercase method values (normalised internally)", () => {
+    expect(() =>
+      validateGroup(
+        makeGroup({
+          routes: [
+            { method: "get" as unknown as "GET", path: "/resource", handler: async () => {} },
+          ],
+        })
+      )
+    ).not.toThrow()
   })
 
   it("throws when route.path is not a string", () => {

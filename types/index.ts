@@ -65,7 +65,7 @@ export type Middleware<
 export type NextFunction = () => Promise<void> | void
 
 export type RouteInfo = {
-  method: string
+  method: HttpMethod
   path: string
   prefix: string
 }
@@ -110,9 +110,11 @@ export type PolicyResult =
   | { allow: true; modify?: Record<string, unknown> }
   | { allow: false; reason?: string; status?: number }
 
+export type HttpMethod = "GET" | "POST" | "PUT" | "DELETE" | "PATCH" | "HEAD" | "OPTIONS"
+
 export type PolicyScope = {
   path?: string | RegExp
-  method?: "GET" | "POST" | "PUT" | "DELETE" | "PATCH" | "HEAD" | "OPTIONS"
+  method?: HttpMethod
 }
 
 export type SchemaField = {
@@ -130,7 +132,7 @@ export type Route<
   TState extends Record<string, unknown> = Record<string, unknown>,
   TMeta extends Record<string, unknown> = Record<never, never>,
 > = {
-  method: string
+  method: HttpMethod
   path: string
   handler: (ctx: OrvaxisContext<TState, TMeta>) => Promise<void> | void
   middleware?: Middleware<TState, TMeta>[]

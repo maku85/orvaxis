@@ -1,6 +1,8 @@
 import type { Group, OrvaxisRequest } from "../types"
 import { HttpError } from "./HttpError"
 
+const VALID_METHODS = new Set(["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"])
+
 export function validateRequest(req: OrvaxisRequest): void {
   if (typeof req.path !== "string" || req.path === "") {
     throw new HttpError(400, "req.path must be a non-empty string")
@@ -35,6 +37,11 @@ export function validateGroup(group: Group): void {
     if (typeof route.method !== "string" || route.method === "") {
       throw new TypeError(
         `route.method must be a non-empty string for path "${route.path}" in group "${group.prefix}"`
+      )
+    }
+    if (!VALID_METHODS.has(route.method.toUpperCase())) {
+      throw new TypeError(
+        `route.method "${route.method}" is not a valid HTTP method for path "${route.path}" in group "${group.prefix}"`
       )
     }
   }

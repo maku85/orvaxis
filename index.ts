@@ -24,6 +24,7 @@ export type {
   DebugInfo,
   Group,
   HookName,
+  HttpMethod,
   Logger,
   Middleware,
   NextFunction,

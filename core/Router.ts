@@ -30,10 +30,10 @@ class Trie {
   private roots = new Map<string, TrieNode>()
 
   insert(method: string, pattern: string, route: Route, group: Group): void {
-    let root = this.roots.get(method)
+    let root = this.roots.get(method.toUpperCase())
     if (!root) {
       root = createNode()
-      this.roots.set(method, root)
+      this.roots.set(method.toUpperCase(), root)
     }
 
     const segments = pattern.split("/").filter(Boolean)
@@ -73,7 +73,7 @@ class Trie {
   }
 
   match(method: string, path: string): RouteMatch | null {
-    const root = this.roots.get(method)
+    const root = this.roots.get(method.toUpperCase())
     if (!root) return null
 
     const segments = path.split("/").filter(Boolean)

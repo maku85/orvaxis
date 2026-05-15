@@ -134,6 +134,8 @@ Route paths support three segment types:
 
 The wildcard must be the last segment in the pattern. More specific routes always win: `/users/me` beats `/:id`, which beats `/*`.
 
+`Route.method` is typed as `HttpMethod` (`"GET" | "POST" | "PUT" | "DELETE" | "PATCH" | "HEAD" | "OPTIONS"`). Methods are normalised to uppercase at both registration and match time, so a route registered as `"get"` and a request arriving as `"GET"` always find each other. Unknown method strings are rejected at registration with a `TypeError`.
+
 ```ts
 app.group({
   prefix: "/files",
@@ -757,7 +759,7 @@ It favors:
 
 ## Current Status
 
-The core execution model is stable, tested, and covered by 235 passing tests.
+The core execution model is stable, tested, and covered by 240 passing tests.
 
 Not yet recommended for production. Known gaps before production use:
 

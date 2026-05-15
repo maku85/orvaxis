@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest"
 import { Router } from "../core/Router"
-import type { Group } from "../types"
+import type { Group, HttpMethod } from "../types"
 
 const noop = async () => {}
 
-const makeGroup = (prefix: string, routes: { method: string; path: string }[]): Group => ({
+const makeGroup = (prefix: string, routes: { method: HttpMethod; path: string }[]): Group => ({
   prefix,
   routes: routes.map((r) => ({ ...r, handler: noop })),
 })
@@ -320,6 +320,36 @@ describe("Router", () => {
       expect(() => router.group(makeGroup("/api", [{ method: "GET", path: "/*/rest" }]))).toThrow(
         TypeError
       )
+    })
+  })
+
+  describe("method normalisation", () => {
+    it("matches a request with uppercase method against a lowercase-registered route", () => {
+      const router = new Router()
+      router.group({
+        prefix: "/api",
+        routes: [{ method: "get" as unknown as "GET", path: "/users", handler: noop }],
+      })
+      expect(router.match({ path: "/api/users", method: "GET" })).not.toBeNull()
+    })
+
+    it("matches a request with lowercase method against an uppercase-registered route", () => {
+      const router = new Router()
+      router.group(makeGroup("/api", [{ method: "GET", path: "/users" }]))
+      expect(router.match({ path: "/api/users", method: "get" })).not.toBeNull()
+    })
+
+    it("does not confuse routes with different methods after normalisation", () => {
+      const router = new Router()
+      router.group(
+        makeGroup("/api", [
+          { method: "GET", path: "/r" },
+          { method: "POST", path: "/r" },
+        ])
+      )
+      expect(router.match({ path: "/api/r", method: "get" })?.route.method).toBe("GET")
+      expect(router.match({ path: "/api/r", method: "post" })?.route.method).toBe("POST")
+      expect(router.match({ path: "/api/r", method: "DELETE" })).toBeNull()
     })
   })
 })
