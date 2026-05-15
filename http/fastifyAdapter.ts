@@ -39,18 +39,20 @@ export function createFastifyServer(
     const path = (req.url ?? "/").split("?")[0]
     const requestId =
       (req.headers["x-request-id"] as string) || (req.id as string) || crypto.randomUUID()
+    const controller = new AbortController()
     const adapted = Object.assign(req, {
       path,
       method: req.method ?? "GET",
       headers: req.headers,
       id: requestId,
+      signal: controller.signal,
     }) as unknown as OrvaxisRequest
     const wrapped = wrapFastifyResponse(reply)
     wrapped.setHeader("X-Request-ID", requestId)
 
     try {
       const handlePromise = app.handle(adapted, wrapped)
-      await (timeoutMs > 0 ? withTimeout(handlePromise, timeoutMs) : handlePromise)
+      await (timeoutMs > 0 ? withTimeout(handlePromise, timeoutMs, controller) : handlePromise)
     } catch (err) {
       if (!wrapped.sent) {
         const e = err as { status?: number }

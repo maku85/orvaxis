@@ -53,6 +53,31 @@ describe("withTimeout", () => {
     expect(clearTimeoutSpy).toHaveBeenCalled()
     clearTimeoutSpy.mockRestore()
   })
+
+  it("aborts the controller when the deadline expires", async () => {
+    const controller = new AbortController()
+    const pending = new Promise<never>(() => {})
+    const race = withTimeout(pending, 500, controller).catch(() => {})
+    await vi.advanceTimersByTimeAsync(501)
+    await race
+    expect(controller.signal.aborted).toBe(true)
+  })
+
+  it("does not abort the controller when the promise resolves before the deadline", async () => {
+    const controller = new AbortController()
+    const result = await withTimeout(Promise.resolve("ok"), 1000, controller)
+    expect(result).toBe("ok")
+    expect(controller.signal.aborted).toBe(false)
+  })
+
+  it("works without a controller (backwards compatible)", async () => {
+    const pending = new Promise<never>(() => {})
+    const race = withTimeout(pending, 500).catch((e) => e)
+    await vi.advanceTimersByTimeAsync(501)
+    const err = await race
+    expect(err).toBeInstanceOf(HttpError)
+    expect(err.status).toBe(408)
+  })
 })
 
 describe("sanitizeErrorMessage", () => {

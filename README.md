@@ -450,7 +450,17 @@ const server = createExpressServer(app, undefined, { timeout: 10_000 })
 const server = createExpressServer(app, undefined, { timeout: 0 })
 ```
 
-When the deadline expires the adapter rejects with `HttpError(408, "Request Timeout")` and the normal error path sends a 408 response to the client. The same option is available on `createFastifyServer`.
+When the deadline expires the adapter sends a 408 response and sets `ctx.req.signal` to aborted, so any downstream work that accepts an `AbortSignal` is cancelled immediately:
+
+```ts
+handler: async (ctx) => {
+  // fetch is aborted if the request times out
+  const res = await fetch("https://api.example.com/data", { signal: ctx.req.signal })
+  ctx.res.json(await res.json())
+}
+```
+
+`ctx.req.signal` is always defined when using the built-in adapters. Pass it to `node:http` requests, database drivers (pg, mongodb, prisma), or any API that accepts an `AbortSignal` to stop work the client will never see. The same option is available on `createFastifyServer`.
 
 `withTimeout` and `AdapterOptions` are exported from the main entry point so custom adapters can reuse them:
 
@@ -505,8 +515,9 @@ app.on("afterPipeline", (ctx) => {
 
 Any adapter needs to:
 1. Ensure `req.path` is a plain path string (no query string)
-2. Call `app.handle(req, res)` (wrapped in `withTimeout` if a deadline is needed) and catch thrown errors, using `sanitizeErrorMessage` to build the response body
-3. Return `{ listen(port, onListen?) }` to satisfy the `ServerAdapter` interface
+2. Create an `AbortController`, attach its `signal` to the request, and pass the controller as the third argument to `withTimeout` so that in-flight work is cancelled when the deadline expires
+3. Call `app.handle(req, res)` (wrapped in `withTimeout` if a deadline is needed) and catch thrown errors, using `sanitizeErrorMessage` to build the response body
+4. Return `{ listen(port, onListen?) }` to satisfy the `ServerAdapter` interface
 
 ---
 
