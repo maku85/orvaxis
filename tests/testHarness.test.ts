@@ -247,6 +247,90 @@ describe("testRequest", () => {
       expect(res.status).toBe(404)
     })
 
+    it("suppresses body when GET handler uses send()", async () => {
+      const app = new Orvaxis()
+      app.group({
+        prefix: "/api",
+        routes: [
+          {
+            method: "GET",
+            path: "/text",
+            handler: async (ctx) => {
+              ctx.res.send("hello")
+            },
+          },
+        ],
+      })
+
+      const res = await testRequest(app, { path: "/api/text", method: "HEAD" })
+      expect(res.status).toBe(200)
+      expect(res.body).toBeUndefined()
+      expect(res.ended).toBe(true)
+    })
+
+    it("suppresses body when GET handler uses write() + end()", async () => {
+      const app = new Orvaxis()
+      app.group({
+        prefix: "/api",
+        routes: [
+          {
+            method: "GET",
+            path: "/stream",
+            handler: async (ctx) => {
+              ctx.res.write("chunk")
+              ctx.res.end("done")
+            },
+          },
+        ],
+      })
+
+      const res = await testRequest(app, { path: "/api/stream", method: "HEAD" })
+      expect(res.status).toBe(200)
+      expect(res.chunks).toEqual([])
+      expect(res.ended).toBe(true)
+    })
+
+    it("suppresses body when GET handler uses end() directly", async () => {
+      const app = new Orvaxis()
+      app.group({
+        prefix: "/api",
+        routes: [
+          {
+            method: "GET",
+            path: "/empty",
+            handler: async (ctx) => {
+              ctx.res.status(204).end()
+            },
+          },
+        ],
+      })
+
+      const res = await testRequest(app, { path: "/api/empty", method: "HEAD" })
+      expect(res.status).toBe(204)
+      expect(res.ended).toBe(true)
+    })
+
+    it("suppresses body when GET handler uses pipe()", async () => {
+      const { Readable } = await import("node:stream")
+      const app = new Orvaxis()
+      app.group({
+        prefix: "/api",
+        routes: [
+          {
+            method: "GET",
+            path: "/file",
+            handler: async (ctx) => {
+              ctx.res.pipe(Readable.from(["data"]))
+            },
+          },
+        ],
+      })
+
+      const res = await testRequest(app, { path: "/api/file", method: "HEAD" })
+      expect(res.status).toBe(200)
+      expect(res.ended).toBe(true)
+    })
+
     it("a dedicated HEAD route takes priority over the GET fallback", async () => {
       const app = new Orvaxis()
       app.group({
