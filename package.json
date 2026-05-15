@@ -1,6 +1,6 @@
 {
   "name": "orvaxis",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Lightweight policy-driven execution runtime for Node.js",
   "type": "commonjs",
   "main": "dist/index.js",
