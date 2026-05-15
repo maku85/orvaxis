@@ -832,7 +832,7 @@ It favors:
 
 ## Current Status
 
-The core execution model is stable, tested, and covered by 254 passing tests.
+The core execution model is stable, tested, and covered by 258 passing tests.
 
 Not yet recommended for production. Known gaps before production use:
 

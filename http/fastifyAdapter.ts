@@ -93,11 +93,25 @@ export function createFastifyServer(
     }
   })
 
+  let listening = false
+
   return {
     listen: async (port: number, onListen?: (port: number) => void) => {
-      await fastify.listen({ port })
-      onListen?.(port)
+      if (listening) {
+        throw new Error("Server is already listening. Call close() first.")
+      }
+      try {
+        await fastify.listen({ port })
+        listening = true
+        onListen?.(port)
+      } catch (err) {
+        listening = false
+        throw err
+      }
     },
-    close: () => fastify.close(),
+    close: async () => {
+      await fastify.close()
+      listening = false
+    },
   }
 }
