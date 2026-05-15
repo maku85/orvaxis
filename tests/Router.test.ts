@@ -244,4 +244,82 @@ describe("Router", () => {
       expect(match?.params).toEqual({})
     })
   })
+
+  describe("wildcard routing", () => {
+    it("matches any single segment with an unnamed wildcard", () => {
+      const router = new Router()
+      router.group(makeGroup("/static", [{ method: "GET", path: "/*" }]))
+
+      const match = router.match({ path: "/static/file.css", method: "GET" })
+      expect(match).not.toBeNull()
+      expect(match?.params).toEqual({ "*": "file.css" })
+    })
+
+    it("matches multiple remaining segments into a single wildcard value", () => {
+      const router = new Router()
+      router.group(makeGroup("/files", [{ method: "GET", path: "/*" }]))
+
+      const match = router.match({ path: "/files/a/b/c.txt", method: "GET" })
+      expect(match?.params).toEqual({ "*": "a/b/c.txt" })
+    })
+
+    it("captures into a named wildcard param", () => {
+      const router = new Router()
+      router.group(makeGroup("/files", [{ method: "GET", path: "/*filepath" }]))
+
+      const match = router.match({ path: "/files/docs/readme.md", method: "GET" })
+      expect(match?.params).toEqual({ filepath: "docs/readme.md" })
+    })
+
+    it("allows static prefix segments before the wildcard", () => {
+      const router = new Router()
+      router.group(makeGroup("/api", [{ method: "GET", path: "/v1/*" }]))
+
+      expect(router.match({ path: "/api/v1/users/me", method: "GET" })?.params).toEqual({
+        "*": "users/me",
+      })
+    })
+
+    it("prefers an exact static/param route over the wildcard for shorter paths", () => {
+      const router = new Router()
+      router.group(
+        makeGroup("/api", [
+          { method: "GET", path: "/users/:id" },
+          { method: "GET", path: "/*" },
+        ])
+      )
+
+      // exact param route wins for a two-segment path
+      const exact = router.match({ path: "/api/users/42", method: "GET" })
+      expect(exact?.route.path).toBe("/users/:id")
+      expect(exact?.params).toEqual({ id: "42" })
+
+      // wildcard takes over for deeper paths that param can't handle
+      const deep = router.match({ path: "/api/users/42/posts", method: "GET" })
+      expect(deep?.route.path).toBe("/*")
+      expect(deep?.params).toEqual({ "*": "users/42/posts" })
+    })
+
+    it("does not match when no segment follows the wildcard anchor", () => {
+      const router = new Router()
+      router.group(makeGroup("/api", [{ method: "GET", path: "/*" }]))
+
+      expect(router.match({ path: "/api", method: "GET" })).toBeNull()
+    })
+
+    it("URL-decodes each wildcard segment individually", () => {
+      const router = new Router()
+      router.group(makeGroup("/files", [{ method: "GET", path: "/*" }]))
+
+      const match = router.match({ path: "/files/hello%20world/foo%20bar", method: "GET" })
+      expect(match?.params).toEqual({ "*": "hello world/foo bar" })
+    })
+
+    it("throws TypeError when wildcard is not the last segment", () => {
+      const router = new Router()
+      expect(() => router.group(makeGroup("/api", [{ method: "GET", path: "/*/rest" }]))).toThrow(
+        TypeError
+      )
+    })
+  })
 })

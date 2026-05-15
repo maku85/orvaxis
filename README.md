@@ -120,9 +120,36 @@ The central execution engine responsible for orchestrating the full request life
 ### Router
 Handles route resolution and grouping:
 - method + path matching via a per-method radix trie — `O(d)` in path depth, independent of total route count
-- static segments always take priority over param segments at the same level; backtracking is automatic when a static branch fails deeper in the tree
+- static segments always take priority over param segments, which take priority over wildcard catch-alls at the same level; backtracking is automatic
 - group-based inheritance
 - route metadata resolution
+
+Route paths support three segment types:
+
+| Syntax | Example | Matches | Captured as |
+|--------|---------|---------|-------------|
+| Static | `/users` | exact string | — |
+| Param | `/:id` | one segment | `params.id` |
+| Wildcard | `/*` or `/*name` | all remaining segments | `params["*"]` or `params.name` |
+
+The wildcard must be the last segment in the pattern. More specific routes always win: `/users/me` beats `/:id`, which beats `/*`.
+
+```ts
+app.group({
+  prefix: "/files",
+  routes: [
+    // named wildcard — captures the full remaining path
+    {
+      method: "GET",
+      path: "/*filepath",
+      handler: async (ctx) => {
+        const { filepath } = ctx.meta.route!.params // e.g. "docs/readme.md"
+        ctx.res.json({ filepath })
+      },
+    },
+  ],
+})
+```
 
 ### Groups
 Logical grouping of routes:
@@ -706,6 +733,7 @@ orvaxis/
     debug-trace.ts           debugger, traceEvent, and buildExecutionSummary
     typed-context.ts         typed OrvaxisContext, getContext, traceEvent
     fastify-server.ts        Fastify adapter with policies and param routing
+    wildcard-routing.ts      named wildcard (/*filepath), unnamed catch-all (/*), priority demo
 ```
 
 ---
@@ -729,7 +757,7 @@ It favors:
 
 ## Current Status
 
-The core execution model is stable, tested, and covered by 227 passing tests.
+The core execution model is stable, tested, and covered by 235 passing tests.
 
 Not yet recommended for production. Known gaps before production use:
 

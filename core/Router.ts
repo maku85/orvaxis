@@ -10,9 +10,15 @@ function decodeSafe(segment: string): string {
   }
 }
 
+type WildcardChild = {
+  name: string
+  match: { route: Route; group: Group }
+}
+
 type TrieNode = {
   children: Map<string, TrieNode>
   paramChild?: { node: TrieNode; name: string }
+  wildcardChild?: WildcardChild
   match?: { route: Route; group: Group }
 }
 
@@ -33,7 +39,20 @@ class Trie {
     const segments = pattern.split("/").filter(Boolean)
     let node = root
 
-    for (const segment of segments) {
+    for (let i = 0; i < segments.length; i++) {
+      const segment = segments[i]
+
+      if (segment.startsWith("*")) {
+        if (i !== segments.length - 1) {
+          throw new TypeError(
+            `Wildcard segment "${segment}" must be the last segment in pattern "${pattern}"`
+          )
+        }
+        const name = segment.length > 1 ? segment.slice(1) : "*"
+        node.wildcardChild = { name, match: { route, group } }
+        return
+      }
+
       if (segment.startsWith(":")) {
         const name = segment.slice(1)
         if (!node.paramChild) {
@@ -73,20 +92,26 @@ class Trie {
 
     const segment = segments[index]
 
-    // Static segments take priority over param segments
+    // 1. Static — most specific
     const staticChild = node.children.get(segment)
     if (staticChild) {
       const result = this.traverse(staticChild, segments, index + 1, params)
       if (result) return result
     }
 
-    // Param segment as fallback — backtrack if deeper match fails
+    // 2. Param — one segment, backtrack if deeper match fails
     if (node.paramChild) {
       const decoded = decodeSafe(segment)
       params[node.paramChild.name] = decoded
       const result = this.traverse(node.paramChild.node, segments, index + 1, params)
       if (result) return result
       delete params[node.paramChild.name]
+    }
+
+    // 3. Wildcard — consumes all remaining segments (least specific)
+    if (node.wildcardChild) {
+      params[node.wildcardChild.name] = segments.slice(index).map(decodeSafe).join("/")
+      return { ...node.wildcardChild.match, params: { ...params } }
     }
 
     return null
