@@ -55,6 +55,7 @@ export function createExpressServer(
       path: req.path,
       method: req.method,
       headers: req.headers,
+      query: req.query as unknown as Record<string, string | string[]>,
       id: requestId,
       signal: controller.signal,
     }) as unknown as OrvaxisRequest

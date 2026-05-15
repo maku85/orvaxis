@@ -25,6 +25,7 @@ export interface OrvaxisRequest {
   path: string
   method: string
   headers: Record<string, string | string[] | undefined>
+  query?: Record<string, string | string[]>
   id?: string
   signal?: AbortSignal
   [key: string]: unknown

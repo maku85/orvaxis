@@ -5,6 +5,7 @@ export type TestRequestInit = {
   path: string
   method?: string
   headers?: Record<string, string | string[] | undefined>
+  query?: Record<string, string | string[]>
   id?: string
   [key: string]: unknown
 }

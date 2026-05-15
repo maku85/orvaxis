@@ -74,6 +74,7 @@ export function createFastifyServer(
       path,
       method: req.method ?? "GET",
       headers: req.headers,
+      query: req.query as Record<string, string | string[]>,
       id: requestId,
       signal: controller.signal,
     }) as unknown as OrvaxisRequest

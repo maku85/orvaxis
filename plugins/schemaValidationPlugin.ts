@@ -40,7 +40,10 @@ export const schemaValidationPlugin: Plugin = {
       }
 
       if (schema.query !== undefined) {
-        ctx.req.query = validate("query", schema.query, ctx.req.query)
+        ctx.req.query = validate("query", schema.query, ctx.req.query) as Record<
+          string,
+          string | string[]
+        >
       }
 
       if (schema.headers !== undefined) {

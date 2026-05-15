@@ -146,6 +146,72 @@ describe("testRequest", () => {
     })
   })
 
+  describe("query params", () => {
+    it("forwards query params onto ctx.req.query", async () => {
+      const app = new Orvaxis()
+      app.group({
+        prefix: "/api",
+        routes: [
+          {
+            method: "GET",
+            path: "/search",
+            handler: async (ctx) => {
+              ctx.res.json({ q: ctx.req.query?.q, page: ctx.req.query?.page })
+            },
+          },
+        ],
+      })
+
+      const res = await testRequest(app, {
+        path: "/api/search",
+        query: { q: "orvaxis", page: "2" },
+      })
+      expect(res.status).toBe(200)
+      expect(res.body).toEqual({ q: "orvaxis", page: "2" })
+    })
+
+    it("ctx.req.query is undefined when not provided", async () => {
+      const app = new Orvaxis()
+      app.group({
+        prefix: "/api",
+        routes: [
+          {
+            method: "GET",
+            path: "/ping",
+            handler: async (ctx) => {
+              ctx.res.json({ hasQuery: ctx.req.query !== undefined })
+            },
+          },
+        ],
+      })
+
+      const res = await testRequest(app, { path: "/api/ping" })
+      expect(res.body).toEqual({ hasQuery: false })
+    })
+
+    it("supports array values in query params", async () => {
+      const app = new Orvaxis()
+      app.group({
+        prefix: "/api",
+        routes: [
+          {
+            method: "GET",
+            path: "/filter",
+            handler: async (ctx) => {
+              ctx.res.json({ tags: ctx.req.query?.tags })
+            },
+          },
+        ],
+      })
+
+      const res = await testRequest(app, {
+        path: "/api/filter",
+        query: { tags: ["a", "b", "c"] },
+      })
+      expect(res.body).toEqual({ tags: ["a", "b", "c"] })
+    })
+  })
+
   describe("HEAD → GET fallback", () => {
     it("returns 200 and no body for HEAD when a GET route exists", async () => {
       const res = await testRequest(makeApp(), { path: "/api/ping", method: "HEAD" })

@@ -341,7 +341,8 @@ app.group({
         body: z.object({ name: z.string(), age: z.number().int().min(0) }),
       },
       handler: async (ctx) => {
-        // ctx.req.body is the parsed, coerced value
+        // ctx.req.body   — parsed, coerced body
+        // ctx.req.query  — typed as Record<string, string | string[]>, populated by both adapters
         ctx.res.status(201).json(ctx.req.body)
       },
     },
@@ -676,6 +677,10 @@ const res = await testRequest(app, { path: "/api/users/42" })
 // res.ctx     → full OrvaxisContext
 // res.error   → undefined
 
+// with query params
+const search = await testRequest(app, { path: "/api/users/42", query: { expand: "profile" } })
+// search.ctx.req.query → { expand: "profile" }
+
 // route not found
 const notFound = await testRequest(app, { path: "/api/missing" })
 // notFound.status  → 404
@@ -687,7 +692,7 @@ const streamed = await testRequest(app, { path: "/api/stream" })
 // streamed.ended   → true                   (ctx.res.end was called)
 ```
 
-`TestRequestInit` accepts `path`, `method` (defaults to `"GET"`), `headers`, `id`, and any additional field (e.g. `body`) which is forwarded directly onto `req`. `testRequest` never throws — errors thrown during execution are captured in `result.error` and their `.status` property (if present) is reflected in `result.status`. For streaming handlers, `result.chunks` holds all values passed to `ctx.res.write` and `ctx.res.end`, and `result.ended` is `true` when `ctx.res.end` was called.
+`TestRequestInit` accepts `path`, `method` (defaults to `"GET"`), `headers`, `query`, `id`, and any additional field (e.g. `body`) which is forwarded directly onto `req`. `query` is typed as `Record<string, string | string[]>` and maps directly to `ctx.req.query` inside the handler: `testRequest` never throws — errors thrown during execution are captured in `result.error` and their `.status` property (if present) is reflected in `result.status`. For streaming handlers, `result.chunks` holds all values passed to `ctx.res.write` and `ctx.res.end`, and `result.ended` is `true` when `ctx.res.end` was called.
 
 ### Route introspection
 
@@ -861,7 +866,7 @@ It favors:
 
 ## Current Status
 
-The core execution model is stable, tested, and covered by 276 passing tests.
+The core execution model is stable, tested, and covered by 279 passing tests.
 
 Not yet recommended for production. Known gaps before production use:
 
