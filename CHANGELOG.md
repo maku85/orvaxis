@@ -13,6 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Pluggable logger** — a `Logger` interface (`{ info, error }`) is now part of the public API. Pass a logger instance through three independent entry points: `new Orvaxis({ logger })` (routes it to the hook system for meta-errors), `createExpressServer / createFastifyServer` third-arg options (`{ logger }`) (routes it to post-response error logging), and `loggerPlugin({ logger })` (routes it to request and error log lines). All three default to `console` when omitted. `Logger` and `OrvaxisOptions` are exported from the main entry point.
 - **Request ID propagation** — both adapters now generate a `X-Request-ID` automatically on every request and expose it on `ctx.req.id`. If the incoming request already carries a `X-Request-ID` header (e.g. from an API gateway or upstream service), that value is reused instead of generating a new one. Fastify's native request ID is used as a secondary fallback before falling back to `crypto.randomUUID()`. The header is always present in the response.
 
+### Added
+
+- **`combinedTimeline` in `buildExecutionSummary`** — the summary now includes a `combinedTimeline: UnifiedEvent[]` field that merges user-emitted trace events and internal debug lifecycle entries into a single array sorted by timestamp. Each entry carries `{ kind: "trace" | "debug", name, timestamp, meta }`. `UnifiedEvent` is exported from the main entry point.
+
 ### Fixed
 
 - **Error response sanitization** — adapter error responses no longer leak internal error messages to the client when `NODE_ENV=production`. Generic errors return `{ error: "Internal Server Error" }`; `HttpError` messages are always forwarded as-is since they are intentional user-facing responses. Outside production all messages are preserved for debugging. `sanitizeErrorMessage` is exported for custom adapters.

@@ -131,4 +131,43 @@ describe("buildExecutionSummary", () => {
     const ctx = makeCtx({ timeline: [] })
     expect(buildExecutionSummary(ctx).debugSteps).toEqual({})
   })
+
+  describe("combinedTimeline", () => {
+    it("is empty when both trace and debug are absent", () => {
+      const ctx = makeCtx({ withDebug: false })
+      expect(buildExecutionSummary(ctx).combinedTimeline).toEqual([])
+    })
+
+    it("includes trace events with kind 'trace'", () => {
+      const ctx = makeCtx({
+        traceEvents: [{ type: "db:query", timestamp: 10, meta: { table: "users" } }],
+      })
+      const { combinedTimeline } = buildExecutionSummary(ctx)
+      expect(combinedTimeline).toEqual([{ kind: "trace", name: "db:query", timestamp: 10, meta: { table: "users" } }])
+    })
+
+    it("includes debug entries with kind 'debug'", () => {
+      const ctx = makeCtx({
+        timeline: [{ event: "HOOK:onRequest", time: 5 }],
+      })
+      const { combinedTimeline } = buildExecutionSummary(ctx)
+      expect(combinedTimeline).toEqual([{ kind: "debug", name: "HOOK:onRequest", timestamp: 5, meta: undefined }])
+    })
+
+    it("merges and sorts events from both sources by timestamp", () => {
+      const ctx = makeCtx({
+        traceEvents: [
+          { type: "db:query", timestamp: 20 },
+          { type: "db:end", timestamp: 40 },
+        ],
+        timeline: [
+          { event: "HOOK:onRequest", time: 10 },
+          { event: "HANDLER_EXECUTED", time: 30 },
+        ],
+      })
+      const { combinedTimeline } = buildExecutionSummary(ctx)
+      expect(combinedTimeline.map((e) => e.timestamp)).toEqual([10, 20, 30, 40])
+      expect(combinedTimeline.map((e) => e.kind)).toEqual(["debug", "trace", "debug", "trace"])
+    })
+  })
 })

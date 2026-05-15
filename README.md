@@ -339,22 +339,25 @@ When enabled, the debugger records a structured timeline of every lifecycle step
 app.debugger.enable()
 ```
 
-Use `buildExecutionSummary(ctx)` to get a combined view of both the debug timeline and the trace:
+Use `buildExecutionSummary(ctx)` to get a structured view of both the trace and the debug timeline:
 
 ```ts
 import { buildExecutionSummary } from "orvaxis"
 
 app.on("afterPipeline", (ctx) => {
   const summary = buildExecutionSummary(ctx)
-  // summary.requestId  — from ctx.meta.trace
-  // summary.duration   — total ms
-  // summary.traceEvents — lifecycle events from ctx.meta.trace.events
-  // summary.debugSteps  — grouped debug entries (requires debugger enabled)
-  // summary.route       — matched route + group
+  // summary.requestId      — from ctx.meta.trace
+  // summary.duration       — total ms
+  // summary.traceEvents    — user-emitted events (traceEvent / traceMiddleware)
+  // summary.debugSteps     — internal lifecycle events grouped by phase (requires debugger enabled)
+  // summary.combinedTimeline — all events merged and sorted by timestamp, each with a `kind` field ("trace" | "debug")
+  // summary.route          — matched route + group
 })
 ```
 
-`buildExecutionSummary` always returns an object — `traceEvents` and `duration` are available even without the debugger enabled.
+`combinedTimeline` is the easiest way to understand the full sequence of what happened during a request — it interleaves your custom trace events with the internal lifecycle steps in chronological order. Each entry carries `{ kind, name, timestamp, meta }`.
+
+`buildExecutionSummary` always returns an object — `traceEvents`, `combinedTimeline`, and `duration` are available even without the debugger enabled.
 
 ---
 

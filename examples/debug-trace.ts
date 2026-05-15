@@ -8,11 +8,12 @@ app.debugger.enable()
 app.on("afterPipeline", (ctx) => {
   const summary = buildExecutionSummary(ctx)
   console.log("[SUMMARY]", JSON.stringify(summary, null, 2))
-  // summary.requestId    — unique ID for this request
-  // summary.duration     — total ms (always available)
-  // summary.traceEvents  — lifecycle events (MIDDLEWARE:start/end, custom, ...)
-  // summary.debugSteps   — grouped debug entries (REQUEST_START, POLICY_*, HOOK:*, ...)
-  // summary.route        — matched route + group
+  // summary.requestId        — unique ID for this request
+  // summary.duration         — total ms (always available)
+  // summary.traceEvents      — user-emitted events (MIDDLEWARE:start/end, custom, ...)
+  // summary.debugSteps       — internal lifecycle events grouped by phase (REQUEST_START, POLICY_*, HOOK:*, ...)
+  // summary.combinedTimeline — all events merged and sorted by timestamp, each with kind: "trace" | "debug"
+  // summary.route            — matched route + group
 })
 
 app.group({

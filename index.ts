@@ -5,7 +5,11 @@ export { createMockResponse, type MockResponse } from "./core/mockResponse"
 export { Orvaxis } from "./core/Orvaxis"
 export { Runtime } from "./core/Runtime"
 export { type TestRequestInit, type TestResponse, testRequest } from "./core/testHarness"
-export { buildExecutionSummary, type ExecutionSummary } from "./debug/buildExecutionSummary"
+export {
+  buildExecutionSummary,
+  type ExecutionSummary,
+  type UnifiedEvent,
+} from "./debug/buildExecutionSummary"
 export { traceEvent } from "./debug/traceEvent"
 export { createExpressServer } from "./http/expressAdapter"
 export { createFastifyServer } from "./http/fastifyAdapter"
