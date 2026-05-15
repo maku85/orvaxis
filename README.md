@@ -541,6 +541,58 @@ app.on("afterPipeline", (ctx) => {
 [ERR] 550e8400-e29b-41d4-a716-446655440000 Error: something failed
 ```
 
+### Streaming
+
+`ctx.res` exposes three methods for streaming responses:
+
+| Method | Behaviour |
+|--------|-----------|
+| `ctx.res.write(chunk)` | Sends a chunk to the client without closing the connection |
+| `ctx.res.end(chunk?)` | Sends an optional final chunk and closes the connection |
+| `ctx.res.pipe(stream)` | Pipes a `node:stream.Readable` directly to the response |
+
+```ts
+app.group({
+  prefix: "/api",
+  routes: [
+    {
+      method: "GET",
+      path: "/events",
+      handler: async (ctx) => {
+        ctx.res.setHeader("Content-Type", "text/event-stream")
+        ctx.res.setHeader("Cache-Control", "no-cache")
+
+        ctx.res.write("data: connected\n\n")
+
+        // send a few events then close
+        for (let i = 1; i <= 3; i++) {
+          ctx.res.write(`data: event ${i}\n\n`)
+        }
+
+        ctx.res.end()
+      },
+    },
+    {
+      method: "GET",
+      path: "/file/:name",
+      handler: async (ctx) => {
+        const { createReadStream } = await import("node:fs")
+        const stream = createReadStream(`/data/${ctx.meta.route!.params.name}`)
+        ctx.res.pipe(stream)
+      },
+    },
+  ],
+})
+```
+
+When using the built-in adapters, disable the default 30 s timeout for long-lived streaming connections:
+
+```ts
+const server = createExpressServer(app, undefined, { timeout: 0 })
+```
+
+For testing, `testRequest` captures all chunks in `result.chunks` and exposes `result.ended`, so streaming handlers do not require a live server.
+
 ### Writing a custom adapter
 
 Any adapter needs to:
@@ -584,9 +636,14 @@ const res = await testRequest(app, { path: "/api/users/42" })
 const notFound = await testRequest(app, { path: "/api/missing" })
 // notFound.status  → 404
 // notFound.error   → Error("Not Found")
+
+// streaming handler
+const streamed = await testRequest(app, { path: "/api/stream" })
+// streamed.chunks  → ["chunk1", "chunk2"]   (written via ctx.res.write)
+// streamed.ended   → true                   (ctx.res.end was called)
 ```
 
-`TestRequestInit` accepts `path`, `method` (defaults to `"GET"`), `headers`, `id`, and any additional field (e.g. `body`) which is forwarded directly onto `req`. `testRequest` never throws — errors thrown during execution are captured in `result.error` and their `.status` property (if present) is reflected in `result.status`.
+`TestRequestInit` accepts `path`, `method` (defaults to `"GET"`), `headers`, `id`, and any additional field (e.g. `body`) which is forwarded directly onto `req`. `testRequest` never throws — errors thrown during execution are captured in `result.error` and their `.status` property (if present) is reflected in `result.status`. For streaming handlers, `result.chunks` holds all values passed to `ctx.res.write` and `ctx.res.end`, and `result.ended` is `true` when `ctx.res.end` was called.
 
 ### Route introspection
 
@@ -736,6 +793,7 @@ orvaxis/
     typed-context.ts         typed OrvaxisContext, getContext, traceEvent
     fastify-server.ts        Fastify adapter with policies and param routing
     wildcard-routing.ts      named wildcard (/*filepath), unnamed catch-all (/*), priority demo
+    streaming.ts             SSE, NDJSON, and file streaming via write/end/pipe
 ```
 
 ---
@@ -759,7 +817,7 @@ It favors:
 
 ## Current Status
 
-The core execution model is stable, tested, and covered by 240 passing tests.
+The core execution model is stable, tested, and covered by 246 passing tests.
 
 Not yet recommended for production. Known gaps before production use:
 
@@ -774,7 +832,6 @@ Graceful shutdown is supported via `server.close()` on the `ServerAdapter`.
 ## Future Directions
 
 - **OpenTelemetry export** — the trace system already produces structured spans; a plugin exporting to OTLP/Zipkin is a natural next step
-- **Response body interception** — a middleware-level API to transform or wrap outgoing response bodies before they are sent
 
 ## Contributing
 

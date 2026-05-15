@@ -34,12 +34,13 @@ export function validateGroup(group: Group): void {
         `route.path must start with '/': "${route.path}" in group "${group.prefix}"`
       )
     }
-    if (typeof route.method !== "string" || route.method === "") {
+    const rawMethod = route.method as unknown as string
+    if (typeof rawMethod !== "string" || rawMethod === "") {
       throw new TypeError(
         `route.method must be a non-empty string for path "${route.path}" in group "${group.prefix}"`
       )
     }
-    if (!VALID_METHODS.has(route.method.toUpperCase())) {
+    if (!VALID_METHODS.has(rawMethod.toUpperCase())) {
       throw new TypeError(
         `route.method "${route.method}" is not a valid HTTP method for path "${route.path}" in group "${group.prefix}"`
       )

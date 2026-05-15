@@ -24,6 +24,19 @@ function wrapExpressResponse(res: Response): OrvaxisResponse {
       res.set(name, value as string | string[])
       return wrapped
     },
+    write(chunk) {
+      wrapped.sent = true
+      res.write(chunk)
+    },
+    end(chunk?) {
+      wrapped.sent = true
+      if (chunk !== undefined) res.end(chunk)
+      else res.end()
+    },
+    pipe(stream) {
+      wrapped.sent = true
+      stream.pipe(res)
+    },
   }
   return wrapped
 }

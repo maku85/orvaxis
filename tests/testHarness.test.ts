@@ -145,4 +145,29 @@ describe("testRequest", () => {
       expect(res.ctx?.meta.trace?.requestId).toBe("req-abc")
     })
   })
+
+  describe("streaming", () => {
+    it("exposes chunks written via ctx.res.write and ctx.res.end", async () => {
+      const app = new Orvaxis()
+      app.group({
+        prefix: "/stream",
+        routes: [
+          {
+            method: "GET",
+            path: "/data",
+            handler: async (ctx) => {
+              ctx.res.write("chunk1")
+              ctx.res.write("chunk2")
+              ctx.res.end("final")
+            },
+          },
+        ],
+      })
+
+      const res = await testRequest(app, { path: "/stream/data" })
+      expect(res.chunks).toEqual(["chunk1", "chunk2", "final"])
+      expect(res.ended).toBe(true)
+      expect(res.status).toBe(200)
+    })
+  })
 })

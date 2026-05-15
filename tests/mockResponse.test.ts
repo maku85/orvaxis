@@ -51,4 +51,47 @@ describe("createMockResponse", () => {
     expect(res.sent).toBe(true)
     expect(res.body).toEqual({ created: true })
   })
+
+  describe("streaming", () => {
+    it("write() appends chunks and sets sent=true", () => {
+      const res = createMockResponse()
+      res.write("hello")
+      res.write(" world")
+      expect(res.sent).toBe(true)
+      expect(res.chunks).toEqual(["hello", " world"])
+      expect(res.ended).toBe(false)
+    })
+
+    it("end() sets ended=true and sent=true", () => {
+      const res = createMockResponse()
+      res.end()
+      expect(res.sent).toBe(true)
+      expect(res.ended).toBe(true)
+      expect(res.chunks).toEqual([])
+    })
+
+    it("end(chunk) appends the final chunk before closing", () => {
+      const res = createMockResponse()
+      res.write("part1")
+      res.end("done")
+      expect(res.chunks).toEqual(["part1", "done"])
+      expect(res.ended).toBe(true)
+    })
+
+    it("pipe() stores the stream and sets sent=true", () => {
+      const { Readable } = require("node:stream")
+      const res = createMockResponse()
+      const stream = new Readable({ read() {} })
+      res.pipe(stream)
+      expect(res.sent).toBe(true)
+      expect(res.piped).toBe(stream)
+    })
+
+    it("initializes chunks as empty array and ended as false", () => {
+      const res = createMockResponse()
+      expect(res.chunks).toEqual([])
+      expect(res.ended).toBe(false)
+      expect(res.piped).toBeNull()
+    })
+  })
 })

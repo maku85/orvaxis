@@ -37,6 +37,9 @@ export interface OrvaxisResponse {
   json(body: unknown): void
   send(body: unknown): void
   setHeader(name: string, value: string | string[]): OrvaxisResponse
+  write(chunk: unknown): void
+  end(chunk?: unknown): void
+  pipe(stream: import("node:stream").Readable): void
 }
 
 export type Group<

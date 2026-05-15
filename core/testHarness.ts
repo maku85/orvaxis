@@ -13,6 +13,8 @@ export type TestResponse = {
   status: number
   body: unknown
   headers: Record<string, string | string[]>
+  chunks: unknown[]
+  ended: boolean
   ctx: OrvaxisContext | undefined
   error: Error | undefined
 }
@@ -39,6 +41,8 @@ export async function testRequest(
     status: errStatus ?? res.statusCode,
     body: res.body,
     headers: res.sentHeaders,
+    chunks: res.chunks,
+    ended: res.ended,
     ctx,
     error,
   }

@@ -4,10 +4,25 @@ import type { OrvaxisRequest, OrvaxisResponse, ServerAdapter } from "../types"
 import { type AdapterOptions, sanitizeErrorMessage, withTimeout } from "./timeout"
 
 function wrapFastifyResponse(reply: FastifyReply): OrvaxisResponse {
+  let statusCode = 200
+  let streamStarted = false
+
+  function startStream() {
+    if (!streamStarted) {
+      streamStarted = true
+      reply.hijack()
+      reply.raw.writeHead(
+        statusCode,
+        reply.getHeaders() as unknown as import("node:http").OutgoingHttpHeaders
+      )
+    }
+  }
+
   const wrapped: OrvaxisResponse = {
     statusCode: 200,
     sent: false,
     status(code) {
+      statusCode = code
       wrapped.statusCode = code
       reply.status(code)
       return wrapped
@@ -23,6 +38,21 @@ function wrapFastifyResponse(reply: FastifyReply): OrvaxisResponse {
     setHeader(name, value) {
       reply.header(name, Array.isArray(value) ? value.join(", ") : value)
       return wrapped
+    },
+    write(chunk) {
+      wrapped.sent = true
+      startStream()
+      reply.raw.write(chunk)
+    },
+    end(chunk?) {
+      startStream()
+      wrapped.sent = true
+      if (chunk !== undefined) reply.raw.end(chunk)
+      else reply.raw.end()
+    },
+    pipe(stream) {
+      wrapped.sent = true
+      reply.send(stream)
     },
   }
   return wrapped
