@@ -134,6 +134,21 @@ Route paths support three segment types:
 
 The wildcard must be the last segment in the pattern. More specific routes always win: `/users/me` beats `/:id`, which beats `/*`.
 
+Registering two routes with the same method and pattern throws a `TypeError` immediately at registration time:
+
+```ts
+app.group({ prefix: "/api", routes: [{ method: "GET", path: "/users", handler }] })
+app.group({ prefix: "/api", routes: [{ method: "GET", path: "/users", handler }] })
+// TypeError: Duplicate route: GET /api/users
+
+// param name conflict at the same trie position
+app.group({ prefix: "/api", routes: [{ method: "GET", path: "/:id",     handler }] })
+app.group({ prefix: "/api", routes: [{ method: "GET", path: "/:userId", handler }] })
+// TypeError: Route conflict: GET /api/:userId — param ":userId" conflicts with ":id" already registered at this position
+```
+
+Routes that share a path but differ in HTTP method, or that share a pattern across different group prefixes, are allowed.
+
 `Route.method` is typed as `HttpMethod` (`"GET" | "POST" | "PUT" | "DELETE" | "PATCH" | "HEAD" | "OPTIONS"`). Methods are normalised to uppercase at both registration and match time, so a route registered as `"get"` and a request arriving as `"GET"` always find each other. Unknown method strings are rejected at registration with a `TypeError`.
 
 ```ts
@@ -817,7 +832,7 @@ It favors:
 
 ## Current Status
 
-The core execution model is stable, tested, and covered by 246 passing tests.
+The core execution model is stable, tested, and covered by 254 passing tests.
 
 Not yet recommended for production. Known gaps before production use:
 

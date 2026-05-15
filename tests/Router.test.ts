@@ -352,4 +352,75 @@ describe("Router", () => {
       expect(router.match({ path: "/api/r", method: "DELETE" })).toBeNull()
     })
   })
+
+  describe("duplicate route detection", () => {
+    it("throws TypeError when the same static route is registered twice", () => {
+      const router = new Router()
+      router.group(makeGroup("/api", [{ method: "GET", path: "/users" }]))
+      expect(() => router.group(makeGroup("/api", [{ method: "GET", path: "/users" }]))).toThrow(
+        TypeError
+      )
+    })
+
+    it("error message includes the method and full pattern", () => {
+      const router = new Router()
+      router.group(makeGroup("/api", [{ method: "POST", path: "/items" }]))
+      expect(() => router.group(makeGroup("/api", [{ method: "POST", path: "/items" }]))).toThrow(
+        "Duplicate route: POST /api/items"
+      )
+    })
+
+    it("throws TypeError when the same param route is registered twice", () => {
+      const router = new Router()
+      router.group(makeGroup("/api", [{ method: "GET", path: "/:id" }]))
+      expect(() => router.group(makeGroup("/api", [{ method: "GET", path: "/:id" }]))).toThrow(
+        TypeError
+      )
+    })
+
+    it("throws TypeError when a wildcard route is registered twice", () => {
+      const router = new Router()
+      router.group(makeGroup("/files", [{ method: "GET", path: "/*" }]))
+      expect(() => router.group(makeGroup("/files", [{ method: "GET", path: "/*" }]))).toThrow(
+        TypeError
+      )
+    })
+
+    it("throws TypeError when two param routes use different names at the same position", () => {
+      const router = new Router()
+      router.group(makeGroup("/api", [{ method: "GET", path: "/:id" }]))
+      expect(() => router.group(makeGroup("/api", [{ method: "GET", path: "/:userId" }]))).toThrow(
+        /Route conflict.*:userId.*:id|Route conflict.*:id.*:userId/
+      )
+    })
+
+    it("allows the same path pattern with different HTTP methods", () => {
+      const router = new Router()
+      expect(() =>
+        router.group(
+          makeGroup("/api", [
+            { method: "GET", path: "/users" },
+            { method: "POST", path: "/users" },
+            { method: "DELETE", path: "/users" },
+          ])
+        )
+      ).not.toThrow()
+    })
+
+    it("allows the same path pattern across different group prefixes", () => {
+      const router = new Router()
+      expect(() => {
+        router.group(makeGroup("/v1", [{ method: "GET", path: "/users" }]))
+        router.group(makeGroup("/v2", [{ method: "GET", path: "/users" }]))
+      }).not.toThrow()
+    })
+
+    it("detects duplicates across two group() calls for the same prefix", () => {
+      const router = new Router()
+      router.group(makeGroup("/api", [{ method: "GET", path: "/ping" }]))
+      expect(() => router.group(makeGroup("/api", [{ method: "GET", path: "/ping" }]))).toThrow(
+        TypeError
+      )
+    })
+  })
 })

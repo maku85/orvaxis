@@ -30,10 +30,11 @@ class Trie {
   private roots = new Map<string, TrieNode>()
 
   insert(method: string, pattern: string, route: Route, group: Group): void {
-    let root = this.roots.get(method.toUpperCase())
+    const methodUpper = method.toUpperCase()
+    let root = this.roots.get(methodUpper)
     if (!root) {
       root = createNode()
-      this.roots.set(method.toUpperCase(), root)
+      this.roots.set(methodUpper, root)
     }
 
     const segments = pattern.split("/").filter(Boolean)
@@ -48,6 +49,9 @@ class Trie {
             `Wildcard segment "${segment}" must be the last segment in pattern "${pattern}"`
           )
         }
+        if (node.wildcardChild) {
+          throw new TypeError(`Duplicate route: ${methodUpper} ${pattern}`)
+        }
         const name = segment.length > 1 ? segment.slice(1) : "*"
         node.wildcardChild = { name, match: { route, group } }
         return
@@ -57,6 +61,10 @@ class Trie {
         const name = segment.slice(1)
         if (!node.paramChild) {
           node.paramChild = { node: createNode(), name }
+        } else if (node.paramChild.name !== name) {
+          throw new TypeError(
+            `Route conflict: ${methodUpper} ${pattern} — param ":${name}" conflicts with ":${node.paramChild.name}" already registered at this position`
+          )
         }
         node = node.paramChild.node
       } else {
@@ -69,6 +77,9 @@ class Trie {
       }
     }
 
+    if (node.match) {
+      throw new TypeError(`Duplicate route: ${methodUpper} ${pattern}`)
+    }
     node.match = { route, group }
   }
 
