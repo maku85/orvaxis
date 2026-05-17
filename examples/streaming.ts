@@ -1,5 +1,5 @@
 import { createReadStream } from "node:fs"
-import { Orvaxis, createExpressServer } from "../index"
+import { createExpressServer, Orvaxis } from "../index"
 
 const app = new Orvaxis()
 
