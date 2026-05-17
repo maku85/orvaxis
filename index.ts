@@ -4,7 +4,6 @@ export { defineRoute } from "./core/defineRoute"
 export { HttpError } from "./core/HttpError"
 export { createMockResponse, type MockResponse } from "./core/mockResponse"
 export { Orvaxis } from "./core/Orvaxis"
-export { Runtime } from "./core/Runtime"
 export { type TestRequestInit, type TestResponse, testRequest } from "./core/testHarness"
 export {
   buildExecutionSummary,
@@ -33,6 +32,7 @@ export type {
   OrvaxisOptions,
   OrvaxisRequest,
   OrvaxisResponse,
+  PluginContext,
   Policy,
   PolicyResult,
   PolicyScope,

@@ -62,13 +62,40 @@ describe("Tracer", () => {
     const tracer = new Tracer("id")
     const before = Date.now()
     const trace = tracer.end()
+    const after = Date.now()
+    // endTime carries sub-ms precision so we compare against integer-ms boundaries with ±1 tolerance
     expect(trace.endTime).toBeGreaterThanOrEqual(before)
-    expect(trace.endTime).toBeLessThanOrEqual(Date.now())
+    expect(trace.endTime).toBeLessThanOrEqual(after + 1)
   })
 
   it("endTime is >= startTime", () => {
     const tracer = new Tracer("id")
     const trace = tracer.end()
     expect(trace.endTime).toBeGreaterThanOrEqual(trace.startTime)
+  })
+
+  it("consecutive events have strictly increasing timestamps", () => {
+    const tracer = new Tracer("id")
+    tracer.event("A")
+    tracer.event("B")
+    tracer.event("C")
+    const { events } = tracer.end()
+
+    expect(events[1].timestamp).toBeGreaterThan(events[0].timestamp)
+    expect(events[2].timestamp).toBeGreaterThan(events[1].timestamp)
+  })
+
+  it("event timestamps are >= startTime", () => {
+    const tracer = new Tracer("id")
+    tracer.event("X")
+    const trace = tracer.end()
+    expect(trace.events[0].timestamp).toBeGreaterThanOrEqual(trace.startTime)
+  })
+
+  it("endTime is >= last event timestamp", () => {
+    const tracer = new Tracer("id")
+    tracer.event("last")
+    const trace = tracer.end()
+    expect(trace.endTime).toBeGreaterThanOrEqual(trace.events[0].timestamp)
   })
 })

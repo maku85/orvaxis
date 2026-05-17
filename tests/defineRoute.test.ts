@@ -8,6 +8,28 @@ import { schemaValidationPlugin } from "../plugins/schemaValidationPlugin"
 const BodySchema = z.object({ name: z.string(), age: z.number() })
 
 describe("defineRoute", () => {
+  it("ctx.req.body is accessible as unknown on a plain route without defineRoute", async () => {
+    const app = new Orvaxis()
+    let captured: unknown
+
+    app.group({
+      prefix: "/",
+      routes: [
+        {
+          method: "POST",
+          path: "/echo",
+          handler: async (ctx) => {
+            captured = ctx.req.body
+            ctx.res.json({ ok: true })
+          },
+        },
+      ],
+    })
+
+    await testRequest(app, { method: "POST", path: "/echo", body: { x: 1 } })
+    expect(captured).toEqual({ x: 1 })
+  })
+
   it("returns a Route object with the same method, path, schema, and handler", () => {
     const handler = async () => {}
     const route = defineRoute({

@@ -1,5 +1,4 @@
-import type { Runtime } from "../core/Runtime"
-import type { Logger, OrvaxisContext } from "../types"
+import type { Logger, OrvaxisContext, PluginContext } from "../types"
 
 export function loggerPlugin(options: { logger?: Logger } = {}) {
   const logger = options.logger ?? console
@@ -7,7 +6,7 @@ export function loggerPlugin(options: { logger?: Logger } = {}) {
   return {
     name: "logger",
 
-    apply(runtime: Runtime) {
+    apply(runtime: PluginContext) {
       runtime.hooks.on("onRequest", (ctx: OrvaxisContext) => {
         logger.info("[REQ]", ctx.req.method, ctx.req.path, ctx.req.id)
       })

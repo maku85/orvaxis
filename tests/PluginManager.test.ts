@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest"
 import { Runtime } from "../core/Runtime"
 import type { Plugin } from "../plugins/PluginManager"
 import { PluginManager } from "../plugins/PluginManager"
+import type { PluginContext } from "../types"
 
 function makePlugin(name: string, apply = vi.fn()): Plugin {
   return { name, apply }
@@ -43,6 +44,24 @@ describe("Runtime.addPlugin", () => {
 
     expect(apply).toHaveBeenCalledOnce()
     expect(apply).toHaveBeenCalledWith(runtime)
+  })
+
+  it("plugin with explicit PluginContext annotation can register hooks", async () => {
+    const runtime = new Runtime()
+    let triggered = false
+
+    const plugin: Plugin = {
+      name: "typed",
+      apply(ctx: PluginContext) {
+        ctx.hooks.on("onRequest", () => {
+          triggered = true
+        })
+      },
+    }
+
+    runtime.addPlugin(plugin)
+    await runtime.hooks.trigger("onRequest", {} as Parameters<typeof runtime.hooks.trigger>[1])
+    expect(triggered).toBe(true)
   })
 
   it("tracks the plugin in runtime.plugins", () => {

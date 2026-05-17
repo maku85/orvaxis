@@ -1,8 +1,8 @@
-import type { Runtime } from "../core/Runtime"
+import type { PluginContext } from "../types"
 
 export type Plugin = {
   name: string
-  apply: (runtime: Runtime) => void
+  apply: (ctx: PluginContext) => void
 }
 
 export class PluginManager {

@@ -30,6 +30,8 @@ npm install express   # Express adapter
 npm install fastify   # Fastify adapter
 ```
 
+The package ships both **CommonJS** (`require`) and **ES Module** (`import`) builds. Bundlers and native ESM consumers pick up the ESM build automatically via the `"exports"` map; no configuration needed.
+
 It is not a framework in the traditional sense.
 It is an **execution orchestration layer** designed to control, observe, and structure backend request flows in a predictable and composable way.
 
@@ -371,15 +373,28 @@ import type { Plugin } from "orvaxis"
 
 const metricsPlugin: Plugin = {
   name: "metrics",
-  apply(runtime) {
-    runtime.hooks.on("afterPipeline", (ctx) => {
-      const duration = ctx.meta.trace?.endTime - ctx.meta.trace?.startTime
+  apply(ctx) {
+    ctx.hooks.on("afterPipeline", (reqCtx) => {
+      const duration = reqCtx.meta.trace?.endTime - reqCtx.meta.trace?.startTime
       recordMetric("request.duration", duration)
     })
   }
 }
 
 app.register(metricsPlugin)
+```
+
+The `apply` parameter is typed as `PluginContext`, a minimal interface that exposes only `hooks.on`. If you need explicit typing on `apply`, import `PluginContext` directly:
+
+```ts
+import type { Plugin, PluginContext } from "orvaxis"
+
+const myPlugin: Plugin = {
+  name: "my-plugin",
+  apply(ctx: PluginContext) {
+    ctx.hooks.on("onRequest", (reqCtx) => { /* ... */ })
+  }
+}
 ```
 
 Registered plugins are tracked in `runtime.plugins` and applied immediately on registration. `PluginManager` is also exported for custom orchestration.
@@ -391,8 +406,8 @@ Registered plugins are tracked in `runtime.plugins` and applied immediately on r
 Each request generates a structured execution trace available as `ctx.meta.trace`:
 
 - `requestId` — unique identifier per request
-- `events` — timestamped lifecycle events (`TraceEvent[]`)
-- `startTime` / `endTime` — wall-clock boundaries
+- `events` — timestamped lifecycle events (`TraceEvent[]`); timestamps are wall-clock-aligned with sub-millisecond decimal precision, guaranteed monotonically increasing within a request
+- `startTime` / `endTime` — wall-clock boundaries in integer milliseconds (`Date.now()`)
 
 Use `traceMiddleware()` to automatically record timing around middleware execution:
 
@@ -501,7 +516,7 @@ const { id } = ctx.params
 
 #### `defineRoute<TBody>()` — typed request body
 
-Wrap a route definition in `defineRoute` to propagate the Zod (or any `.parse()`-based) schema's inferred type directly into the handler's `ctx.req.body`, eliminating manual casts:
+`ctx.req.body` is typed as `unknown` on all routes. Use `defineRoute` to propagate the Zod (or any `.parse()`-based) schema's inferred type directly into `ctx.req.body` inside the handler, eliminating the manual cast:
 
 ```ts
 import { defineRoute, schemaValidationPlugin } from "orvaxis"

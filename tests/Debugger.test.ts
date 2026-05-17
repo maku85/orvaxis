@@ -86,4 +86,18 @@ describe("Debugger", () => {
 
     expect(ctx.meta.debug).toBe(ref)
   })
+
+  it("consecutive entries have monotonically increasing timestamps", () => {
+    const dbg = new Debugger()
+    dbg.enable()
+    const ctx = makeCtx()
+
+    dbg.log(ctx, "A")
+    dbg.log(ctx, "B")
+    dbg.log(ctx, "C")
+
+    const timeline = ctx.meta.debug?.timeline ?? []
+    expect(timeline[1].time).toBeGreaterThan(timeline[0].time)
+    expect(timeline[2].time).toBeGreaterThan(timeline[1].time)
+  })
 })

@@ -25,6 +25,7 @@ export interface OrvaxisRequest {
   path: string
   method: string
   headers: Record<string, string | string[] | undefined>
+  body?: unknown
   query?: Record<string, string | string[]>
   id?: string
   signal?: AbortSignal
@@ -161,4 +162,10 @@ export type TraceEvent = {
   type: string
   timestamp: number
   meta?: Record<string, unknown>
+}
+
+export interface PluginContext {
+  hooks: {
+    on(name: HookName, fn: (ctx: OrvaxisContext, error?: Error) => Promise<void> | void): void
+  }
 }
