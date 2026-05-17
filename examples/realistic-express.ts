@@ -72,10 +72,14 @@ const rateLimit: Policy = {
     const key = ctx.req.headers["x-api-key"] as string
     const now = Date.now()
     const entry = rateStore.get(key) ?? { count: 0, resetAt: now + 60_000 }
-    if (now > entry.resetAt) { entry.count = 0; entry.resetAt = now + 60_000 }
+    if (now > entry.resetAt) {
+      entry.count = 0
+      entry.resetAt = now + 60_000
+    }
     entry.count++
     rateStore.set(key, entry)
-    if (entry.count > 60) return { allow: false, reason: "Rate limit exceeded (60 req/min)", status: 429 }
+    if (entry.count > 60)
+      return { allow: false, reason: "Rate limit exceeded (60 req/min)", status: 429 }
     return { allow: true }
   },
 }
@@ -119,7 +123,11 @@ const subscribers = new Set<SseWriter>()
 
 function broadcast(event: string, data: unknown) {
   for (const send of subscribers) {
-    try { send(event, data) } catch { subscribers.delete(send) }
+    try {
+      send(event, data)
+    } catch {
+      subscribers.delete(send)
+    }
   }
 }
 
@@ -207,6 +215,7 @@ app.group({
       path: "/:id",
       schema: { params: TaskParams },
       handler: async (ctx) => {
+        // biome-ignore lint/style/noNonNullAssertion: route is always defined inside a route handler
         ctx.res.json(requireTask(ctx.meta.route!.params.id))
       },
     },
@@ -215,6 +224,7 @@ app.group({
       path: "/:id",
       schema: { body: UpdateTaskBody, params: TaskParams },
       handler: async (ctx) => {
+        // biome-ignore lint/style/noNonNullAssertion: route is always defined inside a route handler
         const task = requireTask(ctx.meta.route!.params.id)
         const patch = ctx.req.body as z.infer<typeof UpdateTaskBody>
         if (patch.title !== undefined) task.title = patch.title
@@ -228,6 +238,7 @@ app.group({
       path: "/:id",
       schema: { params: TaskParams },
       handler: async (ctx) => {
+        // biome-ignore lint/style/noNonNullAssertion: route is always defined inside a route handler
         const { id } = ctx.meta.route!.params
         requireTask(id)
         tasks.delete(id)
@@ -263,6 +274,7 @@ app.group({
       path: "/tasks/:id",
       schema: { params: TaskParams },
       handler: async (ctx) => {
+        // biome-ignore lint/style/noNonNullAssertion: route is always defined inside a route handler
         const { id } = ctx.meta.route!.params
         if (!tasks.has(id)) throw new HttpError(404, "Task not found")
         tasks.delete(id)

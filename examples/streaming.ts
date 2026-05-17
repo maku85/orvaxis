@@ -39,7 +39,7 @@ app.group({
         ]
 
         for (const record of records) {
-          ctx.res.write(JSON.stringify(record) + "\n")
+          ctx.res.write(`${JSON.stringify(record)}\n`)
         }
 
         ctx.res.end()
@@ -51,7 +51,7 @@ app.group({
       method: "GET",
       path: "/file/*filepath",
       handler: async (ctx) => {
-        const filepath = ctx.meta.route!.params.filepath
+        const filepath = ctx.meta.route?.params.filepath
         ctx.res.setHeader("Content-Type", "application/octet-stream")
         ctx.res.pipe(createReadStream(filepath))
       },

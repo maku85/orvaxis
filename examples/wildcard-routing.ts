@@ -13,6 +13,7 @@ app.group({
       method: "GET",
       path: "/files/*filepath",
       handler: async (ctx) => {
+        // biome-ignore lint/style/noNonNullAssertion: route is always defined inside a route handler
         const { filepath } = ctx.meta.route!.params
         // In a real app you would resolve and stream the file from disk.
         ctx.res.json({ filepath })
