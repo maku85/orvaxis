@@ -1,3 +1,5 @@
+import { createServer as httpCreateServer } from "node:http"
+import type { AddressInfo } from "node:net"
 import express from "express"
 import { describe, expect, it, vi } from "vitest"
 import { Orvaxis } from "../core/Orvaxis"
@@ -71,4 +73,53 @@ describe("createExpressServer — graceful shutdown", () => {
     expect(spy).toHaveBeenCalled()
     spy.mockRestore()
   })
+})
+
+describe("createExpressServer — SSE timeout auto-cancel", () => {
+  it("does not kill a streaming connection when write() is called before the deadline", async () => {
+    const { get } = await import("node:http")
+
+    const orvaxisApp = new Orvaxis()
+    orvaxisApp.group({
+      prefix: "/",
+      routes: [
+        {
+          method: "GET",
+          path: "/stream",
+          handler: async (ctx) => {
+            ctx.res.write(": ping\n\n")
+            await new Promise<void>((resolve) => {
+              ctx.req.signal?.addEventListener("abort", resolve)
+              setTimeout(resolve, 300)
+            })
+            ctx.res.end()
+          },
+        },
+      ],
+    })
+
+    const expressApp = express()
+    createExpressServer(orvaxisApp, expressApp, { timeout: 50 })
+
+    const httpSrv = httpCreateServer(expressApp)
+    await new Promise<void>((resolve) => httpSrv.listen(0, resolve))
+    const { port } = httpSrv.address() as AddressInfo
+
+    try {
+      const res = await new Promise<{ statusCode: number; alive: boolean }>((resolve, reject) => {
+        const req = get(`http://localhost:${port}/stream`, (incoming) => {
+          setTimeout(() => {
+            resolve({ statusCode: incoming.statusCode ?? 0, alive: !incoming.destroyed })
+            req.destroy()
+          }, 120)
+        })
+        req.on("error", reject)
+      })
+
+      expect(res.statusCode).toBe(200)
+      expect(res.alive).toBe(true)
+    } finally {
+      await new Promise<void>((resolve) => httpSrv.close(() => resolve()))
+    }
+  }, 2000)
 })

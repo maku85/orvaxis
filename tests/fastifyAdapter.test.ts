@@ -1,3 +1,5 @@
+import { get } from "node:http"
+import type { AddressInfo } from "node:net"
 import Fastify from "fastify"
 import { describe, expect, it, vi } from "vitest"
 import { Orvaxis } from "../core/Orvaxis"
@@ -68,4 +70,49 @@ describe("createFastifyServer — listen() guard", () => {
       await server.close()
     }
   })
+})
+
+describe("createFastifyServer — SSE timeout auto-cancel", () => {
+  it("does not kill a streaming connection when write() is called before the deadline", async () => {
+    const orvaxisApp = new Orvaxis()
+    orvaxisApp.group({
+      prefix: "/",
+      routes: [
+        {
+          method: "GET",
+          path: "/stream",
+          handler: async (ctx) => {
+            ctx.res.write(": ping\n\n")
+            await new Promise<void>((resolve) => {
+              ctx.req.signal?.addEventListener("abort", resolve)
+              setTimeout(resolve, 300)
+            })
+            ctx.res.end()
+          },
+        },
+      ],
+    })
+
+    const fastifyInstance = Fastify()
+    const server = createFastifyServer(orvaxisApp, fastifyInstance, { timeout: 50 })
+    await server.listen(0)
+    const { port } = fastifyInstance.server.address() as AddressInfo
+
+    try {
+      const res = await new Promise<{ statusCode: number; alive: boolean }>((resolve, reject) => {
+        const req = get(`http://localhost:${port}/stream`, (incoming) => {
+          setTimeout(() => {
+            resolve({ statusCode: incoming.statusCode ?? 0, alive: !incoming.destroyed })
+            req.destroy()
+          }, 120)
+        })
+        req.on("error", reject)
+      })
+
+      expect(res.statusCode).toBe(200)
+      expect(res.alive).toBe(true)
+    } finally {
+      await server.close()
+    }
+  }, 2000)
 })

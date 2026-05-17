@@ -1,15 +1,17 @@
 import Fastify, { type FastifyReply } from "fastify"
+import { HttpError } from "../core/HttpError"
 import type { Orvaxis } from "../core/Orvaxis"
 import type { OrvaxisRequest, OrvaxisResponse, ServerAdapter } from "../types"
-import { type AdapterOptions, sanitizeErrorMessage, withTimeout } from "./timeout"
+import { type AdapterOptions, sanitizeErrorMessage } from "./timeout"
 
-function wrapFastifyResponse(reply: FastifyReply): OrvaxisResponse {
+function wrapFastifyResponse(reply: FastifyReply, onStreamStart: () => void): OrvaxisResponse {
   let statusCode = 200
   let streamStarted = false
 
   function startStream() {
     if (!streamStarted) {
       streamStarted = true
+      onStreamStart()
       reply.hijack()
       reply.raw.writeHead(
         statusCode,
@@ -70,20 +72,35 @@ export function createFastifyServer(
     const requestId =
       (req.headers["x-request-id"] as string) || (req.id as string) || crypto.randomUUID()
     const controller = new AbortController()
-    const adapted = Object.assign(req, {
-      path,
-      method: req.method ?? "GET",
-      headers: req.headers,
-      query: req.query as Record<string, string | string[]>,
-      id: requestId,
-      signal: controller.signal,
-    }) as unknown as OrvaxisRequest
-    const wrapped = wrapFastifyResponse(reply)
+    // FastifyRequest defines 'signal' (and others) as getter-only on the prototype.
+    // Object.defineProperties bypasses [[Set]] entirely and adds own properties that shadow the getters.
+    const adapted = Object.create(req) as OrvaxisRequest
+    Object.defineProperties(adapted, {
+      path: { value: path, writable: true, configurable: true, enumerable: true },
+      id: { value: requestId, writable: true, configurable: true, enumerable: true },
+      signal: { value: controller.signal, writable: true, configurable: true, enumerable: true },
+    })
+    let cancelTimer: (() => void) | undefined
+    const wrapped = wrapFastifyResponse(reply, () => cancelTimer?.())
     wrapped.setHeader("X-Request-ID", requestId)
 
     try {
       const handlePromise = app.handle(adapted, wrapped)
-      await (timeoutMs > 0 ? withTimeout(handlePromise, timeoutMs, controller) : handlePromise)
+      if (timeoutMs > 0) {
+        let timer: ReturnType<typeof setTimeout>
+        cancelTimer = () => clearTimeout(timer)
+        await Promise.race([
+          handlePromise,
+          new Promise<never>((_, reject) => {
+            timer = setTimeout(() => {
+              controller.abort()
+              reject(new HttpError(408, "Request Timeout"))
+            }, timeoutMs)
+          }),
+        ]).finally(() => clearTimeout(timer))
+      } else {
+        await handlePromise
+      }
     } catch (err) {
       if (!wrapped.sent) {
         const e = err as { status?: number }

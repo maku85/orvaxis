@@ -1,9 +1,10 @@
 import express, { type Application, type NextFunction, type Request, type Response } from "express"
+import { HttpError } from "../core/HttpError"
 import type { Orvaxis } from "../core/Orvaxis"
 import type { OrvaxisRequest, OrvaxisResponse, ServerAdapter } from "../types"
-import { type AdapterOptions, sanitizeErrorMessage, withTimeout } from "./timeout"
+import { type AdapterOptions, sanitizeErrorMessage } from "./timeout"
 
-function wrapExpressResponse(res: Response): OrvaxisResponse {
+function wrapExpressResponse(res: Response, onStreamStart: () => void): OrvaxisResponse {
   const wrapped: OrvaxisResponse = {
     statusCode: 200,
     sent: false,
@@ -25,6 +26,7 @@ function wrapExpressResponse(res: Response): OrvaxisResponse {
       return wrapped
     },
     write(chunk) {
+      onStreamStart()
       wrapped.sent = true
       res.write(chunk)
     },
@@ -51,20 +53,41 @@ export function createExpressServer(
   server.use(async (req: Request, res: Response, _next: NextFunction) => {
     const requestId = (req.headers["x-request-id"] as string) || crypto.randomUUID()
     const controller = new AbortController()
-    const adapted = Object.assign(req, {
-      path: req.path,
-      method: req.method,
-      headers: req.headers,
-      query: req.query as unknown as Record<string, string | string[]>,
-      id: requestId,
-      signal: controller.signal,
-    }) as unknown as OrvaxisRequest
-    const wrapped = wrapExpressResponse(res)
+    // Express.request defines 'path' (and others) as getter-only on the prototype.
+    // Object.defineProperties bypasses [[Set]] entirely and adds own properties that shadow the getters.
+    const adapted = Object.create(req) as OrvaxisRequest
+    Object.defineProperties(adapted, {
+      query: {
+        value: req.query as unknown as Record<string, string | string[]>,
+        writable: true,
+        configurable: true,
+        enumerable: true,
+      },
+      id: { value: requestId, writable: true, configurable: true, enumerable: true },
+      signal: { value: controller.signal, writable: true, configurable: true, enumerable: true },
+    })
+
+    let cancelTimer: (() => void) | undefined
+    const wrapped = wrapExpressResponse(res, () => cancelTimer?.())
     wrapped.setHeader("X-Request-ID", requestId)
 
     try {
       const handlePromise = app.handle(adapted, wrapped)
-      await (timeoutMs > 0 ? withTimeout(handlePromise, timeoutMs, controller) : handlePromise)
+      if (timeoutMs > 0) {
+        let timer: ReturnType<typeof setTimeout>
+        cancelTimer = () => clearTimeout(timer)
+        await Promise.race([
+          handlePromise,
+          new Promise<never>((_, reject) => {
+            timer = setTimeout(() => {
+              controller.abort()
+              reject(new HttpError(408, "Request Timeout"))
+            }, timeoutMs)
+          }),
+        ]).finally(() => clearTimeout(timer))
+      } else {
+        await handlePromise
+      }
     } catch (err) {
       if (!wrapped.sent) {
         const e = err as { status?: number }

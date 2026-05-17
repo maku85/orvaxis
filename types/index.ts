@@ -98,6 +98,7 @@ export type OrvaxisContext<
   meta: ContextMeta & TMeta
   logs: string[]
   error?: Error
+  readonly params: Record<string, string>
 }
 
 export type Policy<

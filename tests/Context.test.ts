@@ -45,3 +45,32 @@ describe("createContext", () => {
     expect(ctx2.state.x).toBeUndefined()
   })
 })
+
+describe("ctx.params", () => {
+  it("returns an empty object when no route is matched yet", () => {
+    const ctx = createContext(emptyReq, emptyRes)
+    expect(ctx.params).toEqual({})
+  })
+
+  it("returns the route params once meta.route is populated", () => {
+    const ctx = createContext(emptyReq, emptyRes)
+    ctx.meta.route = {
+      route: { method: "GET", path: "/:id", handler: async () => {} },
+      group: { prefix: "/", routes: [] },
+      params: { id: "abc-123" },
+    }
+    expect(ctx.params).toEqual({ id: "abc-123" })
+  })
+
+  it("reflects live updates when params change", () => {
+    const ctx = createContext(emptyReq, emptyRes)
+    ctx.meta.route = {
+      route: { method: "GET", path: "/:id", handler: async () => {} },
+      group: { prefix: "/", routes: [] },
+      params: { id: "first" },
+    }
+    expect(ctx.params.id).toBe("first")
+    ctx.meta.route.params = { id: "second" }
+    expect(ctx.params.id).toBe("second")
+  })
+})

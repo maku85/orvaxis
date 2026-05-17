@@ -1,5 +1,6 @@
 export { getContext } from "./core/contextStore"
 export { Debugger } from "./core/Debugger"
+export { defineRoute } from "./core/defineRoute"
 export { HttpError } from "./core/HttpError"
 export { createMockResponse, type MockResponse } from "./core/mockResponse"
 export { Orvaxis } from "./core/Orvaxis"

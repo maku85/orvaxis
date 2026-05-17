@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **`ctx.params` shortcut** — `OrvaxisContext` now exposes a `readonly params: Record<string, string>` getter that returns `ctx.meta.route?.params ?? {}`. Handlers no longer need the verbose `ctx.meta.route!.params` pattern and the non-null assertion it requires; `ctx.params.id` is always safe inside a handler.
+
+- **`defineRoute<TBody>()` helper** — a thin wrapper around a route definition that infers the Zod (or any `.parse()`-based) schema's body type and propagates it into `ctx.req.body` inside the handler. Eliminates `ctx.req.body as z.infer<typeof MySchema>` casts with no runtime overhead. Accepts an optional second type argument `TState` to simultaneously type `ctx.state`. Non-breaking — plain route objects continue to work unchanged.
+
+- **SSE timeout auto-cancel** — both HTTP adapters (Express and Fastify) now automatically cancel the per-request timeout timer the first time `ctx.res.write()` is called. Long-lived streaming connections (SSE, chunked transfer) are no longer killed by the default 30 s timeout without requiring `timeout: 0` on the entire server. Normal request/response routes retain the full timeout.
+
+### Fixed
+
+- **`Object.assign` on getter-only request properties** — both adapters previously called `Object.assign(req, { path, method, ... })` directly on the framework's request object. In ECMAScript strict mode (the default for ES modules used by Vitest and modern bundlers), assigning to a property that has only a getter on the prototype throws a `TypeError`. Both adapters now use `Object.create(req)` + `Object.defineProperties` to add the orvaxis-specific fields as own properties without invoking `[[Set]]`, which correctly shadows any prototype getters (e.g. `path` on Express, `signal` on Fastify 5) without touching the underlying request object.
+
 ## [0.2.4] - 2026-05-17
 
 ### Added

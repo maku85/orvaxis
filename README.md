@@ -171,7 +171,7 @@ app.group({
       method: "GET",
       path: "/*filepath",
       handler: async (ctx) => {
-        const { filepath } = ctx.meta.route!.params // e.g. "docs/readme.md"
+        const { filepath } = ctx.params // e.g. "docs/readme.md"
         ctx.res.json({ filepath })
       },
     },
@@ -218,14 +218,24 @@ Pre-execution rules that determine whether a request is allowed.
 
 Example:
 ```ts
-export const requireApiKey: Policy = {
+type AuthState = { userId: string; role: "user" | "admin" }
+
+export const requireApiKey: Policy<AuthState> = {
   name: "require-api-key",
   priority: 100,
   async evaluate(ctx) {
-    const key = ctx.req.headers["x-api-key"]
-    if (!key) return { allow: false, reason: "Missing X-API-Key header" }
-    return { allow: true, modify: { apiKey: key } }
+    const key = ctx.req.headers["x-api-key"] as string
+    const identity = IDENTITIES[key]
+    if (!identity) return { allow: false, reason: "Missing X-API-Key header", status: 401 }
+    ctx.state = identity   // typed write — no cast needed
+    return { allow: true }
   }
+}
+
+// handler — ctx.state is typed as AuthState
+const handler = async (ctx: OrvaxisContext<AuthState>) => {
+  ctx.state.role   // "user" | "admin"
+  ctx.state.userId // string
 }
 ```
 
@@ -474,6 +484,50 @@ const handler = async (ctx: AppContext) => {
 ```
 
 The second parameter is intersected with `ContextMeta`, so all framework-internal fields remain typed.
+
+#### `ctx.params` — URL parameter shortcut
+
+`ctx.params` is a shorthand for `ctx.meta.route?.params ?? {}`. It is always safe to access inside a handler — no `!` assertion needed:
+
+```ts
+// before
+const { id } = ctx.meta.route!.params
+
+// after
+const { id } = ctx.params
+```
+
+#### `defineRoute<TBody>()` — typed request body
+
+Wrap a route definition in `defineRoute` to propagate the Zod (or any `.parse()`-based) schema's inferred type directly into the handler's `ctx.req.body`, eliminating manual casts:
+
+```ts
+import { defineRoute, schemaValidationPlugin } from "orvaxis"
+import { z } from "zod"
+
+const CreateUserBody = z.object({ name: z.string(), age: z.number() })
+
+app.group({
+  prefix: "/api",
+  routes: [
+    defineRoute({
+      method: "POST",
+      path: "/users",
+      schema: { body: CreateUserBody },
+      handler: async (ctx) => {
+        const body = ctx.req.body          // z.infer<typeof CreateUserBody> — no cast
+        ctx.res.status(201).json({ name: body.name })
+      },
+    }),
+  ],
+})
+```
+
+Pass `TState` as a second type argument to also type `ctx.state`:
+
+```ts
+defineRoute<z.infer<typeof CreateUserBody>, AuthState>({ ... })
+```
 
 ---
 

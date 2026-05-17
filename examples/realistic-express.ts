@@ -6,10 +6,13 @@
  *   - Per-key rate limiting (global policy, priority 90)
  *   - Role-based access control (admin group policy)
  *   - Schema validation with Zod (body + params)
+ *   - Type-safe body via defineRoute<TBody>() — no cast needed
+ *   - ctx.params shortcut — no ctx.meta.route!.params
+ *   - Type-safe auth state via ctx.state — no double-cast
  *   - Request tracing via traceMiddleware
  *   - Structured logging via loggerPlugin
  *   - Service functions using getContext() — no ctx threading
- *   - SSE live-update stream using ctx.res.write / ctx.res.end
+ *   - SSE live-update stream (timeout auto-cancelled on first write)
  *   - Observability via buildExecutionSummary on afterPipeline
  *
  * Usage:
@@ -24,6 +27,7 @@
 import { randomUUID } from "node:crypto"
 import { z } from "zod"
 import { getContext } from "../core/contextStore"
+import { defineRoute } from "../core/defineRoute"
 import { HttpError } from "../core/HttpError"
 import { Orvaxis } from "../core/Orvaxis"
 import { buildExecutionSummary } from "../debug/buildExecutionSummary"
@@ -36,8 +40,8 @@ import type { OrvaxisContext, Policy } from "../types"
 // ── Domain types ────────────────────────────────────────────────────────────
 
 type Task = { id: string; title: string; done: boolean; ownerId: string; createdAt: number }
-type AuthMeta = { userId: string; role: "user" | "admin" }
-type AppCtx = OrvaxisContext<Record<string, unknown>, AuthMeta>
+type AuthState = { userId: string; role: "user" | "admin" }
+type AppCtx = OrvaxisContext<AuthState>
 
 // ── In-memory store ──────────────────────────────────────────────────────────
 
@@ -46,7 +50,7 @@ const rateStore = new Map<string, { count: number; resetAt: number }>()
 
 // ── Identities ───────────────────────────────────────────────────────────────
 
-const IDENTITIES: Record<string, AuthMeta> = {
+const IDENTITIES: Record<string, AuthState> = {
   "key-alice": { userId: "alice", role: "user" },
   "key-bob": { userId: "bob", role: "user" },
   "key-admin": { userId: "root", role: "admin" },
@@ -54,18 +58,19 @@ const IDENTITIES: Record<string, AuthMeta> = {
 
 // ── Policies ─────────────────────────────────────────────────────────────────
 
-const requireApiKey: Policy = {
+const requireApiKey: Policy<AuthState> = {
   name: "require-api-key",
   priority: 100,
   evaluate(ctx) {
     const key = ctx.req.headers["x-api-key"] as string
     const identity = IDENTITIES[key]
     if (!identity) return { allow: false, reason: "Invalid or missing X-API-Key", status: 401 }
-    return { allow: true, modify: identity }
+    ctx.state = identity
+    return { allow: true }
   },
 }
 
-const rateLimit: Policy = {
+const rateLimit: Policy<AuthState> = {
   name: "rate-limit",
   priority: 90,
   evaluate(ctx) {
@@ -84,10 +89,10 @@ const rateLimit: Policy = {
   },
 }
 
-const requireAdmin: Policy = {
+const requireAdmin: Policy<AuthState> = {
   name: "require-admin",
   evaluate(ctx) {
-    if ((ctx.meta as unknown as AuthMeta).role !== "admin")
+    if (ctx.state.role !== "admin")
       return { allow: false, reason: "Admin access required", status: 403 }
     return { allow: true }
   },
@@ -104,14 +109,14 @@ const TaskParams = z.object({ id: z.string().uuid() })
 
 // ── Service helpers (use getContext — no ctx argument needed) ─────────────────
 
-function authMeta(): AuthMeta {
-  return (getContext()?.meta as unknown as AuthMeta) ?? { userId: "", role: "user" }
+function authState(): AuthState {
+  return (getContext()?.state as AuthState) ?? { userId: "", role: "user" }
 }
 
 function requireTask(id: string): Task {
   const task = tasks.get(id)
   if (!task) throw new HttpError(404, "Task not found")
-  const { userId, role } = authMeta()
+  const { userId, role } = authState()
   if (role !== "admin" && task.ownerId !== userId) throw new HttpError(403, "Access denied")
   return task
 }
@@ -187,59 +192,55 @@ app.group({
       path: "",
       handler: async (ctx: AppCtx) => {
         const list = [...tasks.values()].filter((t) =>
-          ctx.meta.role === "admin" ? true : t.ownerId === ctx.meta.userId
+          ctx.state.role === "admin" ? true : t.ownerId === ctx.state.userId
         )
         ctx.res.json(list)
       },
     },
-    {
+    defineRoute<z.infer<typeof CreateTaskBody>, AuthState>({
       method: "POST",
       path: "",
       schema: { body: CreateTaskBody },
-      handler: async (ctx: AppCtx) => {
-        const body = ctx.req.body as z.infer<typeof CreateTaskBody>
+      handler: async (ctx) => {
         const task: Task = {
           id: randomUUID(),
-          title: body.title,
+          title: ctx.req.body.title,
           done: false,
-          ownerId: ctx.meta.userId,
+          ownerId: ctx.state.userId,
           createdAt: Date.now(),
         }
         tasks.set(task.id, task)
         broadcast("task:created", task)
         ctx.res.status(201).json(task)
       },
-    },
+    }),
     {
       method: "GET",
       path: "/:id",
       schema: { params: TaskParams },
       handler: async (ctx) => {
-        // biome-ignore lint/style/noNonNullAssertion: route is always defined inside a route handler
-        ctx.res.json(requireTask(ctx.meta.route!.params.id))
+        ctx.res.json(requireTask(ctx.params.id))
       },
     },
-    {
+    defineRoute<z.infer<typeof UpdateTaskBody>, AuthState>({
       method: "PATCH",
       path: "/:id",
       schema: { body: UpdateTaskBody, params: TaskParams },
       handler: async (ctx) => {
-        // biome-ignore lint/style/noNonNullAssertion: route is always defined inside a route handler
-        const task = requireTask(ctx.meta.route!.params.id)
-        const patch = ctx.req.body as z.infer<typeof UpdateTaskBody>
+        const task = requireTask(ctx.params.id)
+        const patch = ctx.req.body
         if (patch.title !== undefined) task.title = patch.title
         if (patch.done !== undefined) task.done = patch.done
         broadcast("task:updated", task)
         ctx.res.json(task)
       },
-    },
+    }),
     {
       method: "DELETE",
       path: "/:id",
       schema: { params: TaskParams },
       handler: async (ctx) => {
-        // biome-ignore lint/style/noNonNullAssertion: route is always defined inside a route handler
-        const { id } = ctx.meta.route!.params
+        const { id } = ctx.params
         requireTask(id)
         tasks.delete(id)
         broadcast("task:deleted", { id })
@@ -274,8 +275,7 @@ app.group({
       path: "/tasks/:id",
       schema: { params: TaskParams },
       handler: async (ctx) => {
-        // biome-ignore lint/style/noNonNullAssertion: route is always defined inside a route handler
-        const { id } = ctx.meta.route!.params
+        const { id } = ctx.params
         if (!tasks.has(id)) throw new HttpError(404, "Task not found")
         tasks.delete(id)
         broadcast("task:deleted", { id })
@@ -300,6 +300,5 @@ app.group({
 
 // ── Start ─────────────────────────────────────────────────────────────────────
 
-// timeout: 0 — required for the SSE /events endpoint (long-lived connection)
-const server = createExpressServer(app, undefined, { timeout: 0 })
+const server = createExpressServer(app)
 server.listen(3000, (port) => console.log(`[orvaxis] listening on http://localhost:${port}`))
