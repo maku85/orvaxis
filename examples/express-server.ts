@@ -3,8 +3,16 @@ import { createExpressServer } from "../http/expressAdapter"
 
 const app = new Orvaxis()
 
+// ctx.logs is a per-request string accumulator — push anything you want to
+// capture for this request and read it back at any later lifecycle point.
 app.on("onRequest", (ctx) => {
   ctx.logs.push(`[${ctx.req.method}] ${ctx.req.path}`)
+})
+
+app.on("afterPipeline", (ctx) => {
+  if (ctx.logs.length > 0) {
+    console.log("[ctx.logs]", ctx.logs)
+  }
 })
 
 app.group({
@@ -14,6 +22,7 @@ app.group({
       method: "GET",
       path: "/hello",
       handler: async (ctx) => {
+        ctx.logs.push("handler: /hello executed")
         ctx.res.json({ message: "Hello from Orvaxis" })
       },
     },
@@ -29,3 +38,6 @@ app.group({
 
 const server = createExpressServer(app)
 server.listen(3000).catch(console.error)
+
+// GET /api/hello prints to console:
+// [ctx.logs] [ '[GET] /api/hello', 'handler: /hello executed' ]

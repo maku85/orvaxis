@@ -17,6 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`ctx.logs` documented as public API** — `OrvaxisContext.logs: string[]` is now explicitly documented as a request-scoped log accumulator. The framework initialises it as `[]` and leaves it entirely user-owned; hooks, middleware, and handlers can push formatted strings and read them back at any later lifecycle point. `examples/express-server.ts` is updated to demonstrate the full push-then-read pattern using `onRequest` and `afterPipeline`.
+
 - **`PluginContext` interface** — a new public type that describes the minimal surface a plugin's `apply` function receives. It exposes only `hooks.on`, which is the only hook-system capability plugins need. `Plugin.apply` now accepts `PluginContext` instead of `Runtime`, and `Runtime` is no longer exported from the package entry point. Existing plugins that rely on type inference (the common case) are unaffected; plugins that explicitly annotated the parameter as `Runtime` should update to `PluginContext`.
 
 - **`OrvaxisRequest.body` field** — `body?: unknown` is now an explicit, named field on `OrvaxisRequest` instead of relying on the `[key: string]: unknown` index signature. Handlers on plain routes can now read `ctx.req.body` without a cast. `defineRoute` continues to narrow the type to the inferred schema type (`TBody`) inside the handler.

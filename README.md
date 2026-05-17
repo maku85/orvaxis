@@ -514,6 +514,24 @@ const { id } = ctx.meta.route!.params
 const { id } = ctx.params
 ```
 
+#### `ctx.logs` — request-scoped log accumulator
+
+`ctx.logs` is a `string[]` that lives for the duration of a single request. Push any formatted message from hooks, middleware, or handlers and read it back at any later lifecycle point — useful for per-request audit trails, debugging, or test assertions without a real logger:
+
+```ts
+app.on("onRequest", (ctx) => {
+  ctx.logs.push(`[${ctx.req.method}] ${ctx.req.path}`)
+})
+
+app.on("afterPipeline", (ctx) => {
+  if (ctx.logs.length > 0) console.log("[request log]", ctx.logs)
+})
+```
+
+The array is initialised as `[]` by the framework. Nothing in the framework writes to it — it is entirely user-owned.
+
+---
+
 #### `defineRoute<TBody>()` — typed request body
 
 `ctx.req.body` is typed as `unknown` on all routes. Use `defineRoute` to propagate the Zod (or any `.parse()`-based) schema's inferred type directly into `ctx.req.body` inside the handler, eliminating the manual cast:
