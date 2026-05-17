@@ -239,6 +239,8 @@ const handler = async (ctx: OrvaxisContext<AuthState>) => {
 }
 ```
 
+`scope.method` is typed as `HttpMethod` (always uppercase). The request method is normalised to uppercase before the comparison, so a request arriving as `"get"` still matches a scope with `method: "GET"`.
+
 ---
 
 ### Hooks

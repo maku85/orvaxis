@@ -17,6 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Policy scope method matching is now case-insensitive** — `PolicyEngine.matchesScope` previously compared `ctx.req.method` against `scope.method` with a raw string equality check. Since `scope.method` is typed as `HttpMethod` (always uppercase) but `ctx.req.method` is never normalised in `validateRequest` or `createContext`, a request arriving with a lowercase method (e.g. from a custom adapter or `testRequest`) would silently bypass any policy that declared a `scope: { method: "GET" }`. The comparison now calls `.toUpperCase()` on the request method before comparing, consistent with how the router trie already handles method normalisation at match time.
+
 - **`Object.assign` on getter-only request properties** — both adapters previously called `Object.assign(req, { path, method, ... })` directly on the framework's request object. In ECMAScript strict mode (the default for ES modules used by Vitest and modern bundlers), assigning to a property that has only a getter on the prototype throws a `TypeError`. Both adapters now use `Object.create(req)` + `Object.defineProperties` to add the orvaxis-specific fields as own properties without invoking `[[Set]]`, which correctly shadows any prototype getters (e.g. `path` on Express, `signal` on Fastify 5) without touching the underlying request object.
 
 ## [0.2.4] - 2026-05-17

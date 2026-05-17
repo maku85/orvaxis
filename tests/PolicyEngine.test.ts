@@ -132,6 +132,36 @@ describe("PolicyEngine", () => {
     await expect(engine.evaluate(makeCtx("/test", "POST"))).rejects.toThrow("no POST")
   })
 
+  it("matches scope method case-insensitively against lowercase request method", async () => {
+    const engine = new PolicyEngine()
+    engine.register(
+      makePolicy({
+        scope: { method: "POST" },
+        evaluate: async () => ({ allow: false, reason: "blocked" }),
+      })
+    )
+
+    await expect(engine.evaluate(makeCtx("/test", "post"))).rejects.toThrow("blocked")
+  })
+
+  it("skips policy when lowercase request method does not match scope", async () => {
+    const engine = new PolicyEngine()
+    let called = false
+
+    engine.register(
+      makePolicy({
+        scope: { method: "POST" },
+        evaluate: async () => {
+          called = true
+          return { allow: false }
+        },
+      })
+    )
+
+    await engine.evaluate(makeCtx("/test", "get"))
+    expect(called).toBe(false)
+  })
+
   it("matches scope path as exact string", async () => {
     const engine = new PolicyEngine()
     let called = false

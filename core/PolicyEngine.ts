@@ -30,7 +30,7 @@ export class PolicyEngine {
   private matchesScope(scope: PolicyScope | undefined, ctx: OrvaxisContext): boolean {
     if (!scope) return true
 
-    if (scope.method && ctx.req.method !== scope.method) {
+    if (scope.method && ctx.req.method.toUpperCase() !== scope.method) {
       return false
     }
 
