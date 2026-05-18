@@ -136,7 +136,7 @@ Route paths support three segment types:
 
 The wildcard must be the last segment in the pattern. More specific routes always win: `/users/me` beats `/:id`, which beats `/*`.
 
-`HEAD` requests automatically fall back to the matching `GET` route when no dedicated `HEAD` route is registered. The `GET` handler executes in full — policies, middleware, and hooks all run — but the response body is suppressed and the connection is closed cleanly. Headers set by the handler (e.g. `Content-Type`, custom headers) are forwarded normally. A dedicated `HEAD` route always takes priority over the fallback.
+`HEAD` requests automatically fall back to the matching `GET` route when no dedicated `HEAD` route is registered. The `GET` handler executes in full — policies, middleware, and hooks all run — but the response body is suppressed and the connection is closed cleanly. `Content-Length` and `Content-Type` are computed from the body the `GET` handler would have sent and set on the response before closing, so clients using `HEAD` for prefetch or cache validation see accurate metadata. A dedicated `HEAD` route always takes priority over the fallback.
 
 ```ts
 // GET /api/users → { users: [] }

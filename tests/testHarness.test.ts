@@ -242,6 +242,47 @@ describe("testRequest", () => {
       expect(res.headers["x-version"]).toBe("42")
     })
 
+    it("sets Content-Length and Content-Type for HEAD when GET handler uses json()", async () => {
+      const app = new Orvaxis()
+      const body = { id: 1, name: "Alice" }
+      app.group({
+        prefix: "/api",
+        routes: [
+          {
+            method: "GET",
+            path: "/user",
+            handler: async (ctx) => ctx.res.json(body),
+          },
+        ],
+      })
+
+      const res = await testRequest(app, { path: "/api/user", method: "HEAD" })
+      expect(res.body).toBeUndefined()
+      expect(res.headers["Content-Type"]).toBe("application/json")
+      expect(res.headers["Content-Length"]).toBe(
+        String(Buffer.byteLength(JSON.stringify(body), "utf-8"))
+      )
+    })
+
+    it("sets Content-Length for HEAD when GET handler uses send() with a string", async () => {
+      const app = new Orvaxis()
+      const text = "hello wörld"
+      app.group({
+        prefix: "/api",
+        routes: [
+          {
+            method: "GET",
+            path: "/text",
+            handler: async (ctx) => ctx.res.send(text),
+          },
+        ],
+      })
+
+      const res = await testRequest(app, { path: "/api/text", method: "HEAD" })
+      expect(res.body).toBeUndefined()
+      expect(res.headers["Content-Length"]).toBe(String(Buffer.byteLength(text, "utf-8")))
+    })
+
     it("returns 404 for HEAD when no GET route matches", async () => {
       const res = await testRequest(makeApp(), { path: "/api/missing", method: "HEAD" })
       expect(res.status).toBe(404)

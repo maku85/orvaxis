@@ -36,11 +36,21 @@ function wrapForHead(res: OrvaxisResponse): OrvaxisResponse {
       res.setHeader(name, value)
       return wrapper
     },
-    json(_body) {
+    json(body) {
+      const serialized = JSON.stringify(body)
+      res.setHeader("Content-Type", "application/json")
+      res.setHeader("Content-Length", String(Buffer.byteLength(serialized, "utf-8")))
       wrapper.sent = true
       res.end()
     },
-    send(_body) {
+    send(body) {
+      const len =
+        body == null
+          ? 0
+          : Buffer.isBuffer(body)
+            ? body.length
+            : Buffer.byteLength(String(body), "utf-8")
+      res.setHeader("Content-Length", String(len))
       wrapper.sent = true
       res.end()
     },

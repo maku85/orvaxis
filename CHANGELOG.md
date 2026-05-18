@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **HEAD responses now include `Content-Length` and `Content-Type`** — `wrapForHead` (the internal wrapper that suppresses the response body for `HEAD → GET` fallback requests) previously called `res.end()` without computing the body size, violating RFC 9110 which requires HEAD responses to carry the same headers a GET would return. `json(body)` now serializes the body with `JSON.stringify`, sets `Content-Type: application/json`, and sets `Content-Length` to the UTF-8 byte length of the serialized string before calling `end()`. `send(body)` computes the byte length of the body (Buffer length, UTF-8 string length, or `0` for null/undefined) and sets `Content-Length` accordingly. The body itself is never written to the socket in either case.
+
 - **`otelPlugin` now traces 404 and 405 responses** — previously the `onRequest` hook (where `otelPlugin` creates its span) fired after routing, so requests that failed to match a route exited via the error path without ever creating a span. 404 and 405 traffic — including path-scanning attacks and misconfigured clients — was invisible in traces and error dashboards. The runtime now fires `onRequest` before routing so every request gets a span. For `OPTIONS` preflight, `ctx.meta.allowedMethods` is pre-populated before `onRequest` fires so `corsPlugin` can still read it. The span name is initially set to the raw request path (`GET /users/42`); `otelPlugin` updates it to the route template (`GET /users/:id`) in the existing `beforeHandler` hook once routing has succeeded. Errors now record the HTTP status from `HttpError.status` rather than `ctx.res.statusCode`, which is still `200` at error-hook time.
 
 ### Changed
