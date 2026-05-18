@@ -33,6 +33,21 @@ describe("PluginManager", () => {
     const manager = new PluginManager()
     expect(manager.list()).toHaveLength(0)
   })
+
+  it("throws TypeError when a plugin with the same name is registered twice", () => {
+    const manager = new PluginManager()
+    manager.register(makePlugin("my-plugin"))
+    expect(() => manager.register(makePlugin("my-plugin"))).toThrow(
+      'Plugin "my-plugin" is already registered'
+    )
+  })
+
+  it("allows plugins with different names", () => {
+    const manager = new PluginManager()
+    manager.register(makePlugin("plugin-a"))
+    manager.register(makePlugin("plugin-b"))
+    expect(manager.list()).toHaveLength(2)
+  })
 })
 
 describe("Runtime.addPlugin", () => {
