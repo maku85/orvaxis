@@ -643,7 +643,7 @@ const { id } = ctx.params
 
 #### `ctx.logs` — request-scoped log accumulator
 
-`ctx.logs` is a `string[]` that lives for the duration of a single request. Push any formatted message from hooks, middleware, or handlers and read it back at any later lifecycle point — useful for per-request audit trails, debugging, or test assertions without a real logger:
+`ctx.logs` is a `string[]` that lives for the duration of a single request. Push any formatted message from hooks, middleware, or handlers and read it back at any later lifecycle point — useful for short per-request audit trails, debugging, or test assertions without a real logger:
 
 ```ts
 app.on("onRequest", (ctx) => {
@@ -656,6 +656,16 @@ app.on("afterPipeline", (ctx) => {
 ```
 
 The array is initialised as `[]` by the framework. Nothing in the framework writes to it — it is entirely user-owned.
+
+`ctx.logs` is capped at **1 000 entries** by default. Pushes beyond the cap are dropped and `console.warn` fires once per request context. For high-volume output use a dedicated logger instead. The cap is configurable via `OrvaxisOptions`:
+
+```ts
+// raise the cap
+const app = new Orvaxis({ logsMaxSize: 5_000 })
+
+// disable (set to Infinity — not recommended for long-lived SSE connections)
+const app = new Orvaxis({ logsMaxSize: Infinity })
+```
 
 ---
 

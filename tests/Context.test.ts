@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest"
+import { describe, expect, it, vi } from "vitest"
 import { createContext } from "../core/Context"
 import { createMockResponse } from "../core/mockResponse"
 import type { OrvaxisRequest } from "../types"
@@ -43,6 +43,65 @@ describe("createContext", () => {
 
     ctx1.state.x = 1
     expect(ctx2.state.x).toBeUndefined()
+  })
+})
+
+describe("ctx.logs — bounded array", () => {
+  it("is a real array (Array.isArray)", () => {
+    const ctx = createContext(emptyReq, emptyRes)
+    expect(Array.isArray(ctx.logs)).toBe(true)
+  })
+
+  it("accepts pushes up to the cap", () => {
+    const ctx = createContext(emptyReq, emptyRes, 3)
+    ctx.logs.push("a")
+    ctx.logs.push("b")
+    ctx.logs.push("c")
+    expect(ctx.logs).toEqual(["a", "b", "c"])
+  })
+
+  it("drops entries beyond the cap", () => {
+    const ctx = createContext(emptyReq, emptyRes, 2)
+    ctx.logs.push("a")
+    ctx.logs.push("b")
+    ctx.logs.push("c")
+    expect(ctx.logs).toEqual(["a", "b"])
+    expect(ctx.logs.length).toBe(2)
+  })
+
+  it("emits console.warn once when the cap is first exceeded", () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {})
+    const ctx = createContext(emptyReq, emptyRes, 1)
+    ctx.logs.push("a")
+    ctx.logs.push("b")
+    expect(warnSpy).toHaveBeenCalledOnce()
+    expect(warnSpy.mock.calls[0][0]).toContain("ctx.logs")
+    warnSpy.mockRestore()
+  })
+
+  it("warns only once across multiple dropped entries", () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {})
+    const ctx = createContext(emptyReq, emptyRes, 1)
+    ctx.logs.push("a")
+    ctx.logs.push("b")
+    ctx.logs.push("c")
+    expect(warnSpy).toHaveBeenCalledOnce()
+    warnSpy.mockRestore()
+  })
+
+  it("fills up to the cap on a multi-item push that straddles the boundary", () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {})
+    const ctx = createContext(emptyReq, emptyRes, 2)
+    ctx.logs.push("a", "b", "c")
+    expect(ctx.logs).toEqual(["a", "b"])
+    expect(warnSpy).toHaveBeenCalledOnce()
+    warnSpy.mockRestore()
+  })
+
+  it("respects a custom cap passed to createContext", () => {
+    const ctx = createContext(emptyReq, emptyRes, 5)
+    for (let i = 0; i < 6; i++) ctx.logs.push(`entry-${i}`)
+    expect(ctx.logs.length).toBe(5)
   })
 })
 

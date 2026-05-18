@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`ctx.logs` bounded at 1 000 entries by default** — `ctx.logs` is now backed by a `Proxy` that caps the array at `logsMaxSize` entries (default `1 000`). Pushes beyond the cap are silently dropped and `console.warn` is emitted once per request context, pointing to `ctx.logs` and suggesting a dedicated logger for high-volume output. Multi-item pushes (`logs.push("a", "b", "c")`) fill up to the cap and trigger the warning in the same call. The cap is configurable via `new Orvaxis({ logsMaxSize: 500 })` (or `new Runtime({ logsMaxSize: 500 })`). `Array.isArray(ctx.logs)` continues to return `true`; all other array methods are unaffected. `logsMaxSize` is added to `OrvaxisOptions`.
+
 - **Body size limits documented** — Orvaxis does not enforce a body size limit of its own; the ceiling is set by the body parser of the underlying HTTP framework before the runtime is invoked. The README now documents the relevant configuration: `express.json({ limit })` for Express (default `"100kb"`) and `Fastify({ bodyLimit })` for Fastify (default `1 048 576` bytes = 1 MB). Custom adapters and `testRequest` have no limit and must enforce one independently if required. The custom-adapter checklist is updated to call this out explicitly.
 
 - **404 message includes the request path outside production** — when `NODE_ENV !== "production"`, the built-in router throws `HttpError(404, "Not Found: /api/missing")` instead of the generic `"Not Found"`, making unmatched-route debugging faster in development and staging. In production the path is omitted from the message to avoid reflecting user-controlled input. The 405 "Method Not Allowed" message is unchanged.

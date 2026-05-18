@@ -3,8 +3,9 @@ import { createExpressServer } from "../http/expressAdapter"
 
 const app = new Orvaxis()
 
-// ctx.logs is a per-request string accumulator — push anything you want to
-// capture for this request and read it back at any later lifecycle point.
+// ctx.logs is a per-request string accumulator capped at 1 000 entries (configurable
+// via new Orvaxis({ logsMaxSize: N })). Designed for short debug trails — use a
+// dedicated logger for high-volume output.
 app.on("onRequest", (ctx) => {
   ctx.logs.push(`[${ctx.req.method}] ${ctx.req.path}`)
 })

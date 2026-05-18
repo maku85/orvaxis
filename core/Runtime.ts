@@ -77,8 +77,11 @@ export class Runtime {
   readonly policies = new PolicyEngine()
   readonly router = new Router()
 
+  private readonly logsMaxSize: number | undefined
+
   constructor(options: OrvaxisOptions = {}) {
     this.hooks = new HookSystem(options.logger)
+    this.logsMaxSize = options.logsMaxSize
   }
 
   addPlugin(plugin: Plugin) {
@@ -87,7 +90,7 @@ export class Runtime {
   }
 
   async execute(req: OrvaxisRequest, res: OrvaxisResponse): Promise<OrvaxisContext> {
-    const ctx = createContext(req, res)
+    const ctx = createContext(req, res, this.logsMaxSize)
     const tracer = new Tracer(req.id ?? generateId())
     ctx.meta.tracer = tracer
 

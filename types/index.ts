@@ -15,6 +15,7 @@ export interface Logger {
 
 export type OrvaxisOptions = {
   logger?: Logger
+  logsMaxSize?: number
 }
 
 export interface TracerLike {
