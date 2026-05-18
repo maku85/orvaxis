@@ -70,6 +70,30 @@ describe("withTimeout", () => {
     expect(controller.signal.aborted).toBe(false)
   })
 
+  it("calls onCancel synchronously with a cancel function before the race settles", () => {
+    let cancel: (() => void) | undefined
+    const pending = new Promise<never>(() => {})
+    withTimeout(pending, 500, undefined, (fn) => {
+      cancel = fn
+    }).catch(() => {})
+
+    expect(typeof cancel).toBe("function")
+  })
+
+  it("cancelling via onCancel prevents the 408 rejection", async () => {
+    let cancel: (() => void) | undefined
+    const pending = new Promise<string>(() => {})
+    const errors: unknown[] = []
+    withTimeout(pending, 500, undefined, (fn) => {
+      cancel = fn
+    }).catch((e) => errors.push(e))
+
+    expect(cancel).toBeDefined()
+    if (cancel) cancel()
+    await vi.advanceTimersByTimeAsync(600)
+    expect(errors).toHaveLength(0)
+  })
+
   it("works without a controller (backwards compatible)", async () => {
     const pending = new Promise<never>(() => {})
     const race = withTimeout(pending, 500).catch((e) => e)

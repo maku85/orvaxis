@@ -1,8 +1,7 @@
 import Fastify, { type FastifyReply } from "fastify"
-import { HttpError } from "../core/HttpError"
 import type { Orvaxis } from "../core/Orvaxis"
 import type { OrvaxisRequest, OrvaxisResponse, ServerAdapter } from "../types"
-import { type AdapterOptions, buildErrorBody } from "./timeout"
+import { type AdapterOptions, buildErrorBody, withTimeout } from "./timeout"
 
 function wrapFastifyResponse(reply: FastifyReply, onStreamStart: () => void): OrvaxisResponse {
   let statusCode = 200
@@ -87,17 +86,9 @@ export function createFastifyServer(
     try {
       const handlePromise = app.handle(adapted, wrapped)
       if (timeoutMs > 0) {
-        let timer: ReturnType<typeof setTimeout>
-        cancelTimer = () => clearTimeout(timer)
-        await Promise.race([
-          handlePromise,
-          new Promise<never>((_, reject) => {
-            timer = setTimeout(() => {
-              controller.abort()
-              reject(new HttpError(408, "Request Timeout"))
-            }, timeoutMs)
-          }),
-        ]).finally(() => clearTimeout(timer))
+        await withTimeout(handlePromise, timeoutMs, controller, (cancel) => {
+          cancelTimer = cancel
+        })
       } else {
         await handlePromise
       }

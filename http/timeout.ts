@@ -25,16 +25,20 @@ export function buildErrorBody(err: unknown): { error: string; details?: unknown
 export function withTimeout<T>(
   promise: Promise<T>,
   ms: number,
-  controller?: AbortController
+  controller?: AbortController,
+  onCancel?: (cancel: () => void) => void
 ): Promise<T> {
   let timer: ReturnType<typeof setTimeout>
-  return Promise.race([
+  const racePromise = Promise.race([
     promise,
     new Promise<never>((_, reject) => {
+      // Promise executor runs synchronously — timer is set before onCancel fires
       timer = setTimeout(() => {
         controller?.abort()
         reject(new HttpError(408, "Request Timeout"))
       }, ms)
     }),
   ]).finally(() => clearTimeout(timer))
+  onCancel?.(() => clearTimeout(timer))
+  return racePromise
 }
