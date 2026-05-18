@@ -1,4 +1,4 @@
-import { SpanKind, SpanStatusCode, type Span, type Tracer } from "@opentelemetry/api"
+import { type Span, SpanKind, SpanStatusCode, type Tracer } from "@opentelemetry/api"
 import { describe, expect, it, vi } from "vitest"
 import { HttpError } from "../core/HttpError"
 import { Orvaxis } from "../core/Orvaxis"

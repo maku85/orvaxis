@@ -1,12 +1,12 @@
 import {
   type Attributes,
+  context,
+  propagation,
   type Span,
   SpanKind,
   SpanStatusCode,
   type TextMapGetter,
   type Tracer,
-  context,
-  propagation,
 } from "@opentelemetry/api"
 import { HttpError } from "../core/HttpError"
 import type { OrvaxisContext, PluginContext, Trace } from "../types"
