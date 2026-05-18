@@ -783,6 +783,38 @@ process.once("SIGTERM", () => server.close())
 process.once("SIGINT",  () => server.close())
 ```
 
+### Body size limits
+
+Orvaxis does not enforce its own body size limit. The ceiling is set entirely by the body-parsing layer of the underlying framework, **before** the request reaches the Orvaxis runtime.
+
+**Express** — body parsing is opt-in. Pass a `limit` to `express.json()` (default `"100kb"`):
+
+```ts
+import express from "express"
+import { createExpressServer } from "orvaxis"
+
+const server = express()
+server.use(express.json({ limit: "256kb" }))
+server.use(express.urlencoded({ limit: "256kb", extended: true }))
+
+const adapter = createExpressServer(app, server)
+```
+
+**Fastify** — the `bodyLimit` constructor option applies globally (default: `1048576` = 1 MB):
+
+```ts
+import Fastify from "fastify"
+import { createFastifyServer } from "orvaxis"
+
+const fastify = Fastify({ bodyLimit: 256 * 1024 })   // 256 KB
+
+const adapter = createFastifyServer(app, fastify)
+```
+
+**Custom adapters and `testRequest`** — neither enforces a body size limit. For custom adapters, implement the check at the stream level before forwarding the parsed body to `app.handle`. The `testRequest` helper is for unit tests where body size is controlled by the test author.
+
+---
+
 ### Error responses
 
 Every error response from the built-in adapters follows a standard `ErrorResponse` envelope:
@@ -901,9 +933,10 @@ For testing, `testRequest` captures all chunks in `result.chunks` and exposes `r
 Any adapter needs to:
 1. Ensure `req.path` is a plain path string (no query string)
 2. Create an `AbortController`, attach its `signal` to the request, and pass the controller as the third argument to `withTimeout` so that in-flight work is cancelled when the deadline expires
-3. Call `app.handle(req, res)` (wrapped in `withTimeout` if a deadline is needed) and catch thrown errors, using `sanitizeErrorMessage` to build the response body
-4. Return `{ listen(port, onListen?), close() }` to satisfy the `ServerAdapter` interface
-5. In `close()`, call `server.closeIdleConnections()` before `server.close()` to release idle keep-alive connections immediately, then set a `setTimeout(() => server.closeAllConnections(), shutdownTimeout)` deadline (default 10 s) that force-closes remaining connections if they do not drain in time; clear the timer in the close callback so it never fires when shutdown completes cleanly
+3. Enforce a body size limit at the stream level before forwarding the parsed body to `app.handle` — Orvaxis does not apply any limit of its own
+4. Call `app.handle(req, res)` (wrapped in `withTimeout` if a deadline is needed) and catch thrown errors, using `buildErrorBody(err, requestId)` to build the response body
+5. Return `{ listen(port, onListen?), close() }` to satisfy the `ServerAdapter` interface
+6. In `close()`, call `server.closeIdleConnections()` before `server.close()` to release idle keep-alive connections immediately, then set a `setTimeout(() => server.closeAllConnections(), shutdownTimeout)` deadline (default 10 s) that force-closes remaining connections if they do not drain in time; clear the timer in the close callback so it never fires when shutdown completes cleanly
 
 ---
 
