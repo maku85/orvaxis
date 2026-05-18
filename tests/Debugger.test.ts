@@ -25,6 +25,30 @@ describe("Debugger", () => {
     expect(dbg.enabled).toBe(true)
   })
 
+  it("becomes disabled again after disable()", () => {
+    const dbg = new Debugger()
+    dbg.enable()
+    dbg.disable()
+    expect(dbg.enabled).toBe(false)
+  })
+
+  it("enabled is read-only — direct assignment throws", () => {
+    const dbg = new Debugger()
+    expect(() => {
+      // @ts-expect-error — intentional: verifying the field is not writable at runtime
+      dbg.enabled = true
+    }).toThrow()
+  })
+
+  it("does not write to ctx after disable()", () => {
+    const dbg = new Debugger()
+    dbg.enable()
+    dbg.disable()
+    const ctx = makeCtx()
+    dbg.log(ctx, "REQUEST_START")
+    expect(ctx.meta.debug).toBeUndefined()
+  })
+
   it("does not write to ctx when disabled", () => {
     const dbg = new Debugger()
     const ctx = makeCtx()

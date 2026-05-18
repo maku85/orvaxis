@@ -3,6 +3,8 @@ import { buildExecutionSummary, Orvaxis, traceEvent, traceMiddleware } from "../
 
 const app = new Orvaxis()
 
+// enable() / disable() are the only way to toggle debug collection.
+// app.debugger.enabled is a read-only getter — direct assignment throws.
 app.debugger.enable()
 
 app.on("afterPipeline", (ctx) => {

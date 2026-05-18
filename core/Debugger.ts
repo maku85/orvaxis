@@ -3,13 +3,21 @@ import type { DebugInfo, OrvaxisContext } from "../types"
 type PerfOrigin = { startMs: number; startPerf: number }
 
 export class Debugger {
-  enabled = false
+  #enabled = false
   // Keyed by DebugInfo instance so entries across the same request share one origin.
   // WeakMap ensures no retention after the request context is GC'd.
   private readonly _origins = new WeakMap<DebugInfo, PerfOrigin>()
 
+  get enabled(): boolean {
+    return this.#enabled
+  }
+
   enable() {
-    this.enabled = true
+    this.#enabled = true
+  }
+
+  disable() {
+    this.#enabled = false
   }
 
   log(ctx: OrvaxisContext, event: string, meta?: Record<string, unknown>) {

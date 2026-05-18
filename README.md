@@ -552,8 +552,11 @@ async function fetchUser(id: string) {
 When enabled, the debugger records a structured timeline of every lifecycle step:
 
 ```ts
-app.debugger.enable()
+app.debugger.enable()   // start collecting debug timeline
+app.debugger.disable()  // stop collecting (e.g. after warm-up)
 ```
+
+`enabled` is a read-only getter — direct assignment throws at runtime. Always use `enable()` / `disable()` to toggle the state.
 
 Use `buildExecutionSummary(ctx)` to get a structured view of both the trace and the debug timeline:
 
