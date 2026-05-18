@@ -808,6 +808,12 @@ const streamed = await testRequest(app, { path: "/api/stream" })
 
 `TestRequestInit` accepts `path`, `method` (defaults to `"GET"`), `headers`, `query`, `id`, and any additional field (e.g. `body`) which is forwarded directly onto `req`. `query` is typed as `Record<string, string | string[]>` and maps directly to `ctx.req.query` inside the handler: `testRequest` never throws — errors thrown during execution are captured in `result.error` and their `.status` property (if present) is reflected in `result.status`. For streaming handlers, `result.chunks` holds all values passed to `ctx.res.write` and `ctx.res.end`, and `result.ended` is `true` when `ctx.res.end` was called.
 
+`createMockResponse` (the lower-level response mock used internally by `testRequest`) is available from the dedicated `orvaxis/testing` sub-path so it does not appear in autocomplete or bundle analysis for code that does not need it:
+
+```ts
+import { createMockResponse, type MockResponse } from "orvaxis/testing"
+```
+
 ### Route introspection
 
 `app.routes()` returns the flat list of all registered routes as `RouteInfo[]`, useful for OpenAPI generation and admin tooling:
@@ -926,6 +932,7 @@ orvaxis/
     contextStore.ts          AsyncLocalStorage store (getContext)
     HttpError.ts             HttpError class (status + message + cause)
     testHarness.ts           testRequest helper for unit testing
+    mockResponse.ts          createMockResponse (exported via orvaxis/testing)
     utils.ts                 shared utilities (mergeSafe, UNSAFE_KEYS)
 
   debug/

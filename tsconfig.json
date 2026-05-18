@@ -14,6 +14,7 @@
   },
   "include": [
     "index.ts",
+    "testing.ts",
     "core/**/*.ts",
     "debug/**/*.ts",
     "http/**/*.ts",

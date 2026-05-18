@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`orvaxis/testing` sub-path export** — `createMockResponse` and `MockResponse` are no longer exported from the main entry point. Import them from the new `orvaxis/testing` sub-path instead: `import { createMockResponse } from "orvaxis/testing"`. The sub-path is excluded from the production bundle and does not appear in autocomplete for users who do not import it. Both CJS (`require`) and ESM (`import`) conditions are mapped, each with their own `types` pointer.
+
 - **`shutdownTimeout` option** — both adapters accept a new `shutdownTimeout` field in `AdapterOptions` (default `10 000 ms`). After `close()` is called, a deadline timer fires `server.closeAllConnections()` if active connections have not drained within the limit. This prevents a stalled handler from keeping the process alive indefinitely under orchestrators (Kubernetes, systemd) that would otherwise send SIGKILL after their own grace period. Set `shutdownTimeout: 0` to disable the forced close.
 
 - **`ctx.params` shortcut** — `OrvaxisContext` now exposes a `readonly params: Record<string, string>` getter that returns `ctx.meta.route?.params ?? {}`. Handlers no longer need the verbose `ctx.meta.route!.params` pattern and the non-null assertion it requires; `ctx.params.id` is always safe inside a handler.
