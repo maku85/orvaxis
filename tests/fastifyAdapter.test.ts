@@ -117,6 +117,49 @@ describe("createFastifyServer — shutdown deadline", () => {
   }, 500)
 })
 
+describe("createFastifyServer — pipe() streaming", () => {
+  it("streams response body via pipe() from a Readable", async () => {
+    const { get } = await import("node:http")
+    const { Readable } = await import("node:stream")
+
+    const orvaxisApp = new Orvaxis()
+    orvaxisApp.group({
+      prefix: "/",
+      routes: [
+        {
+          method: "GET",
+          path: "/pipe",
+          handler: async (ctx) => {
+            ctx.res.setHeader("Content-Type", "text/plain")
+            ctx.res.pipe(Readable.from(["hello", " ", "world"]))
+          },
+        },
+      ],
+    })
+
+    const fastifyInstance = Fastify()
+    const server = createFastifyServer(orvaxisApp, fastifyInstance)
+    await server.listen(0)
+    const { port } = fastifyInstance.server.address() as AddressInfo
+
+    try {
+      const body = await new Promise<string>((resolve, reject) => {
+        get(`http://localhost:${port}/pipe`, (res) => {
+          let data = ""
+          res.on("data", (chunk: Buffer) => {
+            data += chunk.toString()
+          })
+          res.on("end", () => resolve(data))
+          res.on("error", reject)
+        }).on("error", reject)
+      })
+      expect(body).toBe("hello world")
+    } finally {
+      await server.close()
+    }
+  }, 5000)
+})
+
 describe("createFastifyServer — SSE timeout auto-cancel", () => {
   it("does not kill a streaming connection when write() is called before the deadline", async () => {
     const orvaxisApp = new Orvaxis()

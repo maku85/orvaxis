@@ -330,6 +330,88 @@ describe("schemaValidationPlugin", () => {
     })
   })
 
+  describe("extractDetails edge cases", () => {
+    it("sets details to undefined when cause is a primitive (not an object)", async () => {
+      const app = makeApp()
+      app.group({
+        prefix: "/api",
+        routes: [
+          {
+            method: "POST",
+            path: "/items",
+            schema: {
+              body: {
+                parse: () => {
+                  throw "string error" // primitive — exercises extractDetails line 10 early-return
+                },
+              },
+            },
+            handler: async (ctx) => ctx.res.json({ ok: true }),
+          },
+        ],
+      })
+
+      const res = await testRequest(app, { path: "/api/items", method: "POST", body: {} })
+      expect(res.status).toBe(422)
+      expect((res.error as { details?: unknown })?.details).toBeUndefined()
+    })
+
+    it("uses empty array for path and 'Invalid value' for message when issue fields are wrong types", async () => {
+      const cause = { issues: [{ path: "not-an-array", message: 42 }] }
+      const app = makeApp()
+      app.group({
+        prefix: "/api",
+        routes: [
+          {
+            method: "POST",
+            path: "/items",
+            schema: {
+              body: {
+                parse: () => {
+                  throw cause
+                },
+              },
+            },
+            handler: async (ctx) => ctx.res.json({ ok: true }),
+          },
+        ],
+      })
+
+      const res = await testRequest(app, { path: "/api/items", method: "POST", body: {} })
+      expect(res.status).toBe(422)
+      const details = (res.error as { details?: unknown })?.details as unknown[]
+      expect(details[0]).toEqual({ path: [], message: "Invalid value" })
+    })
+
+    it("maps a null issue in the issues array to a default path/message", async () => {
+      const cause = { issues: [null, { path: ["name"], message: "Required" }] }
+      const app = makeApp()
+      app.group({
+        prefix: "/api",
+        routes: [
+          {
+            method: "POST",
+            path: "/items",
+            schema: {
+              body: {
+                parse: () => {
+                  throw cause
+                },
+              },
+            },
+            handler: async (ctx) => ctx.res.json({ ok: true }),
+          },
+        ],
+      })
+
+      const res = await testRequest(app, { path: "/api/items", method: "POST", body: {} })
+      expect(res.status).toBe(422)
+      const details = (res.error as { details?: unknown })?.details as unknown[]
+      expect(details[0]).toEqual({ path: [], message: "null" })
+      expect(details[1]).toEqual({ path: ["name"], message: "Required" })
+    })
+  })
+
   describe("cause forwarding", () => {
     it("attaches the original validation error as cause", async () => {
       const originalError = new Error("schema mismatch")

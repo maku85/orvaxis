@@ -53,7 +53,8 @@ function wrapFastifyResponse(reply: FastifyReply, onStreamStart: () => void): Or
     },
     pipe(stream) {
       wrapped.sent = true
-      reply.send(stream)
+      startStream()
+      stream.pipe(reply.raw, { end: true })
     },
   }
   return wrapped

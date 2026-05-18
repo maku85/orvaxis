@@ -7,6 +7,7 @@ function makeCtx(path = "/api/test", method = "GET"): OrvaxisContext {
   return {
     req: { path, method, headers: {} },
     res: createMockResponse(),
+    params: {},
     state: {},
     meta: {},
     logs: [],
@@ -205,6 +206,28 @@ describe("PolicyEngine", () => {
 
     await engine.evaluate(makeCtx("/admin/users"))
     expect(called).toBe(true)
+  })
+
+  it("matches scope path string that already ends with '/' — no double-slash prefix", async () => {
+    const engine = new PolicyEngine()
+    const visited: string[] = []
+
+    engine.register(
+      makePolicy({
+        scope: { path: "/api/" },
+        evaluate: async (ctx) => {
+          visited.push(ctx.req.path)
+          return { allow: true }
+        },
+      })
+    )
+
+    await engine.evaluate(makeCtx("/other"))
+    expect(visited).toHaveLength(0)
+
+    await engine.evaluate(makeCtx("/api/"))
+    await engine.evaluate(makeCtx("/api/users"))
+    expect(visited).toEqual(["/api/", "/api/users"])
   })
 
   it("matches scope path as RegExp", async () => {

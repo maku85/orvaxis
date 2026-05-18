@@ -170,6 +170,45 @@ describe("corsPlugin", () => {
       expect(res.headers["Access-Control-Max-Age"]).toBe("3600")
     })
 
+    it("does not set ACAO when the request has no origin header and a specific origin is configured", async () => {
+      const app = makeApp()
+      app.register(corsPlugin({ origin: "https://trusted.com" }))
+      // no origin header in the request
+      const res = await testRequest(app, { path: "/api/resource" })
+      expect(res.headers["Access-Control-Allow-Origin"]).toBeUndefined()
+    })
+
+    it("does not set ACAO when origin is an unknown runtime type (resolveOrigin final fallthrough)", async () => {
+      const app = makeApp()
+      // Pass a plain object — not string, array, or RegExp — to reach the final `return null`
+      app.register(corsPlugin({ origin: {} as unknown as string }))
+      const res = await testRequest(app, {
+        path: "/api/resource",
+        headers: { origin: "https://example.com" },
+      })
+      expect(res.headers["Access-Control-Allow-Origin"]).toBeUndefined()
+    })
+
+    it("does not set ACAO when array origin does not include the request origin", async () => {
+      const app = makeApp()
+      app.register(corsPlugin({ origin: ["https://a.com", "https://b.com"] }))
+      const res = await testRequest(app, {
+        path: "/api/resource",
+        headers: { origin: "https://evil.com" },
+      })
+      expect(res.headers["Access-Control-Allow-Origin"]).toBeUndefined()
+    })
+
+    it("does not set ACAO when RegExp origin does not match the request origin", async () => {
+      const app = makeApp()
+      app.register(corsPlugin({ origin: /^https:\/\/trusted\.com$/ }))
+      const res = await testRequest(app, {
+        path: "/api/resource",
+        headers: { origin: "https://evil.com" },
+      })
+      expect(res.headers["Access-Control-Allow-Origin"]).toBeUndefined()
+    })
+
     it("does not set CORS headers when preflight origin is rejected", async () => {
       const app = makeApp()
       app.register(corsPlugin({ origin: "https://trusted.com" }))

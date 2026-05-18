@@ -264,6 +264,49 @@ describe("testRequest", () => {
       )
     })
 
+    it("sets Content-Length: 0 for HEAD when GET handler uses send() with null", async () => {
+      const app = new Orvaxis()
+      app.group({
+        prefix: "/api",
+        routes: [
+          {
+            method: "GET",
+            path: "/null-body",
+            handler: async (ctx) => {
+              ctx.res.send(null)
+            },
+          },
+        ],
+      })
+
+      const res = await testRequest(app, { path: "/api/null-body", method: "HEAD" })
+      expect(res.status).toBe(200)
+      expect(res.headers["Content-Length"]).toBe("0")
+      expect(res.body).toBeUndefined()
+    })
+
+    it("sets Content-Length for HEAD when GET handler uses send() with a Buffer", async () => {
+      const payload = Buffer.from("hello world")
+      const app = new Orvaxis()
+      app.group({
+        prefix: "/api",
+        routes: [
+          {
+            method: "GET",
+            path: "/buffer-body",
+            handler: async (ctx) => {
+              ctx.res.send(payload)
+            },
+          },
+        ],
+      })
+
+      const res = await testRequest(app, { path: "/api/buffer-body", method: "HEAD" })
+      expect(res.status).toBe(200)
+      expect(res.headers["Content-Length"]).toBe(String(payload.length))
+      expect(res.body).toBeUndefined()
+    })
+
     it("sets Content-Length for HEAD when GET handler uses send() with a string", async () => {
       const app = new Orvaxis()
       const text = "hello wörld"

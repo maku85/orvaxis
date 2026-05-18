@@ -98,6 +98,36 @@ describe("loggerPlugin", () => {
     })
   })
 
+  describe("afterPipeline without prior onRequest", () => {
+    it("logs durationMs as undefined in JSON format when no start time was recorded", async () => {
+      const logger = makeLogger()
+      const runtime = new Runtime()
+      loggerPlugin({ logger }).apply(runtime)
+
+      const ctx = makeCtx("/test", "req-no-start", 200)
+      await runtime.hooks.trigger("afterPipeline", ctx)
+
+      expect(logger.calls).toContainEqual({
+        method: "info",
+        args: [expect.objectContaining({ type: "response", durationMs: undefined })],
+      })
+    })
+
+    it("logs duration as undefined in text format when no start time was recorded", async () => {
+      const logger = makeLogger()
+      const runtime = new Runtime()
+      loggerPlugin({ logger, format: "text" }).apply(runtime)
+
+      const ctx = makeCtx("/test", "req-no-start", 200)
+      await runtime.hooks.trigger("afterPipeline", ctx)
+
+      expect(logger.calls).toContainEqual({
+        method: "info",
+        args: ["[RES]", "GET", "/test", 200, undefined, "req-no-start"],
+      })
+    })
+  })
+
   describe("text format", () => {
     it("logs method, path, and requestId via logger.info on onRequest hook", async () => {
       const logger = makeLogger()
