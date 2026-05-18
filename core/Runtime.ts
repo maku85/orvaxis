@@ -92,6 +92,16 @@ export class Runtime {
           const allowed = this.router.allowedMethods(req.path)
           if (allowed.length > 0) {
             ctx.res.setHeader("Allow", allowed.join(", "))
+            if (req.method.toUpperCase() === "OPTIONS") {
+              ctx.meta.allowedMethods = allowed
+              await this.hooks.trigger("onRequest", ctx)
+              this.debugger.log(ctx, "HOOK:onRequest")
+              if (!ctx.res.sent) ctx.res.status(204).end()
+              ctx.meta.trace = tracer.end()
+              await this.hooks.trigger("afterPipeline", ctx)
+              this.debugger.log(ctx, "REQUEST_END")
+              return ctx
+            }
             throw new HttpError(405, "Method Not Allowed")
           }
           throw new HttpError(404, "Not Found")

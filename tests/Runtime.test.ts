@@ -29,7 +29,7 @@ function makeGroup(
     policies: opts.groupPolicies,
     routes: [
       {
-        method: opts.method ?? "GET",
+        method: (opts.method ?? "GET") as import("../types").HttpMethod,
         path: opts.path ?? "/resource",
         handler:
           opts.handler ??
@@ -81,6 +81,54 @@ describe("Runtime", () => {
       await runtime.execute(makeReq("/api/resource", "POST"), res).catch(() => {})
       const allow = res.sentHeaders.Allow as string
       expect(allow).toContain("HEAD")
+    })
+
+    it("responds 204 for OPTIONS preflight on a known path", async () => {
+      const runtime = new Runtime()
+      runtime.router.group(makeGroup("/api"))
+
+      const res = makeRes()
+      const ctx = await runtime.execute(makeReq("/api/resource", "OPTIONS"), res)
+      expect(res.statusCode).toBe(204)
+      expect(res.ended).toBe(true)
+      expect(ctx.error).toBeUndefined()
+    })
+
+    it("populates ctx.meta.allowedMethods for OPTIONS preflight", async () => {
+      const runtime = new Runtime()
+      runtime.router.group(makeGroup("/api"))
+
+      const res = makeRes()
+      const ctx = await runtime.execute(makeReq("/api/resource", "OPTIONS"), res)
+      expect(ctx.meta.allowedMethods).toContain("GET")
+      expect(ctx.meta.allowedMethods).toContain("HEAD")
+    })
+
+    it("fires onRequest and afterPipeline hooks for OPTIONS preflight", async () => {
+      const runtime = new Runtime()
+      runtime.router.group(makeGroup("/api"))
+      const fired: string[] = []
+      runtime.hooks.on("onRequest", async () => {
+        fired.push("onRequest")
+      })
+      runtime.hooks.on("afterPipeline", async () => {
+        fired.push("afterPipeline")
+      })
+
+      await runtime.execute(makeReq("/api/resource", "OPTIONS"), makeRes())
+      expect(fired).toEqual(["onRequest", "afterPipeline"])
+    })
+
+    it("respects a response sent by a hook during OPTIONS preflight", async () => {
+      const runtime = new Runtime()
+      runtime.router.group(makeGroup("/api"))
+      runtime.hooks.on("onRequest", async (ctx) => {
+        ctx.res.status(403).json({ error: "Forbidden" })
+      })
+
+      const res = makeRes()
+      await runtime.execute(makeReq("/api/resource", "OPTIONS"), res)
+      expect(res.statusCode).toBe(403)
     })
 
     it("still throws 404 for a completely unknown path regardless of method", async () => {
@@ -317,9 +365,15 @@ describe("Runtime", () => {
           },
         })
       )
-      runtime.hooks.on("beforeHandler", async () => order.push("beforeHandler"))
-      runtime.hooks.on("afterHandler", async () => order.push("afterHandler"))
-      runtime.hooks.on("afterPipeline", async () => order.push("afterPipeline"))
+      runtime.hooks.on("beforeHandler", async () => {
+        order.push("beforeHandler")
+      })
+      runtime.hooks.on("afterHandler", async () => {
+        order.push("afterHandler")
+      })
+      runtime.hooks.on("afterPipeline", async () => {
+        order.push("afterPipeline")
+      })
 
       await runtime.execute(makeReq("/api/resource"), makeRes())
       expect(order).toEqual(["beforeHandler", "handler", "afterHandler", "afterPipeline"])

@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **`testRequest` moved to `orvaxis/testing`** — `testRequest`, `TestRequestInit`, and `TestResponse` are no longer exported from the main `orvaxis` entry point. Import them from `orvaxis/testing` instead: `import { testRequest } from "orvaxis/testing"`. This keeps test-only code out of production bundles for consumers that do not use a tree-shaking bundler. `createMockResponse` and `MockResponse` were already on this sub-path; all testing utilities are now consolidated there.
 
+### Added
+
+- **`corsPlugin` — built-in CORS support** — a new `corsPlugin(options?)` factory handles cross-origin requests for any adapter (Express, Fastify, or custom). Register it like any other plugin: `app.register(corsPlugin())`. On every matched request `onRequest` adds `Access-Control-Allow-Origin` (and optionally `Vary: Origin`, `Access-Control-Allow-Credentials`, `Access-Control-Expose-Headers`). For unmatched `OPTIONS` preflight requests the runtime now responds `204` with `Allow` + `Access-Control-Allow-Methods` / `Access-Control-Allow-Headers` / `Access-Control-Max-Age` instead of `404`. Available options: `origin` (string / string[] / RegExp, default `"*"`), `methods`, `allowedHeaders`, `exposedHeaders`, `credentials`, `maxAge`. `corsPlugin` and `CorsOptions` are exported from the main entry point.
+
 ### Fixed
 
 - **Validation errors now include structured `details`** — `HttpError` gains an optional `details?: unknown` field. `schemaValidationPlugin` populates it by extracting `{ path, message }` pairs from the validator's error cause (any object whose `.issues` is an array — compatible with Zod, and any library that follows the same convention). The adapter error response now carries `details` alongside `error` when present: `{ error: "Validation failed: body", details: [{ path: ["name"], message: "Required" }, ...] }`. Validators that do not expose `.issues` are unaffected — `details` is omitted. A new `buildErrorBody(err)` utility in `http/timeout.ts` consolidates response construction in both adapters; `sanitizeErrorMessage` remains exported for custom adapters.

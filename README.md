@@ -390,6 +390,38 @@ On validation failure the plugin throws an error with `status: 422`, a `field` p
 
 The plugin is opt-in — routes with a `schema` field are silently ignored unless `schemaValidationPlugin` is registered.
 
+**`corsPlugin`** — handles cross-origin requests for any adapter (Express, Fastify, or custom):
+
+```ts
+import { Orvaxis, corsPlugin } from "orvaxis"
+
+const app = new Orvaxis()
+
+// wildcard — open public API
+app.register(corsPlugin())
+
+// restricted to specific origins
+app.register(corsPlugin({
+  origin: ["https://app.example.com", "https://admin.example.com"],
+  credentials: true,
+  exposedHeaders: ["X-Request-ID"],
+  maxAge: 3600,
+}))
+```
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `origin` | `string \| string[] \| RegExp` | `"*"` | Allowed origin(s) |
+| `methods` | `string[]` | registered methods | `Access-Control-Allow-Methods` for preflight |
+| `allowedHeaders` | `string[]` | mirrors request | `Access-Control-Allow-Headers` for preflight |
+| `exposedHeaders` | `string[]` | — | `Access-Control-Expose-Headers` on all responses |
+| `credentials` | `boolean` | `false` | `Access-Control-Allow-Credentials` |
+| `maxAge` | `number` | — | `Access-Control-Max-Age` (seconds) for preflight cache |
+
+`OPTIONS` preflight requests on known paths automatically receive a `204` response with all CORS headers populated, no route registration required. `OPTIONS` on an unknown path returns `404` as usual.
+
+When `origin` is not `"*"` the plugin also sets `Vary: Origin` so CDNs cache responses per origin correctly.
+
 **`otelPlugin`** — emits an OpenTelemetry `SERVER` span for every request. Requires `@opentelemetry/api` (optional peer dependency) and a pre-configured SDK with your chosen exporter (OTLP, Zipkin, Jaeger, etc.):
 
 ```ts
@@ -1038,7 +1070,7 @@ It favors:
 
 ## Current Status
 
-The core execution model is stable, tested, and covered by 323 passing tests.
+The core execution model is stable, tested, and covered by 347 passing tests.
 
 Not yet recommended for production. Known gaps before production use:
 
