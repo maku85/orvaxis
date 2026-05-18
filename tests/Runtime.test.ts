@@ -52,6 +52,59 @@ describe("Runtime", () => {
       expect(err.status).toBe(404)
     })
 
+    it("throws 405 when path is registered but method does not match", async () => {
+      const runtime = new Runtime()
+      runtime.router.group(makeGroup("/api"))
+
+      const err = await runtime
+        .execute(makeReq("/api/resource", "DELETE"), makeRes())
+        .catch((e) => e)
+      expect(err.status).toBe(405)
+      expect(err.message).toBe("Method Not Allowed")
+    })
+
+    it("sets Allow header listing registered methods on 405", async () => {
+      const runtime = new Runtime()
+      runtime.router.group(makeGroup("/api"))
+
+      const res = makeRes()
+      await runtime.execute(makeReq("/api/resource", "DELETE"), res).catch(() => {})
+      expect(res.sentHeaders.Allow).toContain("GET")
+      expect(res.sentHeaders.Allow).toContain("HEAD")
+    })
+
+    it("includes HEAD in Allow header when GET is registered", async () => {
+      const runtime = new Runtime()
+      runtime.router.group(makeGroup("/api"))
+
+      const res = makeRes()
+      await runtime.execute(makeReq("/api/resource", "POST"), res).catch(() => {})
+      const allow = res.sentHeaders.Allow as string
+      expect(allow).toContain("HEAD")
+    })
+
+    it("still throws 404 for a completely unknown path regardless of method", async () => {
+      const runtime = new Runtime()
+      runtime.router.group(makeGroup("/api"))
+
+      const err = await runtime
+        .execute(makeReq("/nonexistent", "DELETE"), makeRes())
+        .catch((e) => e)
+      expect(err.status).toBe(404)
+    })
+
+    it("triggers onError hook with 405 error", async () => {
+      const runtime = new Runtime()
+      runtime.router.group(makeGroup("/api"))
+      const onError = vi.fn()
+      runtime.hooks.on("onError", onError)
+
+      await runtime.execute(makeReq("/api/resource", "DELETE"), makeRes()).catch(() => {})
+      expect(onError).toHaveBeenCalledOnce()
+      const err = onError.mock.calls[0][1] as { status: number }
+      expect(err.status).toBe(405)
+    })
+
     it("executes the matching route handler", async () => {
       const runtime = new Runtime()
       runtime.router.group(makeGroup("/api"))

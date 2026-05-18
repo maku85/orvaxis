@@ -147,6 +147,18 @@ app.group({
 })
 ```
 
+When a path is registered but the incoming method is not, the router responds with `405 Method Not Allowed` and sets an `Allow` response header listing every method registered on that path. `HEAD` is included automatically whenever `GET` is registered.
+
+```ts
+app.group({
+  prefix: "/api",
+  routes: [{ method: "GET", path: "/users", handler: async (ctx) => ctx.res.json([]) }],
+})
+
+// POST /api/users → 405 Method Not Allowed
+//                    Allow: GET, HEAD
+```
+
 Registering two routes with the same method and pattern throws a `TypeError` immediately at registration time:
 
 ```ts
@@ -389,7 +401,7 @@ Each span captures:
 
 Distributed trace context is extracted from incoming `traceparent` / `tracestate` headers so Orvaxis participates in upstream traces automatically. `traceMiddleware` events are forwarded to the span as OTel span events. On error the exception is recorded via `span.recordException` and the span status is set to `ERROR`.
 
-> **Note:** spans are only created for requests that reach the `onRequest` hook — i.e. requests that match a route and pass policy checks. Requests that produce a 404 or are rejected by a policy before `onRequest` fires are not traced.
+> **Note:** spans are only created for requests that reach the `onRequest` hook — i.e. requests that match a route and pass policy checks. Requests that produce a 404, 405, or are rejected by a policy before `onRequest` fires are not traced.
 
 To write a custom plugin:
 
@@ -1013,7 +1025,7 @@ It favors:
 
 ## Current Status
 
-The core execution model is stable, tested, and covered by 279 passing tests.
+The core execution model is stable, tested, and covered by 323 passing tests.
 
 Not yet recommended for production. Known gaps before production use:
 

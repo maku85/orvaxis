@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **405 Method Not Allowed** — when a request path is registered but the incoming HTTP method is not, the runtime now responds with `405 Method Not Allowed` instead of `404 Not Found`. The response includes an `Allow` header listing every method registered on that path; `HEAD` is added automatically whenever `GET` is registered, consistent with the existing `HEAD → GET` fallback. `Router` exposes a new `allowedMethods(path): string[]` method for adapters and tooling that need the same information.
+
 ### Added
 
 - **`otelPlugin` — OpenTelemetry integration** — a new `otelPlugin({ tracer })` factory creates an OpenTelemetry `SERVER` span per request using the provided `@opentelemetry/api` `Tracer`. On each request: the incoming `traceparent`/`tracestate` headers are extracted via `propagation.extract` to propagate distributed trace context; a span is started with `http.request.method`, `url.path`, and `orvaxis.request_id` attributes; on success (`afterPipeline`) the response status code is set and any `traceMiddleware` events are added as OTel span events before the span is ended with `OK` status; on error (`onError`) the exception is recorded and the span is ended with `ERROR` status. Requires `@opentelemetry/api ^1.0.0` as an optional peer dependency — users configure their own SDK and exporter. `otelPlugin` and `OtelPluginOptions` are exported from the main entry point.

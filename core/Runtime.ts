@@ -89,6 +89,11 @@ export class Runtime {
 
         const match = this.router.match(req)
         if (!match) {
+          const allowed = this.router.allowedMethods(req.path)
+          if (allowed.length > 0) {
+            ctx.res.setHeader("Allow", allowed.join(", "))
+            throw new HttpError(405, "Method Not Allowed")
+          }
           throw new HttpError(404, "Not Found")
         }
 

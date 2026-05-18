@@ -91,6 +91,17 @@ class Trie {
     return this.traverse(root, segments, 0, {})
   }
 
+  allowedMethods(path: string): string[] {
+    const segments = path.split("/").filter(Boolean)
+    const methods: string[] = []
+    for (const [method, root] of this.roots) {
+      if (this.traverse(root, segments, 0, {}) !== null) {
+        methods.push(method)
+      }
+    }
+    return methods
+  }
+
   private traverse(
     node: TrieNode,
     segments: string[],
@@ -164,5 +175,14 @@ export class Router {
     if (result) return result
     if (req.method.toUpperCase() === "HEAD") return this.trie.match("GET", path)
     return null
+  }
+
+  allowedMethods(path: string): string[] {
+    const normalized = path.replace(/\/+/g, "/")
+    const methods = this.trie.allowedMethods(normalized)
+    if (methods.includes("GET") && !methods.includes("HEAD")) {
+      methods.push("HEAD")
+    }
+    return methods
   }
 }

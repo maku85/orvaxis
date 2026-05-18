@@ -424,6 +424,59 @@ describe("Router", () => {
     })
   })
 
+  describe("allowedMethods", () => {
+    it("returns empty array for an unregistered path", () => {
+      const router = new Router()
+      router.group(makeGroup("/api", [{ method: "GET", path: "/users" }]))
+      expect(router.allowedMethods("/api/unknown")).toEqual([])
+    })
+
+    it("returns registered methods for a known path", () => {
+      const router = new Router()
+      router.group(
+        makeGroup("/api", [
+          { method: "GET", path: "/users" },
+          { method: "POST", path: "/users" },
+        ])
+      )
+      const methods = router.allowedMethods("/api/users")
+      expect(methods).toContain("GET")
+      expect(methods).toContain("POST")
+    })
+
+    it("includes HEAD implicitly when GET is registered", () => {
+      const router = new Router()
+      router.group(makeGroup("/api", [{ method: "GET", path: "/users" }]))
+      expect(router.allowedMethods("/api/users")).toContain("HEAD")
+    })
+
+    it("does not include HEAD when only POST is registered", () => {
+      const router = new Router()
+      router.group(makeGroup("/api", [{ method: "POST", path: "/users" }]))
+      expect(router.allowedMethods("/api/users")).not.toContain("HEAD")
+    })
+
+    it("works with param routes", () => {
+      const router = new Router()
+      router.group(
+        makeGroup("/users", [
+          { method: "GET", path: "/:id" },
+          { method: "DELETE", path: "/:id" },
+        ])
+      )
+      const methods = router.allowedMethods("/users/42")
+      expect(methods).toContain("GET")
+      expect(methods).toContain("DELETE")
+      expect(methods).toContain("HEAD")
+    })
+
+    it("normalizes double slashes in path", () => {
+      const router = new Router()
+      router.group(makeGroup("/api", [{ method: "GET", path: "/users" }]))
+      expect(router.allowedMethods("/api//users")).toContain("GET")
+    })
+  })
+
   describe("HEAD → GET fallback", () => {
     it("matches a HEAD request against a GET route when no HEAD route is registered", () => {
       const router = new Router()
