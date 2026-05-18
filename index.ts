@@ -3,7 +3,6 @@ export { Debugger } from "./core/Debugger"
 export { defineRoute } from "./core/defineRoute"
 export { HttpError } from "./core/HttpError"
 export { Orvaxis } from "./core/Orvaxis"
-export { type TestRequestInit, type TestResponse, testRequest } from "./core/testHarness"
 export {
   buildExecutionSummary,
   type ExecutionSummary,

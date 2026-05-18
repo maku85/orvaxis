@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **`testRequest` moved to `orvaxis/testing`** — `testRequest`, `TestRequestInit`, and `TestResponse` are no longer exported from the main `orvaxis` entry point. Import them from `orvaxis/testing` instead: `import { testRequest } from "orvaxis/testing"`. This keeps test-only code out of production bundles for consumers that do not use a tree-shaking bundler. `createMockResponse` and `MockResponse` were already on this sub-path; all testing utilities are now consolidated there.
+
 ### Fixed
 
 - **405 Method Not Allowed** — when a request path is registered but the incoming HTTP method is not, the runtime now responds with `405 Method Not Allowed` instead of `404 Not Found`. The response includes an `Allow` header listing every method registered on that path; `HEAD` is added automatically whenever `GET` is registered, consistent with the existing `HEAD → GET` fallback. `Router` exposes a new `allowedMethods(path): string[]` method for adapters and tooling that need the same information.

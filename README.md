@@ -804,7 +804,8 @@ Any adapter needs to:
 `testRequest` runs the full execution cycle — policies, pipeline, middleware, handler — against an `Orvaxis` instance, with no HTTP server required.
 
 ```ts
-import { Orvaxis, testRequest } from "orvaxis"
+import { Orvaxis } from "orvaxis"
+import { testRequest } from "orvaxis/testing"
 
 const app = new Orvaxis()
 
@@ -845,10 +846,10 @@ const streamed = await testRequest(app, { path: "/api/stream" })
 
 `TestRequestInit` accepts `path`, `method` (defaults to `"GET"`), `headers`, `query`, `id`, and any additional field (e.g. `body`) which is forwarded directly onto `req`. `query` is typed as `Record<string, string | string[]>` and maps directly to `ctx.req.query` inside the handler: `testRequest` never throws — errors thrown during execution are captured in `result.error` and their `.status` property (if present) is reflected in `result.status`. For streaming handlers, `result.chunks` holds all values passed to `ctx.res.write` and `ctx.res.end`, and `result.ended` is `true` when `ctx.res.end` was called.
 
-`createMockResponse` (the lower-level response mock used internally by `testRequest`) is available from the dedicated `orvaxis/testing` sub-path so it does not appear in autocomplete or bundle analysis for code that does not need it:
+All testing utilities are available from the `orvaxis/testing` sub-path and are excluded from the production bundle:
 
 ```ts
-import { createMockResponse, type MockResponse } from "orvaxis/testing"
+import { testRequest, createMockResponse, type TestRequestInit, type TestResponse, type MockResponse } from "orvaxis/testing"
 ```
 
 ### Route introspection
