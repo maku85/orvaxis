@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **404 message includes the request path outside production** — when `NODE_ENV !== "production"`, the built-in router throws `HttpError(404, "Not Found: /api/missing")` instead of the generic `"Not Found"`, making unmatched-route debugging faster in development and staging. In production the path is omitted from the message to avoid reflecting user-controlled input. The 405 "Method Not Allowed" message is unchanged.
+
 - **Standardised error response envelope** — every error response from the built-in adapters now conforms to a new exported `ErrorResponse` type: `{ error: string; code?: string; requestId?: string; details?: unknown }`. `buildErrorBody` accepts an optional second argument `requestId` (both adapters now pass the request ID); `code` is forwarded when set on `HttpError` via the new `options.code` constructor argument (e.g. `new HttpError(403, "Forbidden", { code: "FORBIDDEN" })`); `details` and `error` behaviour is unchanged. Custom adapters should switch from the inline `{ error: sanitizeErrorMessage(err) }` pattern to `buildErrorBody(err, requestId)`. `ErrorResponse` is exported from the main entry point.
 
 - **`Debugger.enabled` is now read-only** — the field is backed by a native ES2022 private field (`#enabled`). Direct assignment (`app.debugger.enabled = true`) now throws at runtime instead of silently enabling debug collection in production code. Use `app.debugger.enable()` and the new `app.debugger.disable()` to toggle the state explicitly. The public `enabled` getter is unchanged and continues to work for reading the current state.

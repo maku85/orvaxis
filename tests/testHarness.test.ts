@@ -81,7 +81,7 @@ describe("testRequest", () => {
       const res = await testRequest(makeApp(), { path: "/not-found" })
       expect(res.status).toBe(404)
       expect(res.error).toBeDefined()
-      expect(res.error?.message).toBe("Not Found")
+      expect(res.error?.message).toContain("Not Found")
       expect(res.ctx).toBeUndefined()
     })
 

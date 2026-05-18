@@ -810,6 +810,8 @@ Message sanitization depends on `NODE_ENV`:
 
 `HttpError` messages are always forwarded because they are intentional user-facing responses. All other error messages are hidden in production to avoid leaking internal details such as stack traces, file paths, or database error text.
 
+The built-in router applies this rule to its own 404: outside production the message includes the unmatched path (`"Not Found: /api/users/42"`) to make debugging faster; in production it falls back to the generic `"Not Found"` to avoid reflecting user-controlled input in the response body.
+
 `buildErrorBody` and `sanitizeErrorMessage` are exported for custom adapters:
 
 ```ts
@@ -942,7 +944,7 @@ const search = await testRequest(app, { path: "/api/users/42", query: { expand: 
 // route not found
 const notFound = await testRequest(app, { path: "/api/missing" })
 // notFound.status  → 404
-// notFound.error   → Error("Not Found")
+// notFound.error   → Error("Not Found: /api/missing")  (path included outside production)
 
 // streaming handler
 const streamed = await testRequest(app, { path: "/api/stream" })

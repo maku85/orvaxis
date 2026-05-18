@@ -48,8 +48,24 @@ describe("Runtime", () => {
     it("throws 404 when no route matches", async () => {
       const runtime = new Runtime()
       const err = await runtime.execute(makeReq("/unknown"), makeRes()).catch((e) => e)
-      expect(err.message).toBe("Not Found")
+      expect(err.message).toContain("Not Found")
       expect(err.status).toBe(404)
+    })
+
+    it("includes the path in the 404 message in non-production", async () => {
+      vi.stubEnv("NODE_ENV", "development")
+      const runtime = new Runtime()
+      const err = await runtime.execute(makeReq("/api/missing"), makeRes()).catch((e) => e)
+      expect(err.message).toBe("Not Found: /api/missing")
+      vi.unstubAllEnvs()
+    })
+
+    it("omits the path from the 404 message in production", async () => {
+      vi.stubEnv("NODE_ENV", "production")
+      const runtime = new Runtime()
+      const err = await runtime.execute(makeReq("/api/missing"), makeRes()).catch((e) => e)
+      expect(err.message).toBe("Not Found")
+      vi.unstubAllEnvs()
     })
 
     it("throws 405 when path is registered but method does not match", async () => {
@@ -402,7 +418,7 @@ describe("Runtime", () => {
 
       const err = await runtime.execute(makeReq("/nope"), makeRes()).catch((e) => e)
       expect(onError).toHaveBeenCalledOnce()
-      expect(err.message).toBe("Not Found")
+      expect(err.message).toContain("Not Found")
     })
 
     it("sets ctx.error when an error occurs", async () => {
@@ -415,7 +431,7 @@ describe("Runtime", () => {
 
       await runtime.execute(makeReq("/nope"), makeRes()).catch(() => {})
       expect(capturedCtx?.error).toBeDefined()
-      expect(capturedCtx?.error?.message).toBe("Not Found")
+      expect(capturedCtx?.error?.message).toContain("Not Found")
     })
   })
 

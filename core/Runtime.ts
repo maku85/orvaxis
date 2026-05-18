@@ -123,7 +123,10 @@ export class Runtime {
             }
             throw new HttpError(405, "Method Not Allowed")
           }
-          throw new HttpError(404, "Not Found")
+          throw new HttpError(
+            404,
+            process.env.NODE_ENV !== "production" ? `Not Found: ${req.path}` : "Not Found"
+          )
         }
 
         ctx.meta.route = match

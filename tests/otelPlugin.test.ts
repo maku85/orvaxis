@@ -149,10 +149,9 @@ describe("otelPlugin — error path", () => {
     expect(startSpan).toHaveBeenCalledOnce()
     expect(created[0].recordException).toHaveBeenCalledWith(expect.any(HttpError))
     expect(created[0].setAttribute).toHaveBeenCalledWith("http.response.status_code", 404)
-    expect(created[0].setStatus).toHaveBeenCalledWith({
-      code: SpanStatusCode.ERROR,
-      message: "Not Found",
-    })
+    expect(created[0].setStatus).toHaveBeenCalledWith(
+      expect.objectContaining({ code: SpanStatusCode.ERROR })
+    )
     expect(created[0].end).toHaveBeenCalledOnce()
   })
 })
