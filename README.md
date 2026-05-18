@@ -325,17 +325,41 @@ Plugins extend runtime capabilities by registering hooks, middleware, or policie
 
 Orvaxis ships with two built-in plugins:
 
-**`loggerPlugin`** — logs incoming requests and unhandled errors. It is a factory function that accepts an optional `{ logger }` argument:
+**`loggerPlugin`** — logs every request/response cycle and unhandled errors. It is a factory function that accepts an optional `{ logger, format }` argument:
 
 ```ts
 import { Orvaxis, loggerPlugin } from "orvaxis"
 
-// default: uses console
+// default: JSON format, uses console
 const app = new Orvaxis()
 app.register(loggerPlugin())
 
 // custom logger (pino, winston, or any object satisfying Logger)
 app.register(loggerPlugin({ logger: pinoInstance }))
+
+// text format — human-readable plain strings, useful in development
+app.register(loggerPlugin({ format: "text" }))
+```
+
+By default `format` is `"json"`, emitting one structured object per event — ready for Datadog, Elasticsearch, Loki, and similar aggregation stacks without a custom parser:
+
+```
+// onRequest
+{ type: "request", method: "GET", path: "/api/users", requestId: "550e8400-…" }
+
+// afterPipeline — includes status code and total duration
+{ type: "response", method: "GET", path: "/api/users", status: 200, durationMs: 12, requestId: "550e8400-…" }
+
+// onError
+{ type: "error", requestId: "550e8400-…", message: "Not Found", error: Error }
+```
+
+With `format: "text"` the output is plain strings suitable for a terminal:
+
+```
+[REQ] GET /api/users 550e8400-…
+[RES] GET /api/users 200 12ms 550e8400-…
+[ERR] 550e8400-… Error: Not Found
 ```
 
 The `Logger` interface requires only `info` and `error` methods, making it compatible with `console`, pino, winston, and most structured loggers:
@@ -783,11 +807,11 @@ app.on("afterPipeline", (ctx) => {
 })
 ```
 
-`loggerPlugin` automatically includes the ID in every log line:
+`loggerPlugin` automatically includes the ID in every structured log:
 
 ```
-[REQ] GET /api/users 550e8400-e29b-41d4-a716-446655440000
-[ERR] 550e8400-e29b-41d4-a716-446655440000 Error: something failed
+{ type: "request", method: "GET", path: "/api/users", requestId: "550e8400-e29b-41d4-a716-446655440000" }
+{ type: "response", method: "GET", path: "/api/users", status: 200, durationMs: 8, requestId: "550e8400-e29b-41d4-a716-446655440000" }
 ```
 
 ### Streaming

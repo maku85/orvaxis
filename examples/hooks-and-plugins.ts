@@ -4,11 +4,15 @@ import { loggerPlugin } from "../plugins/loggerPlugin"
 
 const app = new Orvaxis()
 
-app.register(loggerPlugin())
-
-app.on("onRequest", (ctx) => {
-  ctx.meta.startedAt = Date.now()
-})
+// Default format is "json" — emits structured objects for log aggregators:
+//   { type: "request",  method, path, requestId }
+//   { type: "response", method, path, status, durationMs, requestId }
+//   { type: "error",    requestId, message, error }
+//
+// Use format: "text" for plain human-readable output in development:
+//   [REQ] GET /api/fast req-abc
+//   [RES] GET /api/fast 200 3ms req-abc
+app.register(loggerPlugin({ format: "text" }))
 
 app.on("beforeHandler", (ctx) => {
   ctx.meta.handlerStartedAt = Date.now()
@@ -17,11 +21,6 @@ app.on("beforeHandler", (ctx) => {
 app.on("afterHandler", (ctx) => {
   const handlerDuration = Date.now() - (ctx.meta.handlerStartedAt as number)
   console.log(`[HANDLER] ${ctx.req.path} — ${handlerDuration}ms`)
-})
-
-app.on("afterPipeline", (ctx) => {
-  const totalDuration = Date.now() - (ctx.meta.startedAt as number)
-  console.log(`[DONE] ${ctx.req.method} ${ctx.req.path} — ${totalDuration}ms total`)
 })
 
 app.on("onError", (_ctx, err) => {
@@ -52,7 +51,7 @@ app.group({
 const server = createExpressServer(app)
 server.listen(3002).catch(console.error)
 
-// Each request prints to console:
-// [REQ] /api/fast               ← loggerPlugin (onRequest)
-// [HANDLER] /api/fast — Xms     ← afterHandler hook (handler time only)
-// [DONE] GET /api/fast — Xms    ← afterPipeline hook (total time)
+// Each request prints (text format):
+// [REQ] GET /api/fast req-abc          ← loggerPlugin onRequest
+// [HANDLER] /api/fast — Xms            ← afterHandler hook (handler time only)
+// [RES] GET /api/fast 200 Xms req-abc  ← loggerPlugin afterPipeline (total time)

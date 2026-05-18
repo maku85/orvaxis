@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- **`loggerPlugin` — structured JSON logging** — the plugin now defaults to `format: "json"`, emitting a single structured object per event compatible with Datadog, Elasticsearch, and Loki without a custom parser. `onRequest` emits `{ type: "request", method, path, requestId }`; a new `afterPipeline` listener emits `{ type: "response", method, path, status, durationMs, requestId }` (includes response status and total request duration); `onError` emits `{ type: "error", requestId, message, error }`. Pass `format: "text"` to restore the previous plain-string output (`[REQ] GET /path req-id` / `[RES] GET /path 200 42ms req-id` / `[ERR] req-id Error: …`).
+
 ## [0.2.5] - 2026-05-18
 
 ### Added
