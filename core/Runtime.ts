@@ -116,15 +116,31 @@ export class Runtime {
           const allowed = precomputed ?? this.router.allowedMethods(req.path)
           if (allowed.length > 0) {
             ctx.res.setHeader("Allow", allowed.join(", "))
+            ctx.meta.allowedMethods = allowed
             if (req.method.toUpperCase() === "OPTIONS") {
-              ctx.meta.allowedMethods = allowed
               if (!ctx.res.sent) ctx.res.status(204).end()
               ctx.meta.trace = tracer.end()
               await this.hooks.trigger("afterPipeline", ctx)
               this.debugger.log(ctx, "REQUEST_END")
               return ctx
             }
+            await this.hooks.trigger("onMethodNotAllowed", ctx)
+            this.debugger.log(ctx, "HOOK:onMethodNotAllowed")
+            if (ctx.res.sent) {
+              ctx.meta.trace = tracer.end()
+              await this.hooks.trigger("afterPipeline", ctx)
+              this.debugger.log(ctx, "REQUEST_END")
+              return ctx
+            }
             throw new HttpError(405, "Method Not Allowed")
+          }
+          await this.hooks.trigger("onNotFound", ctx)
+          this.debugger.log(ctx, "HOOK:onNotFound")
+          if (ctx.res.sent) {
+            ctx.meta.trace = tracer.end()
+            await this.hooks.trigger("afterPipeline", ctx)
+            this.debugger.log(ctx, "REQUEST_END")
+            return ctx
           }
           throw new HttpError(
             404,

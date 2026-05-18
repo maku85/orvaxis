@@ -57,6 +57,8 @@ export type Group<
 
 export type HookName =
   | "onRequest"
+  | "onNotFound"
+  | "onMethodNotAllowed"
   | "beforePipeline"
   | "beforeHandler"
   | "afterHandler"

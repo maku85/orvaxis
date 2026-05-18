@@ -4,6 +4,8 @@ import type { HookName, OrvaxisContext } from "../types"
 
 const ALL_HOOKS: HookName[] = [
   "onRequest",
+  "onNotFound",
+  "onMethodNotAllowed",
   "beforePipeline",
   "beforeHandler",
   "afterHandler",

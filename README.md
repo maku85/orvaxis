@@ -87,9 +87,13 @@ System capabilities are extended through plugins that attach to lifecycle hooks.
 ```
 Request
 ↓
-Policy Engine (global → group → route)
-↓
 onRequest hook
+↓
+Route lookup
+├─ not found  → onNotFound hook  → [404 or custom response] → afterPipeline
+└─ wrong method → onMethodNotAllowed hook → [405 or custom response] → afterPipeline
+↓
+Policy Engine (global → group → route)
 ↓
 beforePipeline hook
 ↓
@@ -271,14 +275,38 @@ String matching is prefix-based: `"/api"` covers the entire sub-tree without req
 
 Lifecycle events that allow observation of execution:
 
-- `onRequest` — fired after policy evaluation, before middleware
+- `onRequest` — fired first, before routing; every request passes through this hook
+- `onNotFound` — fired when no route matches the requested path, before the 404 error is thrown
+- `onMethodNotAllowed` — fired when the path is registered but the HTTP method is not, before the 405 error is thrown; `ctx.meta.allowedMethods` is already populated
 - `beforePipeline` — fired before the global pipeline runs
 - `beforeHandler` — fired after all middleware, immediately before the route handler
 - `afterHandler` — fired immediately after the route handler completes
-- `afterPipeline` — fired after the handler and trace finalization
+- `afterPipeline` — fired after the handler and trace finalization (also fires when `onNotFound` / `onMethodNotAllowed` send a response)
 - `onError` — fired on any unhandled error
 
 `beforeHandler` / `afterHandler` wrap only the handler itself, independent from the pipeline. Use them for per-handler timing, logging, or auditing without interfering with middleware. They do not fire when the handler throws — use `onError` for that case.
+
+`onNotFound` and `onMethodNotAllowed` can short-circuit the error path: if a listener sends a response (`ctx.res.sent === true`), the runtime skips the `HttpError` and returns normally without triggering `onError`. If no listener sends a response, the error is thrown as usual.
+
+```ts
+// custom 404 response
+app.on("onNotFound", (ctx) => {
+  ctx.res.status(404).json({ error: "Not Found", path: ctx.req.path })
+})
+
+// custom 405 response — ctx.meta.allowedMethods is already set
+app.on("onMethodNotAllowed", (ctx) => {
+  const allowed = ctx.meta.allowedMethods as string[]
+  ctx.res.status(405).json({ error: "Method Not Allowed", allowed })
+})
+
+// redirect legacy URLs inside onNotFound
+app.on("onNotFound", (ctx) => {
+  if (ctx.req.path.startsWith("/old/")) {
+    ctx.res.status(301).setHeader("Location", ctx.req.path.replace("/old/", "/api/")).end()
+  }
+})
+```
 
 Hooks do not modify flow; they observe and react.
 
@@ -594,18 +622,21 @@ app.on("afterPipeline", (ctx) => {
 A request lifecycle is deterministic:
 
 ```
-1   Policy evaluation     global → group → route, sorted by priority
-2   onRequest hook
-3   beforePipeline hook
-4   Global pipeline       middleware registered via app.use()
-5   Group middleware
-6   Route middleware
-7   beforeHandler hook
-8   Route handler
-9   afterHandler hook
-10  Trace finalization    ctx.meta.trace is set
-11  afterPipeline hook
-12  Debug output          if app.debugger.enable() was called
+1   onRequest hook
+2   Route lookup
+    ├─ no match → onNotFound hook → (if !sent) throw 404 → afterPipeline → done
+    └─ method mismatch → onMethodNotAllowed hook → (if !sent) throw 405 → afterPipeline → done
+3   Policy evaluation     global → group → route, sorted by priority
+4   beforePipeline hook
+5   Global pipeline       middleware registered via app.use()
+6   Group middleware
+7   Route middleware
+8   beforeHandler hook
+9   Route handler
+10  afterHandler hook
+11  Trace finalization    ctx.meta.trace is set
+12  afterPipeline hook
+13  Debug output          if app.debugger.enable() was called
 ```
 
 ---

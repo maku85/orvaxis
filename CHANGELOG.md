@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`onNotFound` and `onMethodNotAllowed` hooks** — two new `HookName` values that fire before the runtime throws a routing error, giving applications a clean interception point to send custom responses without modifying an adapter. `onNotFound` fires when no route matches the requested path; `onMethodNotAllowed` fires when the path is registered but the HTTP method is not. If a hook listener sends a response (`ctx.res.sent === true`), the runtime skips the `HttpError`, ends the trace, fires `afterPipeline`, and returns normally — no error is thrown and `onError` is not triggered. When no listener sends a response, the runtime throws `HttpError(404)` / `HttpError(405)` as before and `onError` still runs. `ctx.meta.allowedMethods` is populated before `onMethodNotAllowed` fires, so the hook can read the `Allow` list without a separate router call. Common use-cases: custom 404 pages, logging unmatched paths, redirecting legacy URLs, returning branded error envelopes.
+
+  ```ts
+  app.on("onNotFound", (ctx) => {
+    ctx.res.status(404).json({ error: "Not Found", path: ctx.req.path })
+  })
+
+  app.on("onMethodNotAllowed", (ctx) => {
+    const allowed = ctx.meta.allowedMethods as string[]
+    ctx.res.status(405).json({ error: "Method Not Allowed", allowed })
+  })
+  ```
+
 ### Changed
 
 - **`ctx.logs` bounded at 1 000 entries by default** — `ctx.logs` is now backed by a `Proxy` that caps the array at `logsMaxSize` entries (default `1 000`). Pushes beyond the cap are silently dropped and `console.warn` is emitted once per request context, pointing to `ctx.logs` and suggesting a dedicated logger for high-volume output. Multi-item pushes (`logs.push("a", "b", "c")`) fill up to the cap and trigger the warning in the same call. The cap is configurable via `new Orvaxis({ logsMaxSize: 500 })` (or `new Runtime({ logsMaxSize: 500 })`). `Array.isArray(ctx.logs)` continues to return `true`; all other array methods are unaffected. `logsMaxSize` is added to `OrvaxisOptions`.

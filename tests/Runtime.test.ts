@@ -157,6 +157,88 @@ describe("Runtime", () => {
       expect(err.status).toBe(404)
     })
 
+    it("triggers onNotFound hook before throwing 404", async () => {
+      const runtime = new Runtime()
+      const fn = vi.fn()
+      runtime.hooks.on("onNotFound", fn)
+
+      await runtime.execute(makeReq("/unknown"), makeRes()).catch(() => {})
+      expect(fn).toHaveBeenCalledOnce()
+    })
+
+    it("triggers onMethodNotAllowed hook before throwing 405", async () => {
+      const runtime = new Runtime()
+      runtime.router.group(makeGroup("/api"))
+      const fn = vi.fn()
+      runtime.hooks.on("onMethodNotAllowed", fn)
+
+      await runtime.execute(makeReq("/api/resource", "DELETE"), makeRes()).catch(() => {})
+      expect(fn).toHaveBeenCalledOnce()
+    })
+
+    it("skips 404 error when onNotFound hook sends a response", async () => {
+      const runtime = new Runtime()
+      runtime.hooks.on("onNotFound", (ctx) => {
+        ctx.res.status(302).json({ redirectTo: "/home" })
+      })
+
+      const res = makeRes()
+      const ctx = await runtime.execute(makeReq("/unknown"), res)
+      expect(res.statusCode).toBe(302)
+      expect(ctx.error).toBeUndefined()
+    })
+
+    it("skips 405 error when onMethodNotAllowed hook sends a response", async () => {
+      const runtime = new Runtime()
+      runtime.router.group(makeGroup("/api"))
+      runtime.hooks.on("onMethodNotAllowed", (ctx) => {
+        ctx.res.status(302).json({ redirectTo: "/home" })
+      })
+
+      const res = makeRes()
+      const ctx = await runtime.execute(makeReq("/api/resource", "DELETE"), res)
+      expect(res.statusCode).toBe(302)
+      expect(ctx.error).toBeUndefined()
+    })
+
+    it("exposes ctx.meta.allowedMethods inside onMethodNotAllowed hook", async () => {
+      const runtime = new Runtime()
+      runtime.router.group(makeGroup("/api"))
+      let captured: string[] | undefined
+      runtime.hooks.on("onMethodNotAllowed", (ctx) => {
+        captured = ctx.meta.allowedMethods as string[]
+      })
+
+      await runtime.execute(makeReq("/api/resource", "DELETE"), makeRes()).catch(() => {})
+      expect(captured).toContain("GET")
+      expect(captured).toContain("HEAD")
+    })
+
+    it("fires afterPipeline when onNotFound hook sends a response", async () => {
+      const runtime = new Runtime()
+      const afterPipeline = vi.fn()
+      runtime.hooks.on("onNotFound", (ctx) => {
+        ctx.res.status(404).json({ error: "custom not found" })
+      })
+      runtime.hooks.on("afterPipeline", afterPipeline)
+
+      await runtime.execute(makeReq("/unknown"), makeRes())
+      expect(afterPipeline).toHaveBeenCalledOnce()
+    })
+
+    it("fires afterPipeline when onMethodNotAllowed hook sends a response", async () => {
+      const runtime = new Runtime()
+      const afterPipeline = vi.fn()
+      runtime.hooks.on("onMethodNotAllowed", (ctx) => {
+        ctx.res.status(405).json({ error: "custom method not allowed" })
+      })
+      runtime.hooks.on("afterPipeline", afterPipeline)
+      runtime.router.group(makeGroup("/api"))
+
+      await runtime.execute(makeReq("/api/resource", "DELETE"), makeRes())
+      expect(afterPipeline).toHaveBeenCalledOnce()
+    })
+
     it("triggers onError hook with 405 error", async () => {
       const runtime = new Runtime()
       runtime.router.group(makeGroup("/api"))

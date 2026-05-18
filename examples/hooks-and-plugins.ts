@@ -23,6 +23,18 @@ app.on("afterHandler", (ctx) => {
   console.log(`[HANDLER] ${ctx.req.path} — ${handlerDuration}ms`)
 })
 
+app.on("onNotFound", (ctx) => {
+  // Send a branded 404 instead of the default plain error.
+  // If this hook sends a response, onError is NOT triggered.
+  ctx.res.status(404).json({ error: "Not Found", path: ctx.req.path })
+})
+
+app.on("onMethodNotAllowed", (ctx) => {
+  // ctx.meta.allowedMethods is already populated by the runtime.
+  const allowed = ctx.meta.allowedMethods as string[]
+  ctx.res.status(405).json({ error: "Method Not Allowed", allowed })
+})
+
 app.on("onError", (_ctx, err) => {
   console.error("[UNHANDLED]", err)
 })

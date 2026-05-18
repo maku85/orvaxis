@@ -6,6 +6,8 @@ export class HookSystem {
   private readonly logger: Logger
   private hooks: Record<HookName, HookFn[]> = {
     onRequest: [],
+    onNotFound: [],
+    onMethodNotAllowed: [],
     beforePipeline: [],
     beforeHandler: [],
     afterHandler: [],
