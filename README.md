@@ -376,7 +376,19 @@ app.group({
 })
 ```
 
-On validation failure the plugin throws an error with `status: 422`, a `field` property indicating which part failed (`"body"`, `"params"`, `"query"`, or `"headers"`), and the original validator error as `cause`. The plugin is opt-in — routes with a `schema` field are silently ignored unless `schemaValidationPlugin` is registered.
+On validation failure the plugin throws an error with `status: 422`, a `field` property indicating which part failed (`"body"`, `"params"`, `"query"`, or `"headers"`), and the original validator error as `cause`. When the validator error exposes an `.issues` array (Zod and any library following the same convention), the adapter error response includes a `details` field with `{ path, message }` pairs so clients receive actionable feedback:
+
+```json
+{
+  "error": "Validation failed: body",
+  "details": [
+    { "path": ["name"], "message": "Required" },
+    { "path": ["age"],  "message": "Expected number, received string" }
+  ]
+}
+```
+
+The plugin is opt-in — routes with a `schema` field are silently ignored unless `schemaValidationPlugin` is registered.
 
 **`otelPlugin`** — emits an OpenTelemetry `SERVER` span for every request. Requires `@opentelemetry/api` (optional peer dependency) and a pre-configured SDK with your chosen exporter (OTLP, Zipkin, Jaeger, etc.):
 

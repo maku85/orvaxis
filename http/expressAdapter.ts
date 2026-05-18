@@ -2,7 +2,7 @@ import express, { type Application, type NextFunction, type Request, type Respon
 import { HttpError } from "../core/HttpError"
 import type { Orvaxis } from "../core/Orvaxis"
 import type { OrvaxisRequest, OrvaxisResponse, ServerAdapter } from "../types"
-import { type AdapterOptions, sanitizeErrorMessage } from "./timeout"
+import { type AdapterOptions, buildErrorBody } from "./timeout"
 
 function wrapExpressResponse(res: Response, onStreamStart: () => void): OrvaxisResponse {
   const wrapped: OrvaxisResponse = {
@@ -91,7 +91,7 @@ export function createExpressServer(
     } catch (err) {
       if (!wrapped.sent) {
         const e = err as { status?: number }
-        wrapped.status(e.status ?? 500).json({ error: sanitizeErrorMessage(err) })
+        wrapped.status(e.status ?? 500).json(buildErrorBody(err))
       } else {
         logger.error("[orvaxis] unhandled error after response sent:", err)
       }

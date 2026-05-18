@@ -15,6 +15,13 @@ export function sanitizeErrorMessage(err: unknown): string {
   return "Internal Server Error"
 }
 
+export function buildErrorBody(err: unknown): { error: string; details?: unknown } {
+  const body: { error: string; details?: unknown } = { error: sanitizeErrorMessage(err) }
+  const details = (err as { details?: unknown } | null)?.details
+  if (details !== undefined) body.details = details
+  return body
+}
+
 export function withTimeout<T>(
   promise: Promise<T>,
   ms: number,

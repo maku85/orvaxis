@@ -215,6 +215,121 @@ describe("schemaValidationPlugin", () => {
     })
   })
 
+  describe("details extraction", () => {
+    it("populates details from a Zod-like cause with .issues", async () => {
+      const zodLikeCause = {
+        issues: [
+          { path: ["name"], message: "Required" },
+          { path: ["age"], message: "Expected number, received string" },
+        ],
+      }
+      const app = makeApp()
+      app.group({
+        prefix: "/api",
+        routes: [
+          {
+            method: "POST",
+            path: "/items",
+            schema: {
+              body: {
+                parse: () => {
+                  throw zodLikeCause
+                },
+              },
+            },
+            handler: async (ctx) => ctx.res.json({ ok: true }),
+          },
+        ],
+      })
+
+      const res = await testRequest(app, { path: "/api/items", method: "POST", body: {} })
+      expect(res.status).toBe(422)
+      expect((res.error as { details?: unknown })?.details).toEqual([
+        { path: ["name"], message: "Required" },
+        { path: ["age"], message: "Expected number, received string" },
+      ])
+    })
+
+    it("sets details to undefined when cause has no .issues", async () => {
+      const app = makeApp()
+      app.group({
+        prefix: "/api",
+        routes: [
+          {
+            method: "POST",
+            path: "/items",
+            schema: { body: fail("plain error — no issues array") },
+            handler: async (ctx) => ctx.res.json({ ok: true }),
+          },
+        ],
+      })
+
+      const res = await testRequest(app, { path: "/api/items", method: "POST", body: {} })
+      expect(res.status).toBe(422)
+      expect((res.error as { details?: unknown })?.details).toBeUndefined()
+    })
+
+    it("only extracts path and message from each issue, not other fields", async () => {
+      const cause = {
+        issues: [
+          { path: ["email"], message: "Invalid email", code: "invalid_string", fatal: true },
+        ],
+      }
+      const app = makeApp()
+      app.group({
+        prefix: "/api",
+        routes: [
+          {
+            method: "POST",
+            path: "/users",
+            schema: {
+              body: {
+                parse: () => {
+                  throw cause
+                },
+              },
+            },
+            handler: async (ctx) => ctx.res.json({ ok: true }),
+          },
+        ],
+      })
+
+      const res = await testRequest(app, { path: "/api/users", method: "POST", body: {} })
+      const details = (res.error as { details?: unknown })?.details as { code?: unknown }[]
+      expect(details[0]).toEqual({ path: ["email"], message: "Invalid email" })
+      expect(details[0].code).toBeUndefined()
+    })
+
+    it("handles numeric path segments (nested array indices)", async () => {
+      const cause = {
+        issues: [{ path: ["tags", 0, "name"], message: "Required" }],
+      }
+      const app = makeApp()
+      app.group({
+        prefix: "/api",
+        routes: [
+          {
+            method: "POST",
+            path: "/items",
+            schema: {
+              body: {
+                parse: () => {
+                  throw cause
+                },
+              },
+            },
+            handler: async (ctx) => ctx.res.json({ ok: true }),
+          },
+        ],
+      })
+
+      const res = await testRequest(app, { path: "/api/items", method: "POST", body: {} })
+      expect((res.error as { details?: unknown })?.details).toEqual([
+        { path: ["tags", 0, "name"], message: "Required" },
+      ])
+    })
+  })
+
   describe("cause forwarding", () => {
     it("attaches the original validation error as cause", async () => {
       const originalError = new Error("schema mismatch")

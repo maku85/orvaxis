@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Validation errors now include structured `details`** — `HttpError` gains an optional `details?: unknown` field. `schemaValidationPlugin` populates it by extracting `{ path, message }` pairs from the validator's error cause (any object whose `.issues` is an array — compatible with Zod, and any library that follows the same convention). The adapter error response now carries `details` alongside `error` when present: `{ error: "Validation failed: body", details: [{ path: ["name"], message: "Required" }, ...] }`. Validators that do not expose `.issues` are unaffected — `details` is omitted. A new `buildErrorBody(err)` utility in `http/timeout.ts` consolidates response construction in both adapters; `sanitizeErrorMessage` remains exported for custom adapters.
+
 - **405 Method Not Allowed** — when a request path is registered but the incoming HTTP method is not, the runtime now responds with `405 Method Not Allowed` instead of `404 Not Found`. The response includes an `Allow` header listing every method registered on that path; `HEAD` is added automatically whenever `GET` is registered, consistent with the existing `HEAD → GET` fallback. `Router` exposes a new `allowedMethods(path): string[]` method for adapters and tooling that need the same information.
 
 ### Added

@@ -2,7 +2,7 @@ import Fastify, { type FastifyReply } from "fastify"
 import { HttpError } from "../core/HttpError"
 import type { Orvaxis } from "../core/Orvaxis"
 import type { OrvaxisRequest, OrvaxisResponse, ServerAdapter } from "../types"
-import { type AdapterOptions, sanitizeErrorMessage } from "./timeout"
+import { type AdapterOptions, buildErrorBody } from "./timeout"
 
 function wrapFastifyResponse(reply: FastifyReply, onStreamStart: () => void): OrvaxisResponse {
   let statusCode = 200
@@ -104,7 +104,7 @@ export function createFastifyServer(
     } catch (err) {
       if (!wrapped.sent) {
         const e = err as { status?: number }
-        wrapped.status(e.status ?? 500).send({ error: sanitizeErrorMessage(err) })
+        wrapped.status(e.status ?? 500).send(buildErrorBody(err))
       } else {
         logger.error("[orvaxis] unhandled error after response sent:", err)
       }
