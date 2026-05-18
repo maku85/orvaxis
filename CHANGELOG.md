@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **`otelPlugin` now traces 404 and 405 responses** — previously the `onRequest` hook (where `otelPlugin` creates its span) fired after routing, so requests that failed to match a route exited via the error path without ever creating a span. 404 and 405 traffic — including path-scanning attacks and misconfigured clients — was invisible in traces and error dashboards. The runtime now fires `onRequest` before routing so every request gets a span. For `OPTIONS` preflight, `ctx.meta.allowedMethods` is pre-populated before `onRequest` fires so `corsPlugin` can still read it. The span name is initially set to the raw request path (`GET /users/42`); `otelPlugin` updates it to the route template (`GET /users/:id`) in the existing `beforeHandler` hook once routing has succeeded. Errors now record the HTTP status from `HttpError.status` rather than `ctx.res.statusCode`, which is still `200` at error-hook time.
+
 ### Changed
 
 - **`testRequest` moved to `orvaxis/testing`** — `testRequest`, `TestRequestInit`, and `TestResponse` are no longer exported from the main `orvaxis` entry point. Import them from `orvaxis/testing` instead: `import { testRequest } from "orvaxis/testing"`. This keeps test-only code out of production bundles for consumers that do not use a tree-shaking bundler. `createMockResponse` and `MockResponse` were already on this sub-path; all testing utilities are now consolidated there.

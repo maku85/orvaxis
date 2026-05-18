@@ -87,15 +87,24 @@ export class Runtime {
       try {
         validateRequest(req)
 
+        // Pre-populate allowedMethods for OPTIONS so plugins (e.g. corsPlugin) can read
+        // ctx.meta.allowedMethods inside their onRequest handlers before routing completes.
+        if (req.method.toUpperCase() === "OPTIONS") {
+          const preAllowed = this.router.allowedMethods(req.path)
+          if (preAllowed.length > 0) ctx.meta.allowedMethods = preAllowed
+        }
+
+        await this.hooks.trigger("onRequest", ctx)
+        this.debugger.log(ctx, "HOOK:onRequest")
+
         const match = this.router.match(req)
         if (!match) {
-          const allowed = this.router.allowedMethods(req.path)
+          const precomputed = ctx.meta.allowedMethods as string[] | undefined
+          const allowed = precomputed ?? this.router.allowedMethods(req.path)
           if (allowed.length > 0) {
             ctx.res.setHeader("Allow", allowed.join(", "))
             if (req.method.toUpperCase() === "OPTIONS") {
               ctx.meta.allowedMethods = allowed
-              await this.hooks.trigger("onRequest", ctx)
-              this.debugger.log(ctx, "HOOK:onRequest")
               if (!ctx.res.sent) ctx.res.status(204).end()
               ctx.meta.trace = tracer.end()
               await this.hooks.trigger("afterPipeline", ctx)
@@ -118,9 +127,6 @@ export class Runtime {
         await this.evaluatePolicies(match.group.policies ?? [], ctx)
         await this.evaluatePolicies(match.route.policies ?? [], ctx)
         this.debugger.log(ctx, "POLICY_END")
-
-        await this.hooks.trigger("onRequest", ctx)
-        this.debugger.log(ctx, "HOOK:onRequest")
 
         await this.hooks.trigger("beforePipeline", ctx)
         await this.pipeline.execute(ctx)

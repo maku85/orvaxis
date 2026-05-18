@@ -445,7 +445,7 @@ Each span captures:
 
 Distributed trace context is extracted from incoming `traceparent` / `tracestate` headers so Orvaxis participates in upstream traces automatically. `traceMiddleware` events are forwarded to the span as OTel span events. On error the exception is recorded via `span.recordException` and the span status is set to `ERROR`.
 
-> **Note:** spans are only created for requests that reach the `onRequest` hook — i.e. requests that match a route and pass policy checks. Requests that produce a 404, 405, or are rejected by a policy before `onRequest` fires are not traced.
+Every request gets a span — including 404 and 405 responses — so path-scanning traffic and misconfigured clients appear in your error dashboards. The span name starts as the raw request path (`GET /users/42`) and is updated to the route template (`GET /users/:id`) once routing succeeds.
 
 To write a custom plugin:
 

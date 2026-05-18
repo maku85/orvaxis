@@ -76,13 +76,15 @@ describe("otelPlugin — happy path", () => {
   })
 
   it("uses the route template as span name, not the filled-in path", async () => {
-    const { tracer, startSpan } = makeMockTracer()
+    const { tracer, startSpan, created } = makeMockTracer()
     const app = makeApp()
     app.register(otelPlugin({ tracer }))
 
     await testRequest(app, { path: "/api/users/42" })
 
-    expect(startSpan.mock.calls[0][0]).toBe("GET /api/users/:id")
+    // span is created before routing with the raw path, then renamed in beforeHandler
+    expect(startSpan.mock.calls[0][0]).toBe("GET /api/users/42")
+    expect(created[0].updateName).toHaveBeenCalledWith("GET /api/users/:id")
   })
 
   it("sets status code attribute and OK status on afterPipeline", async () => {
@@ -137,13 +139,20 @@ describe("otelPlugin — error path", () => {
     expect(created[0].end).toHaveBeenCalledOnce()
   })
 
-  it("does not start a span when the route is not found (before onRequest fires)", async () => {
-    const { tracer, startSpan } = makeMockTracer()
+  it("creates a span for 404 requests and records the error", async () => {
+    const { tracer, startSpan, created } = makeMockTracer()
     const app = makeApp()
     app.register(otelPlugin({ tracer }))
 
     await testRequest(app, { path: "/api/not-found" })
 
-    expect(startSpan).not.toHaveBeenCalled()
+    expect(startSpan).toHaveBeenCalledOnce()
+    expect(created[0].recordException).toHaveBeenCalledWith(expect.any(HttpError))
+    expect(created[0].setAttribute).toHaveBeenCalledWith("http.response.status_code", 404)
+    expect(created[0].setStatus).toHaveBeenCalledWith({
+      code: SpanStatusCode.ERROR,
+      message: "Not Found",
+    })
+    expect(created[0].end).toHaveBeenCalledOnce()
   })
 })

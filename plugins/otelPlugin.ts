@@ -8,6 +8,7 @@ import {
   context,
   propagation,
 } from "@opentelemetry/api"
+import { HttpError } from "../core/HttpError"
 import type { OrvaxisContext, PluginContext, Trace } from "../types"
 
 export type OtelPluginOptions = {
@@ -54,6 +55,12 @@ export function otelPlugin({ tracer }: OtelPluginOptions) {
         spans.set(ctx, span)
       })
 
+      runtime.hooks.on("beforeHandler", (ctx: OrvaxisContext) => {
+        const span = spans.get(ctx)
+        if (!span) return
+        span.updateName(resolveSpanName(ctx))
+      })
+
       runtime.hooks.on("afterPipeline", (ctx: OrvaxisContext) => {
         const span = spans.get(ctx)
         if (!span) return
@@ -72,7 +79,8 @@ export function otelPlugin({ tracer }: OtelPluginOptions) {
         if (!span) return
         if (err) span.recordException(err)
         span.setStatus({ code: SpanStatusCode.ERROR, message: err?.message })
-        span.setAttribute("http.response.status_code", ctx.res.statusCode)
+        const statusCode = err instanceof HttpError ? err.status : ctx.res.statusCode
+        span.setAttribute("http.response.status_code", statusCode)
         span.end()
         spans.delete(ctx)
       })
