@@ -255,6 +255,16 @@ const handler = async (ctx: OrvaxisContext<AuthState>) => {
 
 `scope.method` is typed as `HttpMethod` (always uppercase). The request method is normalised to uppercase before the comparison, so a request arriving as `"get"` still matches a scope with `method: "GET"`.
 
+`scope.path` supports three forms:
+
+| Form | Example | Matches |
+|---|---|---|
+| `string` | `"/api"` | `/api` and any sub-path (`/api/v1/users`) but not `/apiv2` |
+| `RegExp` | `/^\/admin/` | any path matching the pattern |
+| `(path) => boolean` | `p => p.startsWith("/admin") && !p.startsWith("/admin/public")` | custom predicate |
+
+String matching is prefix-based: `"/api"` covers the entire sub-tree without requiring a RegExp. There are no false positives — `"/api"` does not match `"/apiv2"`.
+
 ---
 
 ### Hooks

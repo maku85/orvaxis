@@ -35,10 +35,12 @@ export class PolicyEngine {
     }
 
     if (scope.path) {
-      if (scope.path instanceof RegExp) {
-        return scope.path.test(ctx.req.path)
-      }
-      return ctx.req.path === scope.path
+      const p = scope.path
+      if (typeof p === "function") return p(ctx.req.path)
+      if (p instanceof RegExp) return p.test(ctx.req.path)
+      // string: prefix match — "/api" matches "/api" and "/api/v1/users" but not "/apiv2"
+      const prefix = p.endsWith("/") ? p : `${p}/`
+      return ctx.req.path === p || ctx.req.path.startsWith(prefix)
     }
 
     return true

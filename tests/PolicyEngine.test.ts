@@ -162,13 +162,37 @@ describe("PolicyEngine", () => {
     expect(called).toBe(false)
   })
 
-  it("matches scope path as exact string", async () => {
+  it("matches scope path string as prefix — exact path and all sub-paths", async () => {
+    const engine = new PolicyEngine()
+    const visited: string[] = []
+
+    engine.register(
+      makePolicy({
+        scope: { path: "/secure" },
+        evaluate: async (ctx) => {
+          visited.push(ctx.req.path)
+          return { allow: true }
+        },
+      })
+    )
+
+    await engine.evaluate(makeCtx("/other"))
+    await engine.evaluate(makeCtx("/securex")) // no false positive for similar prefix
+    expect(visited).toHaveLength(0)
+
+    await engine.evaluate(makeCtx("/secure"))
+    await engine.evaluate(makeCtx("/secure/settings"))
+    await engine.evaluate(makeCtx("/secure/admin/users"))
+    expect(visited).toEqual(["/secure", "/secure/settings", "/secure/admin/users"])
+  })
+
+  it("matches scope path as a predicate function", async () => {
     const engine = new PolicyEngine()
     let called = false
 
     engine.register(
       makePolicy({
-        scope: { path: "/secure" },
+        scope: { path: (p) => p.startsWith("/admin") && !p.startsWith("/admin/public") },
         evaluate: async () => {
           called = true
           return { allow: true }
@@ -176,10 +200,10 @@ describe("PolicyEngine", () => {
       })
     )
 
-    await engine.evaluate(makeCtx("/other"))
+    await engine.evaluate(makeCtx("/admin/public/docs"))
     expect(called).toBe(false)
 
-    await engine.evaluate(makeCtx("/secure"))
+    await engine.evaluate(makeCtx("/admin/users"))
     expect(called).toBe(true)
   })
 

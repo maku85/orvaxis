@@ -100,7 +100,7 @@ const rateLimitApi: Policy = {
   name: "rate-limit",
   priority: 50,
   scope: {
-    path: /^\/api/,   // regex: matches any path starting with /api
+    path: "/api",     // prefix: matches /api and all sub-paths
     method: "POST",   // only POST requests
   },
   async evaluate(ctx) {
@@ -113,8 +113,9 @@ const rateLimitApi: Policy = {
 ```
 
 `scope.path` accepts:
-- `string` — exact match only (e.g. `"/health"`)
+- `string` — prefix match: `"/api"` matches `/api` and all sub-paths (`/api/v1/users`) but not `/apiv2`
 - `RegExp` — pattern match (e.g. `/^\/api/` for all paths under `/api`)
+- `(path: string) => boolean` — custom predicate for complex rules (e.g. exclude a specific sub-path)
 
 `scope.method` is one of `GET | POST | PUT | DELETE | PATCH | HEAD | OPTIONS`.
 
@@ -384,5 +385,5 @@ async function getCurrentUser() {
 |------|--------|
 | **Body parsing** | No built-in body parsing. Use `createExpressServer(app, expressApp)` with `express.json()` pre-registered (see [use case 7](#7-group-level-middleware-body-parsing-correlation-ids)). |
 | **Rate limiting** | No built-in counter/storage. Implement using any in-memory map or Redis client inside a policy. |
-| **Policy scope `path: string`** | Exact match only. Use a `RegExp` (e.g. `/^\/admin/`) to match subtree paths. |
+| **Policy scope `path: string`** | Prefix match — `"/api"` covers `/api` and all sub-paths. Use a predicate function for exclusions: `p => p.startsWith("/admin") && !p.startsWith("/admin/public")`. |
 | **Response body interception** | Orvaxis does not intercept or transform outgoing response bodies. Handlers write the body directly via `ctx.res.json()` / `ctx.res.send()`. Response headers, however, can be set from any middleware via `ctx.res.setHeader()`. |

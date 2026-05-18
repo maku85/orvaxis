@@ -119,7 +119,7 @@ export type PolicyResult =
 export type HttpMethod = "GET" | "POST" | "PUT" | "DELETE" | "PATCH" | "HEAD" | "OPTIONS"
 
 export type PolicyScope = {
-  path?: string | RegExp
+  path?: string | RegExp | ((path: string) => boolean)
   method?: HttpMethod
 }
 
