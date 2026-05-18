@@ -505,7 +505,15 @@ const app = new Orvaxis()
 app.register(otelPlugin({ tracer: trace.getTracer("my-service") }))
 ```
 
-Each span captures:
+Each matched request produces **three nested spans**:
+
+| Span | Lifecycle window | What it covers |
+|---|---|---|
+| `GET /users/:id` (root) | `onRequest` → `afterPipeline` | full request duration |
+| `orvaxis.pipeline` | `beforePipeline` → `beforeHandler` | global pipeline + group/route middleware |
+| `orvaxis.handler` | `beforeHandler` → `afterHandler` | route handler only |
+
+The root span attributes:
 
 | Attribute | Value |
 |---|---|
@@ -514,9 +522,11 @@ Each span captures:
 | `orvaxis.request_id` | `ctx.req.id` |
 | `http.response.status_code` | response status |
 
-Distributed trace context is extracted from incoming `traceparent` / `tracestate` headers so Orvaxis participates in upstream traces automatically. `traceMiddleware` events are forwarded to the span as OTel span events. On error the exception is recorded via `span.recordException` and the span status is set to `ERROR`.
+The root span name is initially set to the raw path (`GET /users/42`) and updated to the route template (`GET /users/:id`) before the handler runs, so parameterised routes group correctly in your trace backend.
 
-Every request gets a span — including 404 and 405 responses — so path-scanning traffic and misconfigured clients appear in your error dashboards. The span name starts as the raw request path (`GET /users/42`) and is updated to the route template (`GET /users/:id`) once routing succeeds.
+Distributed trace context is extracted from incoming `traceparent` / `tracestate` headers so Orvaxis participates in upstream traces automatically. Both child spans are parented to the root span via the stored OTel context and appear correctly nested in Jaeger, Zipkin, and any W3C-compliant backend. `traceMiddleware` events are forwarded to the root span as OTel span events. On error the exception is recorded via `span.recordException`, any open child spans are closed first, and the root span is marked `ERROR`.
+
+Requests that fail before routing (404, 405) produce only the root span — `orvaxis.pipeline` and `orvaxis.handler` are never opened.
 
 To write a custom plugin:
 
@@ -1170,7 +1180,7 @@ orvaxis/
   plugins/
     PluginManager.ts         plugin registry (Plugin type + PluginManager class)
     loggerPlugin.ts          built-in logger plugin
-    otelPlugin.ts            OpenTelemetry SERVER span per request (requires @opentelemetry/api)
+    otelPlugin.ts            OpenTelemetry SERVER span per request + orvaxis.pipeline/orvaxis.handler child spans (requires @opentelemetry/api)
     schemaValidationPlugin.ts body/params/query/headers validation via route.schema
 
   types/
@@ -1182,6 +1192,7 @@ orvaxis/
     hooks-and-plugins.ts     lifecycle hooks and plugin registration
     debug-trace.ts           debugger, traceEvent, and buildExecutionSummary
     typed-context.ts         typed OrvaxisContext, getContext, traceEvent
+    otel-plugin.ts           otelPlugin with child spans + custom span enrichment
     fastify-server.ts        Fastify adapter with policies and param routing
     wildcard-routing.ts      named wildcard (/*filepath), unnamed catch-all (/*), priority demo
     streaming.ts             SSE, NDJSON, and file streaming via write/end/pipe

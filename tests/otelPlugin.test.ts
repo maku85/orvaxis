@@ -66,7 +66,8 @@ describe("otelPlugin — happy path", () => {
 
     await testRequest(app, { path: "/api/hello", id: "req-1" })
 
-    expect(startSpan).toHaveBeenCalledOnce()
+    // root + orvaxis.pipeline + orvaxis.handler
+    expect(startSpan).toHaveBeenCalledTimes(3)
     const [name, opts] = startSpan.mock.calls[0]
     expect(name).toBe("GET /api/hello")
     expect(opts.kind).toBe(SpanKind.SERVER)
@@ -119,6 +120,110 @@ describe("otelPlugin — happy path", () => {
 
     // traceMiddleware emits at least a "middleware:start" and "middleware:end" event
     expect(created[0].addEvent).toHaveBeenCalled()
+  })
+})
+
+describe("otelPlugin — child spans", () => {
+  it("creates orvaxis.pipeline and orvaxis.handler child spans for a matched request", async () => {
+    const { tracer, startSpan } = makeMockTracer()
+    const app = makeApp()
+    app.register(otelPlugin({ tracer }))
+
+    await testRequest(app, { path: "/api/hello" })
+
+    // root + pipeline + handler = 3 spans
+    expect(startSpan).toHaveBeenCalledTimes(3)
+    const names = startSpan.mock.calls.map((c) => c[0])
+    expect(names).toContain("orvaxis.pipeline")
+    expect(names).toContain("orvaxis.handler")
+  })
+
+  it("pipeline span is created before handler span", async () => {
+    const { tracer, startSpan } = makeMockTracer()
+    const app = makeApp()
+    app.register(otelPlugin({ tracer }))
+
+    await testRequest(app, { path: "/api/hello" })
+
+    const names = startSpan.mock.calls.map((c) => c[0])
+    expect(names.indexOf("orvaxis.pipeline")).toBeLessThan(names.indexOf("orvaxis.handler"))
+  })
+
+  it("ends pipeline span before starting handler span", async () => {
+    const endOrder: string[] = []
+    const { tracer, startSpan, created } = makeMockTracer()
+
+    // intercept end() on each span as it is created
+    let pipelineSpan: ReturnType<typeof makeMockSpan> | undefined
+    let handlerSpan: ReturnType<typeof makeMockSpan> | undefined
+
+    startSpan.mockImplementation((...args: unknown[]) => {
+      const span = makeMockSpan()
+      created.push(span)
+      const name = args[0] as string
+      const endMock = span.end as unknown as ReturnType<typeof vi.fn>
+      if (name === "orvaxis.pipeline") {
+        pipelineSpan = span
+        endMock.mockImplementation(() => endOrder.push("pipeline"))
+      } else if (name === "orvaxis.handler") {
+        handlerSpan = span
+        endMock.mockImplementation(() => endOrder.push("handler"))
+      }
+      return span
+    })
+
+    const app = makeApp()
+    app.register(otelPlugin({ tracer }))
+    await testRequest(app, { path: "/api/hello" })
+
+    expect(pipelineSpan).toBeDefined()
+    expect(handlerSpan).toBeDefined()
+    expect(endOrder).toEqual(["pipeline", "handler"])
+  })
+
+  it("ends all child spans when an error occurs in middleware (pipeline span open)", async () => {
+    const { tracer, created } = makeMockTracer()
+    const app = new Orvaxis()
+    app.use(async () => {
+      throw new Error("middleware boom")
+    })
+    app.group({
+      prefix: "/api",
+      routes: [{ method: "GET", path: "/hello", handler: async (ctx) => ctx.res.json({}) }],
+    })
+    app.register(otelPlugin({ tracer }))
+
+    await testRequest(app, { path: "/api/hello" })
+
+    // root + pipeline created, handler never started
+    expect(created).toHaveLength(2)
+    const pipeline = created[1]
+    expect(pipeline.end).toHaveBeenCalledOnce()
+    // root must also be ended
+    expect(created[0].end).toHaveBeenCalledOnce()
+  })
+
+  it("ends handler child span when the handler throws", async () => {
+    const { tracer, created } = makeMockTracer()
+    const app = makeApp()
+    app.register(otelPlugin({ tracer }))
+
+    await testRequest(app, { path: "/api/fail" })
+
+    // root + pipeline + handler
+    expect(created).toHaveLength(3)
+    const handler = created[2]
+    expect(handler.end).toHaveBeenCalledOnce()
+  })
+
+  it("creates only the root span when the route is not found (no child spans)", async () => {
+    const { tracer, startSpan } = makeMockTracer()
+    const app = makeApp()
+    app.register(otelPlugin({ tracer }))
+
+    await testRequest(app, { path: "/api/not-found" })
+
+    expect(startSpan).toHaveBeenCalledOnce()
   })
 })
 
