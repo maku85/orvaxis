@@ -14,6 +14,7 @@ export { createFastifyServer } from "./http/fastifyAdapter"
 export {
   type AdapterOptions,
   buildErrorBody,
+  type ErrorResponse,
   sanitizeErrorMessage,
   withTimeout,
 } from "./http/timeout"

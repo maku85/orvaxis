@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { HttpError } from "../core/HttpError"
-import { sanitizeErrorMessage, withTimeout } from "../http/timeout"
+import { buildErrorBody, sanitizeErrorMessage, withTimeout } from "../http/timeout"
 
 describe("withTimeout", () => {
   beforeEach(() => {
@@ -101,6 +101,58 @@ describe("withTimeout", () => {
     const err = await race
     expect(err).toBeInstanceOf(HttpError)
     expect(err.status).toBe(408)
+  })
+})
+
+describe("buildErrorBody", () => {
+  it("always includes the error message", () => {
+    expect(buildErrorBody(new HttpError(404, "Not Found"))).toMatchObject({ error: "Not Found" })
+  })
+
+  it("includes requestId when provided", () => {
+    const body = buildErrorBody(new HttpError(500, "Oops"), "req-abc")
+    expect(body.requestId).toBe("req-abc")
+  })
+
+  it("omits requestId when not provided", () => {
+    const body = buildErrorBody(new HttpError(500, "Oops"))
+    expect(body).not.toHaveProperty("requestId")
+  })
+
+  it("includes code from HttpError when set", () => {
+    const body = buildErrorBody(new HttpError(403, "Forbidden", { code: "FORBIDDEN" }))
+    expect(body.code).toBe("FORBIDDEN")
+  })
+
+  it("omits code when HttpError has no code", () => {
+    const body = buildErrorBody(new HttpError(404, "Not Found"))
+    expect(body).not.toHaveProperty("code")
+  })
+
+  it("omits code for plain Error objects", () => {
+    const body = buildErrorBody(new Error("boom"))
+    expect(body).not.toHaveProperty("code")
+  })
+
+  it("includes details from HttpError when set", () => {
+    const details = [{ path: ["name"], message: "Required" }]
+    const body = buildErrorBody(new HttpError(400, "Bad Request", { details }))
+    expect(body.details).toEqual(details)
+  })
+
+  it("omits details when not set", () => {
+    const body = buildErrorBody(new HttpError(500, "Oops"))
+    expect(body).not.toHaveProperty("details")
+  })
+
+  it("includes all fields together", () => {
+    const err = new HttpError(422, "Unprocessable", { code: "VALIDATION_ERROR", details: ["x"] })
+    expect(buildErrorBody(err, "req-xyz")).toEqual({
+      error: "Unprocessable",
+      code: "VALIDATION_ERROR",
+      requestId: "req-xyz",
+      details: ["x"],
+    })
   })
 })
 

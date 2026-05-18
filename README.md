@@ -304,18 +304,27 @@ Use `HttpError` to throw errors with an explicit HTTP status code from anywhere 
 ```ts
 import { HttpError } from "orvaxis"
 
-// in a handler
+// basic — status + message
 throw new HttpError(404, "User not found")
 
-// in onError — check the type before accessing .status
+// with a machine-readable code (forwarded to the client in the error envelope)
+throw new HttpError(403, "Forbidden", { code: "FORBIDDEN" })
+
+// with validation details
+throw new HttpError(422, "Validation failed", {
+  code: "VALIDATION_ERROR",
+  details: [{ path: ["email"], message: "Invalid email" }],
+})
+
+// in onError — check the type before accessing .status / .code
 app.on("onError", (ctx) => {
   if (ctx.error instanceof HttpError) {
-    console.error(`[${ctx.error.status}] ${ctx.error.message}`)
+    console.error(`[${ctx.error.status}] ${ctx.error.code ?? ""} ${ctx.error.message}`)
   }
 })
 ```
 
-`HttpError` extends the native `Error` class and accepts an optional `ErrorOptions` third argument (e.g. `{ cause }` for error chaining).
+`HttpError` extends the native `Error` class and also accepts a `cause` in the third argument (e.g. `{ cause: originalError }`) for error chaining.
 
 ---
 
@@ -776,7 +785,23 @@ process.once("SIGINT",  () => server.close())
 
 ### Error responses
 
-Adapters sanitize error messages based on `NODE_ENV`:
+Every error response from the built-in adapters follows a standard `ErrorResponse` envelope:
+
+```ts
+import type { ErrorResponse } from "orvaxis"
+// { error: string; code?: string; requestId?: string; details?: unknown }
+```
+
+Fields populated on every response:
+
+| Field | Source | Always present |
+|---|---|---|
+| `error` | `sanitizeErrorMessage(err)` | yes |
+| `code` | `err.code` when set on `HttpError` | no |
+| `requestId` | request's `X-Request-ID` value | yes |
+| `details` | `err.details` when set on `HttpError` | no |
+
+Message sanitization depends on `NODE_ENV`:
 
 | Environment | Generic `Error` | `HttpError` |
 |---|---|---|
@@ -785,13 +810,13 @@ Adapters sanitize error messages based on `NODE_ENV`:
 
 `HttpError` messages are always forwarded because they are intentional user-facing responses. All other error messages are hidden in production to avoid leaking internal details such as stack traces, file paths, or database error text.
 
-`sanitizeErrorMessage` is exported for custom adapters:
+`buildErrorBody` and `sanitizeErrorMessage` are exported for custom adapters:
 
 ```ts
-import { sanitizeErrorMessage } from "orvaxis"
+import { buildErrorBody } from "orvaxis"
 
-// in a custom adapter's catch block:
-res.status(err.status ?? 500).json({ error: sanitizeErrorMessage(err) })
+// in a custom adapter's catch block — produces the full ErrorResponse envelope:
+res.status(err.status ?? 500).json(buildErrorBody(err, requestId))
 ```
 
 ### Request ID

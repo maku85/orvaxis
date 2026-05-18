@@ -7,6 +7,13 @@ export type AdapterOptions = {
   logger?: Logger
 }
 
+export type ErrorResponse = {
+  error: string
+  code?: string
+  requestId?: string
+  details?: unknown
+}
+
 export function sanitizeErrorMessage(err: unknown): string {
   if (err instanceof HttpError) return err.message ?? "Internal Server Error"
   if (process.env.NODE_ENV !== "production") {
@@ -15,10 +22,13 @@ export function sanitizeErrorMessage(err: unknown): string {
   return "Internal Server Error"
 }
 
-export function buildErrorBody(err: unknown): { error: string; details?: unknown } {
-  const body: { error: string; details?: unknown } = { error: sanitizeErrorMessage(err) }
+export function buildErrorBody(err: unknown, requestId?: string): ErrorResponse {
+  const body: ErrorResponse = { error: sanitizeErrorMessage(err) }
+  const code = (err as { code?: unknown } | null)?.code
+  if (typeof code === "string") body.code = code
   const details = (err as { details?: unknown } | null)?.details
   if (details !== undefined) body.details = details
+  if (requestId !== undefined) body.requestId = requestId
   return body
 }
 

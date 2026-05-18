@@ -82,7 +82,7 @@ export function createExpressServer(
     } catch (err) {
       if (!wrapped.sent) {
         const e = err as { status?: number }
-        wrapped.status(e.status ?? 500).json(buildErrorBody(err))
+        wrapped.status(e.status ?? 500).json(buildErrorBody(err, requestId))
       } else {
         logger.error("[orvaxis] unhandled error after response sent:", err)
       }

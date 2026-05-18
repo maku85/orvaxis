@@ -95,7 +95,7 @@ export function createFastifyServer(
     } catch (err) {
       if (!wrapped.sent) {
         const e = err as { status?: number }
-        wrapped.status(e.status ?? 500).send(buildErrorBody(err))
+        wrapped.status(e.status ?? 500).send(buildErrorBody(err, requestId))
       } else {
         logger.error("[orvaxis] unhandled error after response sent:", err)
       }

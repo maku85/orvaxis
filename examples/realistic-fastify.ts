@@ -115,9 +115,10 @@ function authState(): AuthState {
 
 function requireTask(id: string): Task {
   const task = tasks.get(id)
-  if (!task) throw new HttpError(404, "Task not found")
+  if (!task) throw new HttpError(404, "Task not found", { code: "NOT_FOUND" })
   const { userId, role } = authState()
-  if (role !== "admin" && task.ownerId !== userId) throw new HttpError(403, "Access denied")
+  if (role !== "admin" && task.ownerId !== userId)
+    throw new HttpError(403, "Access denied", { code: "FORBIDDEN" })
   return task
 }
 
