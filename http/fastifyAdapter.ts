@@ -128,9 +128,19 @@ export function createFastifyServer(
       }
     },
     close: async () => {
-      if (listening) fastify.server.closeIdleConnections()
-      await fastify.close()
-      listening = false
+      if (!listening) return
+      const shutdownTimeout = options.shutdownTimeout ?? 10_000
+      fastify.server.closeIdleConnections()
+      const deadline =
+        shutdownTimeout > 0
+          ? setTimeout(() => fastify.server.closeAllConnections(), shutdownTimeout)
+          : undefined
+      try {
+        await fastify.close()
+      } finally {
+        clearTimeout(deadline)
+        listening = false
+      }
     },
   }
 }

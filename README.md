@@ -631,6 +631,31 @@ handler: async (ctx) => {
 import { withTimeout, type AdapterOptions } from "orvaxis"
 ```
 
+### Graceful shutdown
+
+When `close()` is called (e.g. on `SIGTERM`), the adapter stops accepting new connections and waits for active requests to finish. A `shutdownTimeout` cap (default `10 000 ms`) forces `closeAllConnections()` if active connections do not drain in time, so the process always exits cleanly under Kubernetes, systemd, and other orchestrators:
+
+```ts
+// default: 10 000 ms forced-close deadline
+const server = createExpressServer(app)
+
+// custom deadline
+const server = createExpressServer(app, undefined, { shutdownTimeout: 5_000 })
+
+// disable forced close (wait indefinitely — not recommended in production)
+const server = createExpressServer(app, undefined, { shutdownTimeout: 0 })
+```
+
+Typical SIGTERM handler:
+
+```ts
+const server = createExpressServer(app, undefined, { shutdownTimeout: 10_000 })
+await server.listen(3000)
+
+process.once("SIGTERM", () => server.close())
+process.once("SIGINT",  () => server.close())
+```
+
 ### Error responses
 
 Adapters sanitize error messages based on `NODE_ENV`:
@@ -733,7 +758,7 @@ Any adapter needs to:
 2. Create an `AbortController`, attach its `signal` to the request, and pass the controller as the third argument to `withTimeout` so that in-flight work is cancelled when the deadline expires
 3. Call `app.handle(req, res)` (wrapped in `withTimeout` if a deadline is needed) and catch thrown errors, using `sanitizeErrorMessage` to build the response body
 4. Return `{ listen(port, onListen?), close() }` to satisfy the `ServerAdapter` interface
-5. In `close()`, call `server.closeIdleConnections()` before `server.close()` to release idle HTTP keep-alive connections immediately, allowing the close callback to fire as soon as active requests complete rather than waiting indefinitely
+5. In `close()`, call `server.closeIdleConnections()` before `server.close()` to release idle keep-alive connections immediately, then set a `setTimeout(() => server.closeAllConnections(), shutdownTimeout)` deadline (default 10 s) that force-closes remaining connections if they do not drain in time; clear the timer in the close callback so it never fires when shutdown completes cleanly
 
 ---
 
@@ -963,7 +988,7 @@ Not yet recommended for production. Known gaps before production use:
 |-----|--------|
 | **API stability** | Pre-1.0 — breaking changes may occur between minor versions. |
 
-Graceful shutdown is supported via `server.close()` on the `ServerAdapter`.
+Graceful shutdown is supported via `server.close()` on the `ServerAdapter`. Both built-in adapters enforce a `shutdownTimeout` (default 10 s) so the process exits cleanly even when active connections stall.
 
 ---
 

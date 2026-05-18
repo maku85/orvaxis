@@ -72,6 +72,51 @@ describe("createFastifyServer — listen() guard", () => {
   })
 })
 
+describe("createFastifyServer — shutdown deadline", () => {
+  it("calls closeAllConnections() after shutdownTimeout when connections do not drain", async () => {
+    const fastifyInstance = Fastify()
+    const server = createFastifyServer(makeApp(), fastifyInstance, { shutdownTimeout: 50 })
+    await server.listen(0)
+
+    const closeAllSpy = vi
+      .spyOn(fastifyInstance.server, "closeAllConnections")
+      .mockImplementation(() => {})
+    vi.spyOn(fastifyInstance.server, "closeIdleConnections").mockImplementation(() => {})
+    vi.spyOn(fastifyInstance, "close").mockImplementation(() => new Promise<void>(() => {}))
+
+    void server.close() // never resolves — simulates connections that won't drain
+    await new Promise<void>((r) => setTimeout(r, 150))
+
+    expect(closeAllSpy).toHaveBeenCalled()
+  }, 1000)
+
+  it("does not call closeAllConnections() when shutdown completes before the deadline", async () => {
+    const fastifyInstance = Fastify()
+    const server = createFastifyServer(makeApp(), fastifyInstance, { shutdownTimeout: 5_000 })
+    await server.listen(0)
+    const spy = vi.spyOn(fastifyInstance.server, "closeAllConnections")
+    await server.close() // no active connections — fires immediately, clears the deadline
+    expect(spy).not.toHaveBeenCalled()
+  })
+
+  it("does not call closeAllConnections() when shutdownTimeout is 0", async () => {
+    const fastifyInstance = Fastify()
+    const server = createFastifyServer(makeApp(), fastifyInstance, { shutdownTimeout: 0 })
+    await server.listen(0)
+
+    const closeAllSpy = vi
+      .spyOn(fastifyInstance.server, "closeAllConnections")
+      .mockImplementation(() => {})
+    vi.spyOn(fastifyInstance.server, "closeIdleConnections").mockImplementation(() => {})
+    vi.spyOn(fastifyInstance, "close").mockImplementation(() => new Promise<void>(() => {}))
+
+    void server.close()
+    await new Promise<void>((r) => setTimeout(r, 100))
+
+    expect(closeAllSpy).not.toHaveBeenCalled()
+  }, 500)
+})
+
 describe("createFastifyServer — SSE timeout auto-cancel", () => {
   it("does not kill a streaming connection when write() is called before the deadline", async () => {
     const orvaxisApp = new Orvaxis()

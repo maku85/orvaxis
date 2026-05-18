@@ -3,6 +3,7 @@ import type { Logger } from "../types"
 
 export type AdapterOptions = {
   timeout?: number
+  shutdownTimeout?: number
   logger?: Logger
 }
 

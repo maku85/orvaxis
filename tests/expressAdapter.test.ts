@@ -73,6 +73,72 @@ describe("createExpressServer — graceful shutdown", () => {
     expect(spy).toHaveBeenCalled()
     spy.mockRestore()
   })
+
+  it("calls closeAllConnections() after shutdownTimeout when connections do not drain", async () => {
+    const { Server } = await import("node:http")
+    const closeAllSpy = vi
+      .spyOn(Server.prototype, "closeAllConnections")
+      .mockImplementation(() => {})
+    const closeSpy = vi.spyOn(Server.prototype, "close").mockImplementation(function (
+      this: import("node:http").Server
+    ) {
+      return this // never invoke the callback — simulates connections that won't drain
+    })
+    const closeIdleSpy = vi
+      .spyOn(Server.prototype, "closeIdleConnections")
+      .mockReturnValue(undefined)
+
+    const server = createExpressServer(makeApp(), express(), { shutdownTimeout: 50 })
+    await server.listen(0)
+
+    void server.close() // mocked close() never calls its callback — simulates stuck connections
+    await new Promise<void>((r) => setTimeout(r, 150))
+
+    expect(closeAllSpy).toHaveBeenCalled()
+
+    closeAllSpy.mockRestore()
+    closeSpy.mockRestore()
+    closeIdleSpy.mockRestore()
+    await server.close() // real close() now — drains and cleans up
+  }, 1000)
+
+  it("does not call closeAllConnections() when shutdown completes before the deadline", async () => {
+    const { Server } = await import("node:http")
+    const spy = vi.spyOn(Server.prototype, "closeAllConnections")
+    const server = createExpressServer(makeApp(), express(), { shutdownTimeout: 5_000 })
+    await server.listen(0)
+    await server.close() // no active connections — fires immediately, clears the deadline
+    expect(spy).not.toHaveBeenCalled()
+    spy.mockRestore()
+  })
+
+  it("does not call closeAllConnections() when shutdownTimeout is 0", async () => {
+    const { Server } = await import("node:http")
+    const closeAllSpy = vi
+      .spyOn(Server.prototype, "closeAllConnections")
+      .mockImplementation(() => {})
+    const closeSpy = vi.spyOn(Server.prototype, "close").mockImplementation(function (
+      this: import("node:http").Server
+    ) {
+      return this // never invoke the callback — simulates connections that won't drain
+    })
+    const closeIdleSpy = vi
+      .spyOn(Server.prototype, "closeIdleConnections")
+      .mockReturnValue(undefined)
+
+    const server = createExpressServer(makeApp(), express(), { shutdownTimeout: 0 })
+    await server.listen(0)
+
+    void server.close()
+    await new Promise<void>((r) => setTimeout(r, 100))
+
+    expect(closeAllSpy).not.toHaveBeenCalled()
+
+    closeAllSpy.mockRestore()
+    closeSpy.mockRestore()
+    closeIdleSpy.mockRestore()
+    await server.close()
+  }, 500)
 })
 
 describe("createExpressServer — SSE timeout auto-cancel", () => {

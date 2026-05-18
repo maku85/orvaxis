@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`shutdownTimeout` option** — both adapters accept a new `shutdownTimeout` field in `AdapterOptions` (default `10 000 ms`). After `close()` is called, a deadline timer fires `server.closeAllConnections()` if active connections have not drained within the limit. This prevents a stalled handler from keeping the process alive indefinitely under orchestrators (Kubernetes, systemd) that would otherwise send SIGKILL after their own grace period. Set `shutdownTimeout: 0` to disable the forced close.
+
 - **`ctx.params` shortcut** — `OrvaxisContext` now exposes a `readonly params: Record<string, string>` getter that returns `ctx.meta.route?.params ?? {}`. Handlers no longer need the verbose `ctx.meta.route!.params` pattern and the non-null assertion it requires; `ctx.params.id` is always safe inside a handler.
 
 - **`defineRoute<TBody>()` helper** — a thin wrapper around a route definition that infers the Zod (or any `.parse()`-based) schema's body type and propagates it into `ctx.req.body` inside the handler. Eliminates `ctx.req.body as z.infer<typeof MySchema>` casts with no runtime overhead. Accepts an optional second type argument `TState` to simultaneously type `ctx.state`. Non-breaking — plain route objects continue to work unchanged.

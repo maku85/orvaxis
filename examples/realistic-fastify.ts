@@ -300,5 +300,8 @@ app.group({
 
 // ── Start ─────────────────────────────────────────────────────────────────────
 
-const server = createFastifyServer(app)
+const server = createFastifyServer(app, undefined, { shutdownTimeout: 10_000 })
 server.listen(3001, (port) => console.log(`[orvaxis] listening on http://localhost:${port}`))
+
+process.once("SIGTERM", () => server.close())
+process.once("SIGINT", () => server.close())

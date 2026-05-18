@@ -120,8 +120,14 @@ export function createExpressServer(
     close: () =>
       new Promise<void>((resolve, reject) => {
         if (!httpServer) return resolve()
+        const shutdownTimeout = options.shutdownTimeout ?? 10_000
         httpServer.closeIdleConnections()
+        const deadline =
+          shutdownTimeout > 0
+            ? setTimeout(() => httpServer?.closeAllConnections(), shutdownTimeout)
+            : undefined
         httpServer.close((err) => {
+          clearTimeout(deadline)
           httpServer = null
           if (err) reject(err)
           else resolve()
