@@ -15,6 +15,7 @@ export { createFastifyServer } from "./http/fastifyAdapter"
 export { type AdapterOptions, sanitizeErrorMessage, withTimeout } from "./http/timeout"
 export { traceMiddleware } from "./middleware/traceMiddleware"
 export { loggerPlugin } from "./plugins/loggerPlugin"
+export { type OtelPluginOptions, otelPlugin } from "./plugins/otelPlugin"
 export { type Plugin, PluginManager } from "./plugins/PluginManager"
 export { schemaValidationPlugin } from "./plugins/schemaValidationPlugin"
 export type {

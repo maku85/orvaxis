@@ -366,6 +366,31 @@ app.group({
 
 On validation failure the plugin throws an error with `status: 422`, a `field` property indicating which part failed (`"body"`, `"params"`, `"query"`, or `"headers"`), and the original validator error as `cause`. The plugin is opt-in — routes with a `schema` field are silently ignored unless `schemaValidationPlugin` is registered.
 
+**`otelPlugin`** — emits an OpenTelemetry `SERVER` span for every request. Requires `@opentelemetry/api` (optional peer dependency) and a pre-configured SDK with your chosen exporter (OTLP, Zipkin, Jaeger, etc.):
+
+```ts
+import { Orvaxis, otelPlugin } from "orvaxis"
+import { trace } from "@opentelemetry/api"
+
+// configure SDK + exporter once at startup (outside this file)
+
+const app = new Orvaxis()
+app.register(otelPlugin({ tracer: trace.getTracer("my-service") }))
+```
+
+Each span captures:
+
+| Attribute | Value |
+|---|---|
+| `http.request.method` | `GET`, `POST`, … |
+| `url.path` | request path |
+| `orvaxis.request_id` | `ctx.req.id` |
+| `http.response.status_code` | response status |
+
+Distributed trace context is extracted from incoming `traceparent` / `tracestate` headers so Orvaxis participates in upstream traces automatically. `traceMiddleware` events are forwarded to the span as OTel span events. On error the exception is recorded via `span.recordException` and the span status is set to `ERROR`.
+
+> **Note:** spans are only created for requests that reach the `onRequest` hook — i.e. requests that match a route and pass policy checks. Requests that produce a 404 or are rejected by a policy before `onRequest` fires are not traced.
+
 To write a custom plugin:
 
 ```ts
@@ -950,6 +975,7 @@ orvaxis/
   plugins/
     PluginManager.ts         plugin registry (Plugin type + PluginManager class)
     loggerPlugin.ts          built-in logger plugin
+    otelPlugin.ts            OpenTelemetry SERVER span per request (requires @opentelemetry/api)
     schemaValidationPlugin.ts body/params/query/headers validation via route.schema
 
   types/
