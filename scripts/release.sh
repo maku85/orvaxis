@@ -33,7 +33,12 @@ echo "releasing v$VERSION (tag: $DIST_TAG)"
 # ── stamp changelog (stable releases only) ────────────────────────────────────
 if [ "$DIST_TAG" = "latest" ]; then
   TODAY=$(date +%Y-%m-%d)
-  sed -i "s/^## \[Unreleased\]$/## [$VERSION] - $TODAY/" CHANGELOG.md
+  # -i.bak (with an explicit, empty-able suffix) is the one -i syntax accepted by both
+  # GNU sed (Linux) and BSD sed (macOS) — bare `-i "s/.../"` makes BSD sed treat the
+  # script as the backup suffix and the filename as the script, failing with
+  # "invalid command code C".
+  sed -i.bak "s/^## \[Unreleased\]$/## [$VERSION] - $TODAY/" CHANGELOG.md
+  rm -f CHANGELOG.md.bak
   git add package.json CHANGELOG.md
 else
   git add package.json
