@@ -777,6 +777,24 @@ Install only the framework you intend to use — both peer dependencies are opti
 
 Both adapters mount Orvaxis as a single catch-all handler (`server.use(...)` on Express, `fastify.all("/*", ...)` on Fastify) and delegate all routing, hooks, and validation to the Orvaxis runtime. On Express this costs nothing, since Express has no comparable router/validation layer of its own. On Fastify it means you don't benefit from Fastify's own route trie or its compiled (ajv-based) schema validation — those are bypassed, not used. Pick the Fastify adapter for the transport (HTTP/1.1, HTTP/2, its plugin ecosystem for things unrelated to routing) or for consistency with an existing Fastify deployment, not for a routing or validation performance win over Express.
 
+### Query string parsing differs between adapters
+
+`ctx.req.query` is typed as `Record<string, string | string[]>` on both adapters, but Express's default query parser (`qs`, in "extended" mode) does not actually guarantee that shape: bracket notation is parsed into **nested objects**.
+
+```
+GET /search?filter[status]=active
+```
+
+| Adapter | `ctx.req.query.filter` |
+|---|---|
+| Express (default) | `{ status: "active" }` — an object, not a string |
+| Fastify (default) | `"active"` under the literal key `"filter[status]"` — brackets are not special |
+
+Code that reads a query value directly and assumes it's a string (`ctx.req.query.filter.toUpperCase()`) compiles under the declared type but can throw at runtime on Express if a client sends bracketed keys. Two ways to avoid this:
+
+- Validate query params with `route.schema.query` (see [Plugins → `schemaValidationPlugin`](#plugins)) — this reshapes and checks `ctx.req.query` at the boundary regardless of adapter.
+- Or, if you don't use query schemas and want the declared type to actually hold, switch Express to the non-nesting parser: `expressApp.set("query parser", "simple")` before passing it to `createExpressServer`. This affects the whole Express app instance, including any routes you mount outside Orvaxis, so prefer it only when you control the entire app.
+
 ### Timeout
 
 Both adapters accept an optional `AdapterOptions` third argument:
