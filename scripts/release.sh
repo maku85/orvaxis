@@ -32,13 +32,18 @@ echo "releasing v$VERSION (tag: $DIST_TAG)"
 
 # ── stamp changelog (stable releases only) ────────────────────────────────────
 if [ "$DIST_TAG" = "latest" ]; then
+  if ! grep -q '^## \[Unreleased\]$' CHANGELOG.md; then
+    echo "error: CHANGELOG.md has no '## [Unreleased]' heading to stamp — add release notes there before releasing" >&2
+    exit 1
+  fi
   TODAY=$(date +%Y-%m-%d)
-  # -i.bak (with an explicit, empty-able suffix) is the one -i syntax accepted by both
-  # GNU sed (Linux) and BSD sed (macOS) — bare `-i "s/.../"` makes BSD sed treat the
-  # script as the backup suffix and the filename as the script, failing with
-  # "invalid command code C".
-  sed -i.bak "s/^## \[Unreleased\]$/## [$VERSION] - $TODAY/" CHANGELOG.md
-  rm -f CHANGELOG.md.bak
+  # awk (not sed -i) to avoid GNU/BSD -i flag incompatibilities, and because this needs
+  # to both rename the heading and leave a fresh, empty "## [Unreleased]" above it for
+  # the next release — a single sed substitution can't consume-and-replace in one pass.
+  awk -v ver="$VERSION" -v today="$TODAY" '
+    /^## \[Unreleased\]$/ { print; print ""; print "## [" ver "] - " today; next }
+    { print }
+  ' CHANGELOG.md > CHANGELOG.md.tmp && mv CHANGELOG.md.tmp CHANGELOG.md
   git add package.json CHANGELOG.md
 else
   git add package.json

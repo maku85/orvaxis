@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- **`scripts/release.sh` no longer silently skips the CHANGELOG stamp when `## [Unreleased]` is missing** — the previous `sed` substitution matched nothing and exited 0 if that heading wasn't present (e.g. because a prior release already consumed it), leaving the CHANGELOG without a section for the new version and causing `.github/workflows/release.yml` to fail on the following tag push. The script now errors out up front if `## [Unreleased]` is missing, and after stamping the current release it re-inserts a fresh, empty `## [Unreleased]` heading above it — so the next release always has one to consume.
+
+## [0.3.1] - 2026-07-23
+
+### Changed
+
+- **Expanded npm `keywords`** for discoverability — added `policy-engine`, `typescript`, `http`, `observability`, `opentelemetry`, `sse`, `server-sent-events`, `graceful-shutdown` alongside the existing terms.
+
+### Added
+
+- **`.github/workflows/release.yml`** — automatically creates a GitHub Release from the corresponding `CHANGELOG.md` section whenever a `v*` tag is pushed (which `scripts/release.sh` already does on every release), instead of that being a manual step.
+
 ## [0.3.0] - 2026-07-23
 
 ### Fixed
