@@ -9,8 +9,6 @@ export {
   type UnifiedEvent,
 } from "./debug/buildExecutionSummary"
 export { traceEvent } from "./debug/traceEvent"
-export { createExpressServer } from "./http/expressAdapter"
-export { createFastifyServer } from "./http/fastifyAdapter"
 export {
   type AdapterOptions,
   buildErrorBody,
@@ -21,7 +19,6 @@ export {
 export { traceMiddleware } from "./middleware/traceMiddleware"
 export { type CorsOptions, corsPlugin } from "./plugins/corsPlugin"
 export { loggerPlugin } from "./plugins/loggerPlugin"
-export { type OtelPluginOptions, otelPlugin } from "./plugins/otelPlugin"
 export { type Plugin, PluginManager } from "./plugins/PluginManager"
 export { schemaValidationPlugin } from "./plugins/schemaValidationPlugin"
 export type {

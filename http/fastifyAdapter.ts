@@ -67,11 +67,15 @@ export function createFastifyServer(
 ): ServerAdapter {
   const timeoutMs = options.timeout ?? 30_000
   const logger = options.logger ?? console
+  const requestIdHeader = options.requestIdHeader ?? "X-Request-ID"
+  const requestIdHeaderLower = requestIdHeader.toLowerCase()
+  const activeControllers = new Set<AbortController>()
   fastify.all("/*", async (req, reply) => {
     const path = (req.url ?? "/").split("?")[0]
     const requestId =
-      (req.headers["x-request-id"] as string) || (req.id as string) || crypto.randomUUID()
+      (req.headers[requestIdHeaderLower] as string) || (req.id as string) || crypto.randomUUID()
     const controller = new AbortController()
+    activeControllers.add(controller)
     // FastifyRequest defines 'signal' (and others) as getter-only on the prototype.
     // Object.defineProperties bypasses [[Set]] entirely and adds own properties that shadow the getters.
     const adapted = Object.create(req) as OrvaxisRequest
@@ -82,7 +86,7 @@ export function createFastifyServer(
     })
     let cancelTimer: (() => void) | undefined
     const wrapped = wrapFastifyResponse(reply, () => cancelTimer?.())
-    wrapped.setHeader("X-Request-ID", requestId)
+    wrapped.setHeader(requestIdHeader, requestId)
 
     try {
       const handlePromise = app.handle(adapted, wrapped)
@@ -100,6 +104,8 @@ export function createFastifyServer(
       } else {
         logger.error("[orvaxis] unhandled error after response sent:", err)
       }
+    } finally {
+      activeControllers.delete(controller)
     }
   })
 
@@ -113,7 +119,8 @@ export function createFastifyServer(
       try {
         await fastify.listen({ port })
         listening = true
-        onListen?.(port)
+        const address = fastify.server?.address()
+        onListen?.(typeof address === "object" && address ? address.port : port)
       } catch (err) {
         listening = false
         throw err
@@ -122,6 +129,9 @@ export function createFastifyServer(
     close: async () => {
       if (!listening) return
       const shutdownTimeout = options.shutdownTimeout ?? 10_000
+      // Notify in-flight handlers (e.g. SSE loops) that shutdown has started, via the same
+      // ctx.req.signal already used for per-request timeouts — see README "Graceful shutdown".
+      for (const controller of activeControllers) controller.abort()
       fastify.server.closeIdleConnections()
       const deadline =
         shutdownTimeout > 0

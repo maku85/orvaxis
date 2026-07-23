@@ -5,6 +5,8 @@ export type AdapterOptions = {
   timeout?: number
   shutdownTimeout?: number
   logger?: Logger
+  /** Header used to read/propagate the request ID. Default: "X-Request-ID". */
+  requestIdHeader?: string
 }
 
 export type ErrorResponse = {

@@ -49,9 +49,13 @@ export function createExpressServer(
 ): ServerAdapter {
   const timeoutMs = options.timeout ?? 30_000
   const logger = options.logger ?? console
+  const requestIdHeader = options.requestIdHeader ?? "X-Request-ID"
+  const requestIdHeaderLower = requestIdHeader.toLowerCase()
+  const activeControllers = new Set<AbortController>()
   server.use(async (req: Request, res: Response, _next: NextFunction) => {
-    const requestId = (req.headers["x-request-id"] as string) || crypto.randomUUID()
+    const requestId = (req.headers[requestIdHeaderLower] as string) || crypto.randomUUID()
     const controller = new AbortController()
+    activeControllers.add(controller)
     // Express.request defines 'path' (and others) as getter-only on the prototype.
     // Object.defineProperties bypasses [[Set]] entirely and adds own properties that shadow the getters.
     const adapted = Object.create(req) as OrvaxisRequest
@@ -68,7 +72,7 @@ export function createExpressServer(
 
     let cancelTimer: (() => void) | undefined
     const wrapped = wrapExpressResponse(res, () => cancelTimer?.())
-    wrapped.setHeader("X-Request-ID", requestId)
+    wrapped.setHeader(requestIdHeader, requestId)
 
     try {
       const handlePromise = app.handle(adapted, wrapped)
@@ -86,6 +90,8 @@ export function createExpressServer(
       } else {
         logger.error("[orvaxis] unhandled error after response sent:", err)
       }
+    } finally {
+      activeControllers.delete(controller)
     }
   })
 
@@ -100,7 +106,8 @@ export function createExpressServer(
         httpServer = server
           .listen(port)
           .once("listening", () => {
-            onListen?.(port)
+            const address = httpServer?.address()
+            onListen?.(typeof address === "object" && address ? address.port : port)
             resolve()
           })
           .once("error", (err) => {
@@ -112,6 +119,9 @@ export function createExpressServer(
       new Promise<void>((resolve, reject) => {
         if (!httpServer) return resolve()
         const shutdownTimeout = options.shutdownTimeout ?? 10_000
+        // Notify in-flight handlers (e.g. SSE loops) that shutdown has started, via the same
+        // ctx.req.signal already used for per-request timeouts — see README "Graceful shutdown".
+        for (const controller of activeControllers) controller.abort()
         httpServer.closeIdleConnections()
         const deadline =
           shutdownTimeout > 0

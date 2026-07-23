@@ -7,7 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **`onListen` callback now reports the real OS-assigned port instead of echoing `listen(0)`'s literal argument** — both `createExpressServer` and `createFastifyServer` previously called `onListen(port)` with whatever value was passed to `listen()`, so `listen(0, onListen)` — the standard way to let the OS pick a free port — reported back `0` instead of the actual bound port. Anything logging or reacting to the reported port (`console.log(\`listening on ${port}\`)`, wiring up a client against it) got the wrong value. Both adapters now read the real port off the underlying server's `.address()` after `listen` resolves, falling back to the requested port only if the server doesn't expose one (e.g. Unix sockets, custom adapters passed in tests).
+
 ### Added
+
+- **Graceful shutdown now notifies in-flight requests via `ctx.req.signal`** — `close()` on both `createExpressServer` and `createFastifyServer` aborts the `AbortSignal` of every request still in flight *before* waiting for connections to drain, reusing the same signal already documented for per-request timeouts. Long-lived handlers (SSE, chunked streams) can listen for `abort` and end themselves cleanly instead of being force-closed by `shutdownTimeout`. Handlers that don't listen see no behavior change — `shutdownTimeout` still applies as before. See README "Graceful shutdown".
+
+- **Test coverage for `pipe()` under backpressure** — both adapters now have a test that streams several megabytes through `ctx.res.pipe()` to a deliberately slow-consuming client (pause/resume trickling), verifying the full byte sequence arrives intact and in order. Previously `pipe()` was only tested with a small, instantly-flushed payload, which would not have caught a regression that mishandled `Writable` backpressure.
+
+### Breaking
+
+- **`createExpressServer`, `createFastifyServer`, and `otelPlugin` moved to dedicated subpath exports** — `orvaxis/express`, `orvaxis/fastify`, and `orvaxis/otel` respectively (same pattern as the existing `orvaxis/testing`). Previously, all three were re-exported from the main `orvaxis` entry point, which meant `import { Orvaxis } from "orvaxis"` transitively `require()`'d `express`, `fastify`, and `@opentelemetry/api` even if the app only used one of them (or none) — the main entry point failed to load entirely if any single peer dependency was missing, despite all three being declared optional in `peerDependenciesMeta`. Each adapter/plugin now lives in its own entry point, so importing `orvaxis` never touches these optional peer dependencies, and importing `orvaxis/express` only requires `express` to be installed (same for `orvaxis/fastify` and `@opentelemetry/api`/`orvaxis/otel`).
+
+  ```ts
+  // before
+  import { Orvaxis, createExpressServer } from "orvaxis"
+
+  // after
+  import { Orvaxis } from "orvaxis"
+  import { createExpressServer } from "orvaxis/express"
+  ```
+
+  Same rename applies to `createFastifyServer` (`orvaxis/fastify`) and `otelPlugin`/`OtelPluginOptions` (`orvaxis/otel`).
+
+### Added
+
+- **`requestIdHeader` option on `AdapterOptions`** — both `createExpressServer` and `createFastifyServer` previously hardcoded `X-Request-ID` as the header used to read an incoming request ID and to echo it back on the response. Stacks that use a different convention (`X-Correlation-ID`, `X-Trace-ID`, …) can now set `requestIdHeader` to override it; the configured name is used for both directions (reading the incoming header, case-insensitively, and setting the outgoing one). Default remains `X-Request-ID` — no behavior change for existing callers.
+
+  ```ts
+  const server = createExpressServer(app, undefined, { requestIdHeader: "X-Correlation-ID" })
+  ```
 
 - **`onNotFound` and `onMethodNotAllowed` hooks** — two new `HookName` values that fire before the runtime throws a routing error, giving applications a clean interception point to send custom responses without modifying an adapter. `onNotFound` fires when no route matches the requested path; `onMethodNotAllowed` fires when the path is registered but the HTTP method is not. If a hook listener sends a response (`ctx.res.sent === true`), the runtime skips the `HttpError`, ends the trace, fires `afterPipeline`, and returns normally — no error is thrown and `onError` is not triggered. When no listener sends a response, the runtime throws `HttpError(404)` / `HttpError(405)` as before and `onError` still runs. `ctx.meta.allowedMethods` is populated before `onMethodNotAllowed` fires, so the hook can read the `Allow` list without a separate router call. Common use-cases: custom 404 pages, logging unmatched paths, redirecting legacy URLs, returning branded error envelopes.
 

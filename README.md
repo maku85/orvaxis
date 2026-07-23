@@ -496,7 +496,8 @@ When `origin` is not `"*"` the plugin also sets `Vary: Origin` so CDNs cache res
 **`otelPlugin`** — emits an OpenTelemetry `SERVER` span for every request. Requires `@opentelemetry/api` (optional peer dependency) and a pre-configured SDK with your chosen exporter (OTLP, Zipkin, Jaeger, etc.):
 
 ```ts
-import { Orvaxis, otelPlugin } from "orvaxis"
+import { Orvaxis } from "orvaxis"
+import { otelPlugin } from "orvaxis/otel"
 import { trace } from "@opentelemetry/api"
 
 // configure SDK + exporter once at startup (outside this file)
@@ -769,17 +770,19 @@ Two adapters are included out of the box:
 
 | Adapter | Import | Peer dependency |
 |---|---|---|
-| Express | `createExpressServer` | `express ^4.20 \|\| ^5` |
-| Fastify | `createFastifyServer` | `fastify ^5` |
+| Express | `createExpressServer` from `orvaxis/express` | `express ^4.20 \|\| ^5` |
+| Fastify | `createFastifyServer` from `orvaxis/fastify` | `fastify ^5` |
 
-Install only the framework you intend to use — both peer dependencies are optional.
+Install only the framework you intend to use — both peer dependencies are optional. Each adapter lives on its own subpath (`orvaxis/express`, `orvaxis/fastify`) precisely so that importing the main `orvaxis` entry point never requires either peer dependency to be installed.
+
+Both adapters mount Orvaxis as a single catch-all handler (`server.use(...)` on Express, `fastify.all("/*", ...)` on Fastify) and delegate all routing, hooks, and validation to the Orvaxis runtime. On Express this costs nothing, since Express has no comparable router/validation layer of its own. On Fastify it means you don't benefit from Fastify's own route trie or its compiled (ajv-based) schema validation — those are bypassed, not used. Pick the Fastify adapter for the transport (HTTP/1.1, HTTP/2, its plugin ecosystem for things unrelated to routing) or for consistency with an existing Fastify deployment, not for a routing or validation performance win over Express.
 
 ### Timeout
 
 Both adapters accept an optional `AdapterOptions` third argument:
 
 ```ts
-import { createExpressServer } from "orvaxis"
+import { createExpressServer } from "orvaxis/express"
 
 // default: 30 000 ms
 const server = createExpressServer(app)
@@ -811,7 +814,23 @@ import { withTimeout, type AdapterOptions } from "orvaxis"
 
 ### Graceful shutdown
 
-When `close()` is called (e.g. on `SIGTERM`), the adapter stops accepting new connections and waits for active requests to finish. A `shutdownTimeout` cap (default `10 000 ms`) forces `closeAllConnections()` if active connections do not drain in time, so the process always exits cleanly under Kubernetes, systemd, and other orchestrators:
+When `close()` is called (e.g. on `SIGTERM`), the adapter stops accepting new connections and waits for active requests to finish. A `shutdownTimeout` cap (default `10 000 ms`) forces `closeAllConnections()` if active connections do not drain in time, so the process always exits cleanly under Kubernetes, systemd, and other orchestrators.
+
+**In-flight requests are notified via the same `ctx.req.signal` used for timeouts.** Before waiting for connections to drain, `close()` aborts the `AbortSignal` of every request still in flight. A long-lived handler — an SSE loop, a chunked NDJSON stream — can listen for this exactly like it already does for timeouts, and end itself cleanly (send a final message, call `ctx.res.end()`) instead of being cut off by `shutdownTimeout`:
+
+```ts
+handler: async (ctx) => {
+  ctx.res.write(": ping\n\n")
+  await new Promise<void>((resolve) => {
+    ctx.req.signal?.addEventListener("abort", resolve, { once: true })
+  })
+  // fires both on a request timeout and on server shutdown — same signal, same handling
+  ctx.res.write("event: bye\ndata: server shutting down\n\n")
+  ctx.res.end()
+}
+```
+
+If a handler doesn't listen for the signal, nothing changes: `shutdownTimeout` still forces the connection closed as before. This is a notification, not a kill switch.
 
 ```ts
 // default: 10 000 ms forced-close deadline
@@ -842,7 +861,7 @@ Orvaxis does not enforce its own body size limit. The ceiling is set entirely by
 
 ```ts
 import express from "express"
-import { createExpressServer } from "orvaxis"
+import { createExpressServer } from "orvaxis/express"
 
 const server = express()
 server.use(express.json({ limit: "256kb" }))
@@ -855,7 +874,7 @@ const adapter = createExpressServer(app, server)
 
 ```ts
 import Fastify from "fastify"
-import { createFastifyServer } from "orvaxis"
+import { createFastifyServer } from "orvaxis/fastify"
 
 const fastify = Fastify({ bodyLimit: 256 * 1024 })   // 256 KB
 
@@ -918,6 +937,13 @@ Priority order for the ID value:
 app.on("afterPipeline", (ctx) => {
   console.log(ctx.req.id) // always defined — e.g. "550e8400-e29b-41d4-a716-446655440000"
 })
+```
+
+The header name is configurable via `requestIdHeader` on `AdapterOptions`, for stacks that use a different convention (`X-Correlation-ID`, `X-Trace-ID`, …). It applies to both reading the incoming header and setting the outgoing one — the default remains `X-Request-ID`:
+
+```ts
+const server = createExpressServer(app, undefined, { requestIdHeader: "X-Correlation-ID" })
+// same option name on createFastifyServer
 ```
 
 `loggerPlugin` automatically includes the ID in every structured log:
@@ -1085,7 +1111,8 @@ const routes: RouteInfo[] = app.routes()
 
 ### Express
 ```ts
-import { Orvaxis, createExpressServer } from "orvaxis"
+import { Orvaxis } from "orvaxis"
+import { createExpressServer } from "orvaxis/express"
 import type { Policy } from "orvaxis"
 
 const app = new Orvaxis()
@@ -1121,7 +1148,8 @@ server.listen(3000)
 
 ### Fastify
 ```ts
-import { Orvaxis, createFastifyServer } from "orvaxis"
+import { Orvaxis } from "orvaxis"
+import { createFastifyServer } from "orvaxis/fastify"
 
 const app = new Orvaxis()
 
@@ -1147,7 +1175,11 @@ server.listen(3000)
 ## Project Structure
 ```
 orvaxis/
-  index.ts                   entry point, public API
+  index.ts                   entry point, public API (no optional peer dependencies)
+  express.ts                 orvaxis/express entry point (createExpressServer)
+  fastify.ts                 orvaxis/fastify entry point (createFastifyServer)
+  otel.ts                    orvaxis/otel entry point (otelPlugin)
+  testing.ts                 orvaxis/testing entry point
 
   core/
     Orvaxis.ts               public-facing class
@@ -1170,8 +1202,8 @@ orvaxis/
     traceEvent.ts            emit custom trace events without ctx
 
   http/
-    expressAdapter.ts        Express adapter
-    fastifyAdapter.ts        Fastify adapter
+    expressAdapter.ts        Express adapter (exported via orvaxis/express)
+    fastifyAdapter.ts        Fastify adapter (exported via orvaxis/fastify)
     timeout.ts               withTimeout helper and AdapterOptions type
 
   middleware/
@@ -1180,7 +1212,7 @@ orvaxis/
   plugins/
     PluginManager.ts         plugin registry (Plugin type + PluginManager class)
     loggerPlugin.ts          built-in logger plugin
-    otelPlugin.ts            OpenTelemetry SERVER span per request + orvaxis.pipeline/orvaxis.handler child spans (requires @opentelemetry/api)
+    otelPlugin.ts            OpenTelemetry SERVER span per request + orvaxis.pipeline/orvaxis.handler child spans (exported via orvaxis/otel, requires @opentelemetry/api)
     schemaValidationPlugin.ts body/params/query/headers validation via route.schema
 
   types/

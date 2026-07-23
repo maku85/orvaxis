@@ -60,12 +60,30 @@ describe("createFastifyServer — listen() guard", () => {
     expect(spy).toHaveBeenCalled()
   })
 
-  it("invokes the onListen callback with the port after a successful listen", async () => {
+  it("invokes the onListen callback with the OS-assigned port when listen(0) is used", async () => {
     const server = createFastifyServer(makeApp(), Fastify())
     const ports: number[] = []
     await server.listen(0, (p) => ports.push(p))
     try {
-      expect(ports).toEqual([0])
+      expect(ports).toHaveLength(1)
+      expect(ports[0]).toBeGreaterThan(0)
+    } finally {
+      await server.close()
+    }
+  })
+
+  it("invokes the onListen callback with the requested port when a specific port is given", async () => {
+    const { createServer } = await import("node:http")
+    const finder = createServer()
+    await new Promise<void>((resolve) => finder.listen(0, resolve))
+    const port = (finder.address() as AddressInfo).port
+    await new Promise<void>((resolve) => finder.close(() => resolve()))
+
+    const server = createFastifyServer(makeApp(), Fastify())
+    const ports: number[] = []
+    await server.listen(port, (p) => ports.push(p))
+    try {
+      expect(ports).toEqual([port])
     } finally {
       await server.close()
     }
@@ -158,6 +176,80 @@ describe("createFastifyServer — pipe() streaming", () => {
       await server.close()
     }
   }, 5000)
+
+  it("delivers the full stream intact when the client consumes slower than the source produces", async () => {
+    const { Readable } = await import("node:stream")
+
+    const CHUNK_SIZE = 64 * 1024
+    const CHUNK_COUNT = 80 // ~5MB total — large enough to fill socket buffers and force backpressure
+    let produced = 0
+
+    const orvaxisApp = new Orvaxis()
+    orvaxisApp.group({
+      prefix: "/",
+      routes: [
+        {
+          method: "GET",
+          path: "/pipe-large",
+          handler: async (ctx) => {
+            ctx.res.setHeader("Content-Type", "application/octet-stream")
+            // Each chunk is filled with its own index (mod 256), so reordering/corruption
+            // introduced by a pipe() that mishandles backpressure would be detectable.
+            const source = new Readable({
+              read() {
+                if (produced >= CHUNK_COUNT) {
+                  this.push(null)
+                  return
+                }
+                this.push(Buffer.alloc(CHUNK_SIZE, produced % 256))
+                produced++
+              },
+            })
+            ctx.res.pipe(source)
+          },
+        },
+      ],
+    })
+
+    const fastifyInstance = Fastify()
+    const server = createFastifyServer(orvaxisApp, fastifyInstance)
+    await server.listen(0)
+    const { port } = fastifyInstance.server.address() as AddressInfo
+
+    try {
+      const chunks: Buffer[] = []
+      await new Promise<void>((resolve, reject) => {
+        get(`http://localhost:${port}/pipe-large`, (res) => {
+          // Trickle consumption: pause immediately, only drain briefly on an interval.
+          // This fills the socket's receive buffer, which back-pressures the server's
+          // write calls inside pipe() — the scenario this test exists to cover.
+          res.pause()
+          const interval = setInterval(() => {
+            res.resume()
+            setImmediate(() => res.pause())
+          }, 5)
+          res.on("data", (chunk: Buffer) => chunks.push(chunk))
+          res.on("end", () => {
+            clearInterval(interval)
+            resolve()
+          })
+          res.on("error", (err) => {
+            clearInterval(interval)
+            reject(err)
+          })
+        }).on("error", reject)
+      })
+
+      const full = Buffer.concat(chunks)
+      expect(full.length).toBe(CHUNK_SIZE * CHUNK_COUNT)
+      for (let i = 0; i < CHUNK_COUNT; i++) {
+        const slice = full.subarray(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE)
+        expect(slice.every((byte) => byte === i % 256)).toBe(true)
+      }
+    } finally {
+      await server.close()
+    }
+  }, 15000)
 })
 
 describe("createFastifyServer — SSE timeout auto-cancel", () => {
@@ -203,4 +295,121 @@ describe("createFastifyServer — SSE timeout auto-cancel", () => {
       await server.close()
     }
   }, 2000)
+})
+
+describe("createFastifyServer — graceful shutdown notifies in-flight streams", () => {
+  it("aborts ctx.req.signal on close() so an SSE handler can end itself instead of being force-killed", async () => {
+    let handlerFinishedGracefully = false
+    const orvaxisApp = new Orvaxis()
+    orvaxisApp.group({
+      prefix: "/",
+      routes: [
+        {
+          method: "GET",
+          path: "/stream",
+          handler: async (ctx) => {
+            ctx.res.write(": ping\n\n")
+            await new Promise<void>((resolve) => {
+              ctx.req.signal?.addEventListener("abort", () => resolve(), { once: true })
+            })
+            handlerFinishedGracefully = true
+            ctx.res.write("event: bye\ndata: shutting down\n\n")
+            ctx.res.end()
+          },
+        },
+      ],
+    })
+
+    const fastifyInstance = Fastify()
+    // timeout: 0 — only the shutdown abort (not the per-request timeout) should end this handler
+    const server = createFastifyServer(orvaxisApp, fastifyInstance, {
+      timeout: 0,
+      shutdownTimeout: 5_000,
+    })
+    await server.listen(0)
+    const { port } = fastifyInstance.server.address() as AddressInfo
+    const closeAllSpy = vi.spyOn(fastifyInstance.server, "closeAllConnections")
+
+    try {
+      const body = await new Promise<string>((resolve, reject) => {
+        let data = ""
+        const req = get(`http://localhost:${port}/stream`, (res) => {
+          res.on("data", (chunk: Buffer) => {
+            data += chunk.toString()
+            // once the initial ping arrives, trigger shutdown — the handler is now "in-flight"
+            if (data.includes("ping") && !handlerFinishedGracefully) {
+              void server.close()
+            }
+          })
+          res.on("end", () => resolve(data))
+          res.on("error", reject)
+        })
+        req.on("error", reject)
+      })
+
+      expect(handlerFinishedGracefully).toBe(true)
+      expect(body).toContain("event: bye")
+      // graceful path: the handler ended the response itself before shutdownTimeout forced it
+      expect(closeAllSpy).not.toHaveBeenCalled()
+    } finally {
+      closeAllSpy.mockRestore()
+    }
+  }, 5000)
+})
+
+describe("createFastifyServer — request ID header", () => {
+  it("defaults to X-Request-ID: echoes an incoming value and generates one otherwise", async () => {
+    const { request } = await import("node:http")
+    const fastifyInstance = Fastify()
+    const server = createFastifyServer(makeApp(), fastifyInstance)
+    await server.listen(0)
+    const { port } = fastifyInstance.server.address() as AddressInfo
+
+    const fetchHeader = (reqHeaders: Record<string, string>) =>
+      new Promise<string | undefined>((resolve, reject) => {
+        request(`http://localhost:${port}/health`, { headers: reqHeaders }, (res) => {
+          res.resume()
+          res.on("end", () => resolve(res.headers["x-request-id"] as string | undefined))
+        })
+          .on("error", reject)
+          .end()
+      })
+
+    try {
+      expect(await fetchHeader({})).toBeTruthy()
+      expect(await fetchHeader({ "x-request-id": "client-supplied-id" })).toBe(
+        "client-supplied-id"
+      )
+    } finally {
+      await server.close()
+    }
+  })
+
+  it("honors a custom requestIdHeader for both reading and echoing", async () => {
+    const { request } = await import("node:http")
+    const fastifyInstance = Fastify()
+    const server = createFastifyServer(makeApp(), fastifyInstance, {
+      requestIdHeader: "X-Correlation-ID",
+    })
+    await server.listen(0)
+    const { port } = fastifyInstance.server.address() as AddressInfo
+
+    const fetchHeaders = (reqHeaders: Record<string, string>) =>
+      new Promise<Record<string, string | string[] | undefined>>((resolve, reject) => {
+        request(`http://localhost:${port}/health`, { headers: reqHeaders }, (res) => {
+          res.resume()
+          res.on("end", () => resolve(res.headers))
+        })
+          .on("error", reject)
+          .end()
+      })
+
+    try {
+      const headers = await fetchHeaders({ "x-correlation-id": "trace-abc-123" })
+      expect(headers["x-correlation-id"]).toBe("trace-abc-123")
+      expect(headers["x-request-id"]).toBeUndefined()
+    } finally {
+      await server.close()
+    }
+  })
 })

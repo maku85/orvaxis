@@ -9,7 +9,8 @@ Practical use cases with working code examples.
 Authenticate every request globally before it reaches any handler.
 
 ```ts
-import { Orvaxis, createExpressServer } from "orvaxis"
+import { Orvaxis } from "orvaxis"
+import { createExpressServer } from "orvaxis/express"
 import type { Policy } from "orvaxis"
 
 const requireApiKey: Policy = {
@@ -148,7 +149,8 @@ Handlers under `/beta/*` receive `ctx.meta.beta === true` and can branch accordi
 Every request automatically produces a structured trace. Use `traceMiddleware` and `traceEvent` to enrich it.
 
 ```ts
-import { Orvaxis, traceMiddleware, traceEvent, buildExecutionSummary, createExpressServer } from "orvaxis"
+import { Orvaxis, traceMiddleware, traceEvent, buildExecutionSummary } from "orvaxis"
+import { createExpressServer } from "orvaxis/express"
 
 const app = new Orvaxis()
 app.debugger.enable() // optional: adds internal lifecycle events
@@ -200,7 +202,8 @@ createExpressServer(app).listen(3000)
 Log every request with timing, status, and error info using lifecycle hooks.
 
 ```ts
-import { Orvaxis, createExpressServer } from "orvaxis"
+import { Orvaxis } from "orvaxis"
+import { createExpressServer } from "orvaxis/express"
 
 const app = new Orvaxis()
 
@@ -229,7 +232,7 @@ app.on("onError", (ctx, err) => {
 Apply shared middleware to an entire group of routes.
 
 ```ts
-import { createExpressServer } from "orvaxis"
+import { createExpressServer } from "orvaxis/express"
 import express from "express"
 import type { Middleware } from "orvaxis"
 
@@ -250,7 +253,8 @@ app.group({
 
 ```ts
 import express from "express"
-import { Orvaxis, createExpressServer } from "orvaxis"
+import { Orvaxis } from "orvaxis"
+import { createExpressServer } from "orvaxis/express"
 
 const expressApp = express()
 expressApp.use(express.json())           // parse JSON bodies
@@ -268,7 +272,8 @@ Same pattern for Fastify plugins:
 ```ts
 import Fastify from "fastify"
 import multipart from "@fastify/multipart"
-import { Orvaxis, createFastifyServer } from "orvaxis"
+import { Orvaxis } from "orvaxis"
+import { createFastifyServer } from "orvaxis/fastify"
 
 const fastifyApp = Fastify()
 await fastifyApp.register(multipart)

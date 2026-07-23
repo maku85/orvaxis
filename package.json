@@ -25,6 +25,36 @@
         "types": "./dist/testing.d.ts",
         "default": "./dist/testing.js"
       }
+    },
+    "./express": {
+      "import": {
+        "types": "./dist/esm/express.d.ts",
+        "default": "./dist/esm/express.js"
+      },
+      "require": {
+        "types": "./dist/express.d.ts",
+        "default": "./dist/express.js"
+      }
+    },
+    "./fastify": {
+      "import": {
+        "types": "./dist/esm/fastify.d.ts",
+        "default": "./dist/esm/fastify.js"
+      },
+      "require": {
+        "types": "./dist/fastify.d.ts",
+        "default": "./dist/fastify.js"
+      }
+    },
+    "./otel": {
+      "import": {
+        "types": "./dist/esm/otel.d.ts",
+        "default": "./dist/esm/otel.js"
+      },
+      "require": {
+        "types": "./dist/otel.d.ts",
+        "default": "./dist/otel.js"
+      }
     }
   },
   "files": [

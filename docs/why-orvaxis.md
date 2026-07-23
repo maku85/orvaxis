@@ -89,7 +89,8 @@ This works. The problems surface as the app grows:
 ## Orvaxis — the same scenario
 
 ```ts
-import { Orvaxis, createExpressServer } from "orvaxis"
+import { Orvaxis } from "orvaxis"
+import { createExpressServer } from "orvaxis/express"
 import type { Policy } from "orvaxis"
 
 // ── policies: declare what is allowed ─────────────────────────────────────────
@@ -188,4 +189,5 @@ When a policy returns `{ allow: false, status: 401 }`, the runtime throws a type
 
 - **Simple APIs with few rules.** If your app has 3–5 routes and a single auth check, the overhead of explicit layers adds structure without solving a real problem. Plain Express middleware is fine.
 - **You need framework-specific features.** Orvaxis sits on top of Express or Fastify and delegates transport to them. If you rely heavily on framework-specific APIs (e.g., Fastify schemas, Express template engines), you're working around the abstraction.
+- **You're on Fastify specifically for its routing or validation performance.** Both adapters mount Orvaxis as a single catch-all route and run their own router, policy engine, and validation on top. On Express this replaces nothing Express itself provides. On Fastify it bypasses Fastify's own route trie and its compiled (ajv-based) schema validation — the two systems don't compose, Orvaxis's replaces Fastify's. Choose the Fastify adapter for transport-level reasons (HTTP/2, an existing Fastify deployment), not to get Fastify's native routing/validation speed alongside Orvaxis.
 - **Pre-1.0 stability is a concern.** The API may change before 1.0. Pin the version and review the changelog before upgrading.

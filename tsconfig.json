@@ -15,6 +15,9 @@
   "include": [
     "index.ts",
     "testing.ts",
+    "express.ts",
+    "fastify.ts",
+    "otel.ts",
     "core/**/*.ts",
     "debug/**/*.ts",
     "http/**/*.ts",
