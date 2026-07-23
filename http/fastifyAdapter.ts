@@ -109,6 +109,25 @@ export function createFastifyServer(
     }
   })
 
+  // Errors from Fastify's own request lifecycle (content-type parsing, bodyLimit) are thrown
+  // before the catch-all route above ever runs, so they never reach its try/catch. Without this,
+  // Fastify sends its own { statusCode, code, error, message } shape instead of the ErrorResponse
+  // envelope. This is the same envelope used for errors thrown inside the Orvaxis runtime, just
+  // applied before the runtime ever ran.
+  fastify.setErrorHandler((err, req, reply) => {
+    if (reply.sent) {
+      logger.error("[orvaxis] unhandled error after response sent:", err)
+      return
+    }
+    const requestId =
+      (req.headers[requestIdHeaderLower] as string) || (req.id as string) || crypto.randomUUID()
+    const e = err as { statusCode?: number; status?: number }
+    reply
+      .header(requestIdHeader, requestId)
+      .status(e.statusCode ?? e.status ?? 500)
+      .send(buildErrorBody(err, requestId))
+  })
+
   let listening = false
 
   return {

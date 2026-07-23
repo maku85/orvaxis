@@ -458,3 +458,67 @@ describe("createExpressServer — request ID header", () => {
     }
   })
 })
+
+describe("createExpressServer — errors from upstream middleware", () => {
+  it("formats a body-parser error (malformed JSON) as the standard ErrorResponse envelope", async () => {
+    const { request } = await import("node:http")
+
+    const orvaxisApp = new Orvaxis()
+    orvaxisApp.group({
+      prefix: "/",
+      routes: [
+        {
+          method: "POST",
+          path: "/echo",
+          handler: async (ctx) => ctx.res.json({ received: ctx.req.body }),
+        },
+      ],
+    })
+
+    const expressApp = express()
+    expressApp.use(express.json())
+    const server = createExpressServer(orvaxisApp, expressApp)
+    const ports: number[] = []
+    await server.listen(0, (p) => ports.push(p))
+    const port = ports[0]
+
+    try {
+      const res = await new Promise<{ status: number; contentType: string; body: string }>(
+        (resolve, reject) => {
+          const req = request(
+            {
+              host: "localhost",
+              port,
+              path: "/echo",
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+            },
+            (incoming) => {
+              let data = ""
+              incoming.on("data", (chunk: Buffer) => {
+                data += chunk.toString()
+              })
+              incoming.on("end", () =>
+                resolve({
+                  status: incoming.statusCode ?? 0,
+                  contentType: String(incoming.headers["content-type"]),
+                  body: data,
+                })
+              )
+            }
+          )
+          req.on("error", reject)
+          req.end("{ not valid json")
+        }
+      )
+
+      expect(res.status).toBe(400)
+      expect(res.contentType).toContain("application/json")
+      const parsed = JSON.parse(res.body)
+      expect(parsed).toHaveProperty("error")
+      expect(parsed).toHaveProperty("requestId")
+    } finally {
+      await server.close()
+    }
+  })
+})

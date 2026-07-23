@@ -1,4 +1,4 @@
-import { get } from "node:http"
+import { get, request } from "node:http"
 import type { AddressInfo } from "node:net"
 import Fastify from "fastify"
 import { describe, expect, it, vi } from "vitest"
@@ -33,6 +33,7 @@ describe("createFastifyServer — listen() guard", () => {
     let callCount = 0
     const mockFastify = {
       all: () => {},
+      setErrorHandler: () => {},
       listen: async () => {
         callCount++
         if (callCount === 1) throw new Error("bind EADDRINUSE")
@@ -359,7 +360,6 @@ describe("createFastifyServer — graceful shutdown notifies in-flight streams",
 
 describe("createFastifyServer — request ID header", () => {
   it("defaults to X-Request-ID: echoes an incoming value and generates one otherwise", async () => {
-    const { request } = await import("node:http")
     const fastifyInstance = Fastify()
     const server = createFastifyServer(makeApp(), fastifyInstance)
     await server.listen(0)
@@ -386,7 +386,6 @@ describe("createFastifyServer — request ID header", () => {
   })
 
   it("honors a custom requestIdHeader for both reading and echoing", async () => {
-    const { request } = await import("node:http")
     const fastifyInstance = Fastify()
     const server = createFastifyServer(makeApp(), fastifyInstance, {
       requestIdHeader: "X-Correlation-ID",
@@ -408,6 +407,102 @@ describe("createFastifyServer — request ID header", () => {
       const headers = await fetchHeaders({ "x-correlation-id": "trace-abc-123" })
       expect(headers["x-correlation-id"]).toBe("trace-abc-123")
       expect(headers["x-request-id"]).toBeUndefined()
+    } finally {
+      await server.close()
+    }
+  })
+})
+
+describe("createFastifyServer — errors from Fastify's own request lifecycle", () => {
+  function postRaw(
+    port: number,
+    body: string
+  ): Promise<{ status: number; contentType: string; body: string }> {
+    return new Promise((resolve, reject) => {
+      const req = request(
+        {
+          host: "localhost",
+          port,
+          path: "/echo",
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+        },
+        (incoming) => {
+          let data = ""
+          incoming.on("data", (chunk: Buffer) => {
+            data += chunk.toString()
+          })
+          incoming.on("end", () =>
+            resolve({
+              status: incoming.statusCode ?? 0,
+              contentType: String(incoming.headers["content-type"]),
+              body: data,
+            })
+          )
+        }
+      )
+      req.on("error", reject)
+      req.end(body)
+    })
+  }
+
+  it("formats a malformed-JSON error (native Fastify content-type parsing) as the standard ErrorResponse envelope", async () => {
+    const orvaxisApp = new Orvaxis()
+    orvaxisApp.group({
+      prefix: "/",
+      routes: [
+        {
+          method: "POST",
+          path: "/echo",
+          handler: async (ctx) => ctx.res.json({ received: ctx.req.body }),
+        },
+      ],
+    })
+
+    const fastifyInstance = Fastify()
+    const server = createFastifyServer(orvaxisApp, fastifyInstance)
+    await server.listen(0)
+    const { port } = fastifyInstance.server.address() as AddressInfo
+
+    try {
+      const res = await postRaw(port, "{ not valid json")
+      expect(res.status).toBe(400)
+      expect(res.contentType).toContain("application/json")
+      const parsed = JSON.parse(res.body)
+      expect(parsed).toHaveProperty("error")
+      expect(parsed).toHaveProperty("requestId")
+      expect(parsed.code).toBe("FST_ERR_CTP_INVALID_JSON_BODY")
+    } finally {
+      await server.close()
+    }
+  })
+
+  it("formats a bodyLimit error as the standard ErrorResponse envelope", async () => {
+    const orvaxisApp = new Orvaxis()
+    orvaxisApp.group({
+      prefix: "/",
+      routes: [
+        {
+          method: "POST",
+          path: "/echo",
+          handler: async (ctx) => ctx.res.json({ received: ctx.req.body }),
+        },
+      ],
+    })
+
+    const fastifyInstance = Fastify({ bodyLimit: 10 })
+    const server = createFastifyServer(orvaxisApp, fastifyInstance)
+    await server.listen(0)
+    const { port } = fastifyInstance.server.address() as AddressInfo
+
+    try {
+      const res = await postRaw(port, JSON.stringify({ a: "definitely more than ten bytes" }))
+      expect(res.status).toBe(413)
+      expect(res.contentType).toContain("application/json")
+      const parsed = JSON.parse(res.body)
+      expect(parsed).toHaveProperty("error")
+      expect(parsed).toHaveProperty("requestId")
+      expect(parsed.code).toBe("FST_ERR_CTP_BODY_TOO_LARGE")
     } finally {
       await server.close()
     }

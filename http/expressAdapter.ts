@@ -95,6 +95,24 @@ export function createExpressServer(
     }
   })
 
+  // Errors thrown by middleware registered before this adapter (e.g. express.json() on
+  // malformed or oversized bodies) call next(err), which Express routes past the 3-arg
+  // middleware above straight to an error handler. Without one, Express's own default HTML
+  // error page is sent instead of the ErrorResponse envelope. This is the same envelope used
+  // for errors thrown inside the Orvaxis runtime, just applied before the runtime ever ran.
+  server.use((err: unknown, req: Request, res: Response, _next: NextFunction) => {
+    if (res.headersSent) {
+      logger.error("[orvaxis] unhandled error after headers sent:", err)
+      return
+    }
+    const requestId = (req.headers[requestIdHeaderLower] as string) || crypto.randomUUID()
+    const e = err as { status?: number; statusCode?: number }
+    res
+      .set(requestIdHeader, requestId)
+      .status(e.status ?? e.statusCode ?? 500)
+      .json(buildErrorBody(err, requestId))
+  })
+
   let httpServer: ReturnType<typeof server.listen> | null = null
 
   return {
