@@ -423,9 +423,7 @@ describe("createExpressServer — request ID header", () => {
 
     try {
       expect(await fetchHeader({})).toBeTruthy()
-      expect(await fetchHeader({ "x-request-id": "client-supplied-id" })).toBe(
-        "client-supplied-id"
-      )
+      expect(await fetchHeader({ "x-request-id": "client-supplied-id" })).toBe("client-supplied-id")
     } finally {
       await new Promise<void>((resolve) => httpSrv.close(() => resolve()))
     }

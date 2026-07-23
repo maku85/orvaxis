@@ -377,9 +377,7 @@ describe("createFastifyServer — request ID header", () => {
 
     try {
       expect(await fetchHeader({})).toBeTruthy()
-      expect(await fetchHeader({ "x-request-id": "client-supplied-id" })).toBe(
-        "client-supplied-id"
-      )
+      expect(await fetchHeader({ "x-request-id": "client-supplied-id" })).toBe("client-supplied-id")
     } finally {
       await server.close()
     }
