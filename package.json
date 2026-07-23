@@ -69,12 +69,20 @@
   },
   "keywords": [
     "policy",
+    "policy-engine",
     "middleware",
     "router",
     "runtime",
     "express",
     "fastify",
-    "nodejs"
+    "nodejs",
+    "typescript",
+    "http",
+    "observability",
+    "opentelemetry",
+    "sse",
+    "server-sent-events",
+    "graceful-shutdown"
   ],
   "scripts": {
     "dev": "tsx examples/express-server.ts",
