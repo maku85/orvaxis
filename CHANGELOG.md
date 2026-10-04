@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Permission matrix test helper** — `testPolicyMatrix()` runs named request scenarios once through `testRequest` and compares status, terminal policy, and handler execution. `formatPolicyMatrixReport()` produces a readable summary without request values; request traces now expose `handlerExecuted` for this assertion.
+
 - **Incremental Express policy guard** — `createExpressPolicyGuard(app)` runs matching Orvaxis pre-validation policies before an existing Express handler, passing authorized context through `res.locals.orvaxis`. Policy denials and errors use the standard `ErrorResponse`; configurations requiring post-validation schema checks fail explicitly rather than bypassing them.
 
 - **Copyable policy diagnostics** — `formatExecutionSummary(ctx)` formats the route template, outcome, policy decisions, and stages skipped after a denial while omitting request values and free-form denial/error messages. `examples/policy-diagnostics.ts` demonstrates allowed, denied, and failed requests with one command.

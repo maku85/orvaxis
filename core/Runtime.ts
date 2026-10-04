@@ -204,6 +204,7 @@ export class Runtime {
         await this.hooks.trigger("beforeHandler", ctx)
         this.debugger.log(ctx, "HOOK:beforeHandler")
         if (ctx.res.sent) return await this.finishRequest(ctx, tracer)
+        tracer.markHandlerExecuted()
         await match.route.handler(ctx)
         this.debugger.log(ctx, "HANDLER_EXECUTED")
         await this.hooks.trigger("afterHandler", ctx)

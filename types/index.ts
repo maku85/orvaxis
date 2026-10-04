@@ -226,6 +226,7 @@ export type Trace = {
   events: TraceEvent[]
   startTime: number
   endTime?: number
+  handlerExecuted?: boolean
   outcome?: "success" | "error"
   responseSentAtRuntimeEnd?: boolean
   responseCompletedAtRuntimeEnd?: boolean

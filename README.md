@@ -1177,6 +1177,34 @@ All testing utilities are available from the `orvaxis/testing` sub-path and are 
 import { testRequest, createMockResponse, type TestRequestInit, type TestResponse, type MockResponse } from "orvaxis/testing"
 ```
 
+#### Permission matrices
+
+Use `testPolicyMatrix` to run role, identity, tenant, and ownership cases against real policy execution. Each scenario executes once through `testRequest`; the helper compares the HTTP status, terminal policy name, and whether the handler ran using the finalized request trace. It returns mismatches instead of throwing, so the complete report remains available on failure:
+
+```ts
+import { expect, it } from "vitest"
+import { formatPolicyMatrixReport, testPolicyMatrix } from "orvaxis/testing"
+
+it("enforces document permissions", async () => {
+  const report = await testPolicyMatrix(app, [
+    {
+      name: "anonymous request",
+      request: { path: "/api/documents/42" },
+      expected: { status: 401, policy: "authenticate", handlerExecuted: false },
+    },
+    {
+      name: "document owner",
+      request: { path: "/api/documents/42", headers: { "x-user": "alice" } },
+      expected: { status: 200, policy: null, handlerExecuted: true },
+    },
+  ])
+
+  expect(report.passed, formatPolicyMatrixReport(report)).toBe(true)
+})
+```
+
+For a complete anonymous/owner/other-user/other-tenant/admin example, run `pnpm exec tsx examples/policy-matrix.ts`. The report contains scenario names, status, policy, and handler reachability; it omits request headers and values. `ctx.meta.trace.handlerExecuted` records whether the runtime invoked the route handler, including when that handler throws.
+
 ### Route introspection
 
 `app.routes()` returns the flat list of all registered routes as `RouteInfo[]`, useful for OpenAPI generation and admin tooling:
@@ -1320,7 +1348,7 @@ orvaxis/
     Context.ts               context factory
     contextStore.ts          AsyncLocalStorage store (getContext)
     HttpError.ts             HttpError class (status + message + cause)
-    testHarness.ts           testRequest helper for unit testing
+    testHarness.ts           testRequest and policy-matrix helpers for unit testing
     mockResponse.ts          createMockResponse (exported via orvaxis/testing)
     utils.ts                 shared utilities (mergeSafe, UNSAFE_KEYS)
 
@@ -1348,6 +1376,7 @@ orvaxis/
   examples/
     express-server.ts        minimal Express setup
     policy-server.ts         global and route-level policies
+    policy-matrix.ts         identity, ownership, tenant, and admin test scenarios
     hooks-and-plugins.ts     lifecycle hooks and plugin registration
     debug-trace.ts           debugger, traceEvent, and buildExecutionSummary
     typed-context.ts         typed OrvaxisContext, getContext, traceEvent

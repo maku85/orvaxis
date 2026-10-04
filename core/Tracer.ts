@@ -10,7 +10,12 @@ export class Tracer {
       requestId,
       events: [],
       startTime: Date.now(),
+      handlerExecuted: false,
     }
+  }
+
+  markHandlerExecuted() {
+    this.trace.handlerExecuted = true
   }
 
   event(type: string, meta?: Record<string, unknown>) {
