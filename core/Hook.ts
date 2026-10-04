@@ -30,7 +30,11 @@ export class HookSystem {
         await fn(ctx, error)
       } catch (hookErr) {
         if (name === "onError") {
-          this.logger.error("[orvaxis] onError hook threw:", hookErr)
+          try {
+            this.logger.error("[orvaxis] onError hook threw:", hookErr)
+          } catch {
+            // A failing logger must not replace the original request error.
+          }
         } else {
           errors.push(hookErr)
         }

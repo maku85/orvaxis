@@ -7,6 +7,9 @@ function wrapExpressResponse(res: Response, onStreamStart: () => void): OrvaxisR
   const wrapped: OrvaxisResponse = {
     statusCode: 200,
     sent: false,
+    get completed() {
+      return res.writableFinished
+    },
     status(code) {
       wrapped.statusCode = code
       res.status(code)

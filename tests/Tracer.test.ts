@@ -68,6 +68,41 @@ describe("Tracer", () => {
     expect(trace.endTime).toBeLessThanOrEqual(after + 1)
   })
 
+  it("records runtime outcome and response state when finalized", () => {
+    const tracer = new Tracer("id")
+    const trace = tracer.end({
+      outcome: "error",
+      responseSentAtRuntimeEnd: false,
+      responseCompletedAtRuntimeEnd: false,
+    })
+
+    expect(trace).toMatchObject({
+      outcome: "error",
+      responseSentAtRuntimeEnd: false,
+      responseCompletedAtRuntimeEnd: false,
+    })
+  })
+
+  it("keeps the first endTime when cleanup later reports an error", () => {
+    const tracer = new Tracer("id")
+    const first = tracer.end({
+      outcome: "success",
+      responseSentAtRuntimeEnd: true,
+      responseCompletedAtRuntimeEnd: true,
+    })
+    const endTime = first.endTime
+    const trace = tracer.end({
+      outcome: "error",
+      responseSentAtRuntimeEnd: false,
+      responseCompletedAtRuntimeEnd: false,
+    })
+
+    expect(trace.endTime).toBe(endTime)
+    expect(trace.outcome).toBe("error")
+    expect(trace.responseSentAtRuntimeEnd).toBe(true)
+    expect(trace.responseCompletedAtRuntimeEnd).toBe(true)
+  })
+
   it("endTime is >= startTime", () => {
     const tracer = new Tracer("id")
     const trace = tracer.end()

@@ -36,6 +36,8 @@ export interface OrvaxisRequest {
 export interface OrvaxisResponse {
   statusCode: number
   sent: boolean
+  /** Whether the underlying response stream has finished, when the adapter can report it. */
+  completed?: boolean
   status(code: number): OrvaxisResponse
   json(body: unknown): void
   send(body: unknown): void
@@ -159,6 +161,9 @@ export type Trace = {
   events: TraceEvent[]
   startTime: number
   endTime?: number
+  outcome?: "success" | "error"
+  responseSentAtRuntimeEnd?: boolean
+  responseCompletedAtRuntimeEnd?: boolean
 }
 
 export type TraceEvent = {

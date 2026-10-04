@@ -21,8 +21,17 @@ export class Tracer {
     })
   }
 
-  end() {
-    this.trace.endTime = this.trace.startTime + (performance.now() - this._startPerf)
+  end(completion?: {
+    outcome: "success" | "error"
+    responseSentAtRuntimeEnd: boolean
+    responseCompletedAtRuntimeEnd?: boolean
+  }) {
+    this.trace.endTime ??= this.trace.startTime + (performance.now() - this._startPerf)
+    if (completion) {
+      this.trace.outcome = completion.outcome
+      this.trace.responseSentAtRuntimeEnd ??= completion.responseSentAtRuntimeEnd
+      this.trace.responseCompletedAtRuntimeEnd ??= completion.responseCompletedAtRuntimeEnd
+    }
     return this.trace
   }
 }

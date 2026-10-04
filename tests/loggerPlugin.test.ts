@@ -77,7 +77,67 @@ describe("loggerPlugin", () => {
 
       expect(logger.calls).toContainEqual({
         method: "error",
-        args: [{ type: "error", requestId: "req-xyz", message: "something failed", error: err }],
+        args: [
+          expect.objectContaining({
+            type: "error",
+            requestId: "req-xyz",
+            message: "something failed",
+            error: err,
+          }),
+        ],
+      })
+    })
+
+    it("includes the finalized runtime and response state in request error logs", async () => {
+      const logger = makeLogger()
+      const runtime = new Runtime()
+      loggerPlugin({ logger }).apply(runtime)
+      runtime.router.group({
+        prefix: "/api",
+        routes: [
+          {
+            method: "GET",
+            path: "/fail",
+            handler: async () => {
+              throw new Error("failed")
+            },
+          },
+        ],
+      })
+
+      await runtime
+        .execute(
+          { path: "/api/fail", method: "GET", headers: {}, id: "req-error" },
+          {
+            statusCode: 200,
+            sent: false,
+            json() {},
+            send() {},
+            status(code) {
+              this.statusCode = code
+              return this
+            },
+            setHeader() {
+              return this
+            },
+            write() {},
+            end() {},
+            pipe() {},
+          }
+        )
+        .catch(() => {})
+
+      expect(logger.calls).toContainEqual({
+        method: "error",
+        args: [
+          expect.objectContaining({
+            requestId: "req-error",
+            runtimeOutcome: "error",
+            responseSent: false,
+            responseCompleted: undefined,
+            durationMs: expect.any(Number),
+          }),
+        ],
       })
     })
 

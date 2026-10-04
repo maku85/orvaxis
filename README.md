@@ -292,6 +292,8 @@ Lifecycle events that allow observation of execution:
 
 `onNotFound` and `onMethodNotAllowed` can short-circuit the error path: if a listener sends a response (`ctx.res.sent === true`), the runtime skips the `HttpError` and returns normally without triggering `onError`. If no listener sends a response, the error is thrown as usual.
 
+`afterPipeline` runs after a successful runtime lifecycle, including a handled 404/405 and middleware short-circuit. It is not called for a failed request; use `onError` for failure logging and cleanup. The trace is finalized before either completion hook runs.
+
 ```ts
 // custom 404 response
 app.on("onNotFound", (ctx) => {
@@ -574,7 +576,12 @@ Each request generates a structured execution trace available as `ctx.meta.trace
 
 - `requestId` — unique identifier per request
 - `events` — timestamped lifecycle events (`TraceEvent[]`); timestamps are wall-clock-aligned with sub-millisecond decimal precision, guaranteed monotonically increasing within a request
-- `startTime` / `endTime` — wall-clock boundaries in integer milliseconds (`Date.now()`)
+- `startTime` / `endTime` — wall-clock boundaries in integer milliseconds (`Date.now()`); `endTime` marks completion of request processing before the completion hook runs
+- `outcome` — `"success"` or `"error"`, including failures in policies, middleware, handlers, and hooks
+- `responseSentAtRuntimeEnd` — whether the response API had been used when runtime execution completed
+- `responseCompletedAtRuntimeEnd` — whether the adapter reported the underlying HTTP response stream finished at that moment; may be `undefined` for custom adapters
+
+The runtime trace and the HTTP response have separate lifetimes. A handler can return after starting an SSE or other streamed response, so `outcome: "success"` and `responseSentAtRuntimeEnd: true` can coexist with `responseCompletedAtRuntimeEnd: false`. These response fields are a snapshot at the end of request processing; they do not update when the network stream later completes. Errors are finalized before `onError` runs, so error hooks, the logger plugin, and OpenTelemetry can inspect the trace. `afterPipeline` runs after successful request processing, including a short-circuit; failures use `onError` and do not also invoke `afterPipeline`.
 
 Use `traceMiddleware()` to automatically record timing around middleware execution:
 

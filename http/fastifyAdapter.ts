@@ -22,6 +22,9 @@ function wrapFastifyResponse(reply: FastifyReply, onStreamStart: () => void): Or
   const wrapped: OrvaxisResponse = {
     statusCode: 200,
     sent: false,
+    get completed() {
+      return reply.raw.writableFinished
+    },
     status(code) {
       statusCode = code
       wrapped.statusCode = code

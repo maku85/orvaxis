@@ -54,7 +54,18 @@ export function loggerPlugin(options: LoggerPluginOptions = {}) {
 
       runtime.hooks.on("onError", (ctx: OrvaxisContext, err?: Error) => {
         if (format === "json") {
-          logger.error({ type: "error", requestId: ctx.req.id, message: err?.message, error: err })
+          const trace = ctx.meta.trace
+          const startTime = startTimes.get(ctx)
+          logger.error({
+            type: "error",
+            requestId: ctx.req.id,
+            message: err?.message,
+            error: err,
+            durationMs: startTime !== undefined ? Date.now() - startTime : undefined,
+            runtimeOutcome: trace?.outcome,
+            responseSent: trace?.responseSentAtRuntimeEnd,
+            responseCompleted: trace?.responseCompletedAtRuntimeEnd,
+          })
         } else {
           logger.error("[ERR]", ctx.req.id, err)
         }

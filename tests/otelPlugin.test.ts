@@ -312,6 +312,11 @@ describe("otelPlugin — error edge cases", () => {
 
     expect(startSpan).toHaveBeenCalledOnce()
     expect(created[0].recordException).toHaveBeenCalledWith(expect.any(HttpError))
+    expect(created[0].addEvent).toHaveBeenCalledWith(
+      "RUNTIME_ERROR",
+      { name: "HttpError" },
+      expect.any(Number)
+    )
     expect(created[0].setAttribute).toHaveBeenCalledWith("http.response.status_code", 405)
     expect(created[0].end).toHaveBeenCalledOnce()
   })

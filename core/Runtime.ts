@@ -27,6 +27,9 @@ function wrapForHead(res: OrvaxisResponse): OrvaxisResponse {
   const wrapper: OrvaxisResponse = {
     statusCode: res.statusCode,
     sent: false,
+    get completed() {
+      return res.completed
+    },
     status(code) {
       wrapper.statusCode = code
       res.status(code)
@@ -109,7 +112,7 @@ export class Runtime {
 
         await this.hooks.trigger("onRequest", ctx)
         this.debugger.log(ctx, "HOOK:onRequest")
-        if (ctx.res.sent) return this.finishRequest(ctx, tracer)
+        if (ctx.res.sent) return await this.finishRequest(ctx, tracer)
 
         const match = this.router.match(req)
         if (!match) {
@@ -120,28 +123,19 @@ export class Runtime {
             ctx.meta.allowedMethods = allowed
             if (req.method.toUpperCase() === "OPTIONS") {
               if (!ctx.res.sent) ctx.res.status(204).end()
-              ctx.meta.trace = tracer.end()
-              await this.hooks.trigger("afterPipeline", ctx)
-              this.debugger.log(ctx, "REQUEST_END")
-              return ctx
+              return await this.finishRequest(ctx, tracer)
             }
             await this.hooks.trigger("onMethodNotAllowed", ctx)
             this.debugger.log(ctx, "HOOK:onMethodNotAllowed")
             if (ctx.res.sent) {
-              ctx.meta.trace = tracer.end()
-              await this.hooks.trigger("afterPipeline", ctx)
-              this.debugger.log(ctx, "REQUEST_END")
-              return ctx
+              return await this.finishRequest(ctx, tracer)
             }
             throw new HttpError(405, "Method Not Allowed")
           }
           await this.hooks.trigger("onNotFound", ctx)
           this.debugger.log(ctx, "HOOK:onNotFound")
           if (ctx.res.sent) {
-            ctx.meta.trace = tracer.end()
-            await this.hooks.trigger("afterPipeline", ctx)
-            this.debugger.log(ctx, "REQUEST_END")
-            return ctx
+            return await this.finishRequest(ctx, tracer)
           }
           throw new HttpError(
             404,
@@ -162,39 +156,61 @@ export class Runtime {
         this.debugger.log(ctx, "POLICY_END")
 
         await this.hooks.trigger("beforePipeline", ctx)
-        if (ctx.res.sent) return this.finishRequest(ctx, tracer)
+        if (ctx.res.sent) return await this.finishRequest(ctx, tracer)
         const pipelineContinues = await this.pipeline.execute(ctx)
         this.debugger.log(ctx, "PIPELINE_DONE")
-        if (!pipelineContinues) return this.finishRequest(ctx, tracer)
+        if (!pipelineContinues) return await this.finishRequest(ctx, tracer)
 
         const groupContinues = await this.runMiddlewareChain(match.group.middleware ?? [], ctx)
         this.debugger.log(ctx, "GROUP_MIDDLEWARE_DONE")
-        if (!groupContinues) return this.finishRequest(ctx, tracer)
+        if (!groupContinues) return await this.finishRequest(ctx, tracer)
 
         const routeContinues = await this.runMiddlewareChain(match.route.middleware ?? [], ctx)
         this.debugger.log(ctx, "ROUTE_MIDDLEWARE_DONE")
-        if (!routeContinues) return this.finishRequest(ctx, tracer)
+        if (!routeContinues) return await this.finishRequest(ctx, tracer)
 
         await this.hooks.trigger("beforeHandler", ctx)
         this.debugger.log(ctx, "HOOK:beforeHandler")
-        if (ctx.res.sent) return this.finishRequest(ctx, tracer)
+        if (ctx.res.sent) return await this.finishRequest(ctx, tracer)
         await match.route.handler(ctx)
         this.debugger.log(ctx, "HANDLER_EXECUTED")
         await this.hooks.trigger("afterHandler", ctx)
         this.debugger.log(ctx, "HOOK:afterHandler")
 
-        return this.finishRequest(ctx, tracer)
+        return await this.finishRequest(ctx, tracer)
       } catch (err) {
         ctx.error = err as Error
-        this.debugger.log(ctx, "ERROR", { error: String(err) })
-        await this.hooks.trigger("onError", ctx, err as Error)
+        if (!ctx.meta.trace?.endTime) {
+          tracer.event("RUNTIME_ERROR", {
+            name: err instanceof Error ? err.name : "NonErrorThrown",
+          })
+        }
+        ctx.meta.trace = tracer.end({
+          outcome: "error",
+          responseSentAtRuntimeEnd: ctx.res.sent,
+          responseCompletedAtRuntimeEnd: ctx.res.completed,
+        })
+        try {
+          this.debugger.log(ctx, "ERROR", { error: String(err) })
+        } catch {
+          // Diagnostics must never replace the original request error.
+        }
+        try {
+          await this.hooks.trigger("onError", ctx, err as Error)
+        } catch {
+          // Error hooks are cleanup/observation; preserve the original failure.
+        }
         throw err
       }
     })
   }
 
   private async finishRequest(ctx: OrvaxisContext, tracer: Tracer): Promise<OrvaxisContext> {
-    ctx.meta.trace = tracer.end()
+    ctx.meta.trace = tracer.end({
+      outcome: "success",
+      responseSentAtRuntimeEnd: ctx.res.sent,
+      responseCompletedAtRuntimeEnd: ctx.res.completed,
+    })
     await this.hooks.trigger("afterPipeline", ctx)
     this.debugger.log(ctx, "REQUEST_END")
     return ctx

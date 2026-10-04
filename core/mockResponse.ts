@@ -13,6 +13,7 @@ export function createMockResponse(): MockResponse {
   const mock: MockResponse = {
     statusCode: 200,
     sent: false,
+    completed: false,
     body: undefined,
     sentHeaders: {},
     chunks: [],
@@ -24,10 +25,12 @@ export function createMockResponse(): MockResponse {
     },
     json(body) {
       mock.sent = true
+      mock.completed = true
       mock.body = body
     },
     send(body) {
       mock.sent = true
+      mock.completed = true
       mock.body = body
     },
     setHeader(name, value) {
@@ -40,6 +43,7 @@ export function createMockResponse(): MockResponse {
     },
     end(chunk?) {
       mock.sent = true
+      mock.completed = true
       mock.ended = true
       if (chunk !== undefined) mock.chunks.push(chunk)
     },

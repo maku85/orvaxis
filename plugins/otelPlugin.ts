@@ -93,6 +93,14 @@ export function otelPlugin({ tracer }: OtelPluginOptions) {
         const { root } = state
         root.setAttribute("http.response.status_code", ctx.res.statusCode)
         const orvaxisTrace = ctx.meta.trace as Trace | undefined
+        root.setAttribute("orvaxis.runtime.outcome", orvaxisTrace?.outcome ?? "success")
+        root.setAttribute("orvaxis.response.sent", orvaxisTrace?.responseSentAtRuntimeEnd ?? false)
+        if (orvaxisTrace?.responseCompletedAtRuntimeEnd !== undefined) {
+          root.setAttribute(
+            "orvaxis.response.completed_at_runtime_end",
+            orvaxisTrace.responseCompletedAtRuntimeEnd
+          )
+        }
         for (const ev of orvaxisTrace?.events ?? []) {
           root.addEvent(ev.type, ev.meta as Attributes | undefined, ev.timestamp)
         }
@@ -111,6 +119,18 @@ export function otelPlugin({ tracer }: OtelPluginOptions) {
         root.setStatus({ code: SpanStatusCode.ERROR, message: err?.message })
         const statusCode = err instanceof HttpError ? err.status : ctx.res.statusCode
         root.setAttribute("http.response.status_code", statusCode)
+        const orvaxisTrace = ctx.meta.trace as Trace | undefined
+        root.setAttribute("orvaxis.runtime.outcome", orvaxisTrace?.outcome ?? "error")
+        root.setAttribute("orvaxis.response.sent", orvaxisTrace?.responseSentAtRuntimeEnd ?? false)
+        if (orvaxisTrace?.responseCompletedAtRuntimeEnd !== undefined) {
+          root.setAttribute(
+            "orvaxis.response.completed_at_runtime_end",
+            orvaxisTrace.responseCompletedAtRuntimeEnd
+          )
+        }
+        for (const ev of orvaxisTrace?.events ?? []) {
+          root.addEvent(ev.type, ev.meta as Attributes | undefined, ev.timestamp)
+        }
         root.end()
         states.delete(ctx)
       })

@@ -525,6 +525,136 @@ describe("Runtime", () => {
       expect(err.message).toContain("Not Found")
     })
 
+    it("finalizes a trace before onError runs", async () => {
+      const runtime = new Runtime()
+      let captured: OrvaxisContext | undefined
+      runtime.hooks.on("onError", (ctx) => {
+        captured = ctx
+      })
+
+      await runtime.execute(makeReq("/missing"), makeRes()).catch(() => {})
+
+      expect(captured?.meta.trace).toMatchObject({
+        outcome: "error",
+        responseSentAtRuntimeEnd: false,
+        responseCompletedAtRuntimeEnd: false,
+      })
+      expect(captured?.meta.trace?.endTime).toBeDefined()
+      expect(captured?.meta.trace?.events.at(-1)?.type).toBe("RUNTIME_ERROR")
+    })
+
+    it.each([
+      "policy",
+      "middleware",
+      "beforePipeline",
+      "handler",
+    ] as const)("finalizes failures raised in the %s phase", async (phase) => {
+      const runtime = new Runtime()
+      const failure = new Error(`${phase} failed`)
+      const afterPipeline = vi.fn()
+      let captured: OrvaxisContext | undefined
+      runtime.router.group(
+        makeGroup("/api", {
+          handler: async () => {
+            if (phase === "handler") throw failure
+          },
+        })
+      )
+      if (phase === "policy") {
+        runtime.policies.register({
+          name: "failing",
+          evaluate: () => {
+            throw failure
+          },
+        })
+      }
+      if (phase === "middleware")
+        runtime.pipeline.use(() => {
+          throw failure
+        })
+      if (phase === "beforePipeline")
+        runtime.hooks.on("beforePipeline", () => {
+          throw failure
+        })
+      runtime.hooks.on("onError", (ctx) => {
+        captured = ctx
+      })
+      runtime.hooks.on("afterPipeline", afterPipeline)
+
+      await expect(runtime.execute(makeReq("/api/resource"), makeRes())).rejects.toBe(failure)
+
+      expect(captured?.meta.trace?.outcome).toBe("error")
+      expect(captured?.meta.trace?.endTime).toBeDefined()
+      expect(captured?.meta.trace?.events.at(-1)?.type).toBe("RUNTIME_ERROR")
+      expect(afterPipeline).not.toHaveBeenCalled()
+    })
+
+    it("preserves the request error when an onError hook and its logger throw", async () => {
+      const original = new Error("original request failure")
+      const runtime = new Runtime({
+        logger: {
+          info() {},
+          error() {
+            throw new Error("logger failed")
+          },
+        },
+      })
+      runtime.router.group(
+        makeGroup("/api", {
+          handler: async () => {
+            throw original
+          },
+        })
+      )
+      runtime.hooks.on("onError", () => {
+        throw new Error("cleanup failed")
+      })
+
+      await expect(runtime.execute(makeReq("/api/resource"), makeRes())).rejects.toBe(original)
+    })
+
+    it("marks a request failed if an afterPipeline hook throws", async () => {
+      const runtime = new Runtime()
+      const failure = new Error("completion hook failed")
+      let captured: OrvaxisContext | undefined
+      runtime.router.group(makeGroup("/api"))
+      runtime.hooks.on("afterPipeline", () => {
+        throw failure
+      })
+      runtime.hooks.on("onError", (ctx) => {
+        captured = ctx
+      })
+
+      await expect(runtime.execute(makeReq("/api/resource"), makeRes())).rejects.toBe(failure)
+
+      expect(captured?.meta.trace?.outcome).toBe("error")
+      expect(captured?.meta.trace?.endTime).toBeDefined()
+    })
+
+    it("records runtime completion separately from an unfinished stream response", async () => {
+      const runtime = new Runtime()
+      let captured: OrvaxisContext | undefined
+      runtime.router.group(
+        makeGroup("/api", {
+          handler: async (ctx) => {
+            ctx.res.write("event: open\\n\\n")
+          },
+        })
+      )
+      runtime.hooks.on("afterPipeline", (ctx) => {
+        captured = ctx
+      })
+
+      await runtime.execute(makeReq("/api/resource"), makeRes())
+
+      expect(captured?.meta.trace).toMatchObject({
+        outcome: "success",
+        responseSentAtRuntimeEnd: true,
+        responseCompletedAtRuntimeEnd: false,
+      })
+      expect(captured?.meta.trace?.endTime).toBeDefined()
+    })
+
     it("sets ctx.error when an error occurs", async () => {
       const runtime = new Runtime()
       let capturedCtx: OrvaxisContext | undefined
