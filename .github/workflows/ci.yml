@@ -8,17 +8,19 @@ on:
 
 jobs:
   ci:
-    name: Lint, type-check & test
+    name: Check, type-check, test & build
     runs-on: ubuntu-latest
 
     strategy:
       matrix:
-        node-version: [22]
+        node-version: ["22.13.0"]
 
     steps:
       - uses: actions/checkout@v4
 
       - uses: pnpm/action-setup@v4
+        with:
+          version: 11.1.2
 
       - name: Use Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v4
@@ -29,11 +31,17 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Lint
-        run: pnpm lint
+      - name: Lint and format check
+        run: pnpm check
 
       - name: Type-check
         run: pnpm tsc --noEmit
 
+      - name: Type-check API examples
+        run: pnpm typecheck:tests
+
       - name: Test
         run: pnpm test:coverage
+
+      - name: Build package
+        run: pnpm build

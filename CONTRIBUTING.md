@@ -4,8 +4,8 @@ Thank you for your interest in contributing. This guide covers setup, workflow, 
 
 ## Prerequisites
 
-- Node.js >= 20
-- [pnpm](https://pnpm.io) >= 9
+- Node.js >= 22.13.0 (matches `package.json` and CI)
+- [pnpm](https://pnpm.io) 11.1.2 (matches the `packageManager` field and CI)
 
 ## Setup
 
@@ -19,13 +19,12 @@ pnpm install
 
 | Command | Description |
 |---|---|
-| `pnpm build` | Compile TypeScript to `dist/` |
+| `pnpm build` | Compile CommonJS and ESM distributions (same as CI) |
 | `pnpm test` | Run the test suite |
 | `pnpm test:coverage` | Run tests with coverage report |
-| `pnpm lint` | Lint with Biome |
-| `pnpm format` | Format with Biome |
-| `pnpm check` | Lint + format check (what CI runs) |
-| `pnpm tsc --noEmit` | Type-check without emitting files |
+| `pnpm check` | Biome lint and format checks (same command as CI) |
+| `pnpm tsc --noEmit` | Type-check source without emitting files (same as CI) |
+| `pnpm typecheck:tests` | Type-check public API usage examples (same as CI) |
 
 ## Project structure
 
@@ -46,6 +45,8 @@ tests/       Unit tests (mirrors source structure)
 - **No comments** unless the *why* is non-obvious from the code itself.
 - **No new dependencies** without discussion — keep the core footprint small.
 
+Documentation examples are expected to match exported APIs and current runtime behavior. Run the quickstart command after changing its source or instructions.
+
 ## Testing
 
 All changes must include tests. Tests live in `tests/` and use [Vitest](https://vitest.dev).
@@ -53,6 +54,7 @@ All changes must include tests. Tests live in `tests/` and use [Vitest](https://
 ```bash
 pnpm test             # run all tests
 pnpm test:coverage    # check coverage (target: >90%)
+pnpm exec tsx examples/quickstart.ts  # run the documented Express quickstart
 ```
 
 Coverage is tracked via v8. Regressions in coverage require justification.

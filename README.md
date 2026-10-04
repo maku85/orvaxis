@@ -12,858 +12,92 @@
 </p>
 
 <p align="center">
-  Lightweight, policy-driven execution runtime for Node.js applications.
+  See which rule stopped an API request, then test the permissions that protect every route.
 </p>
 
 ---
 
+## Quickstart
+
+Protect a route with named authorization policies. When a request is denied, Orvaxis records the terminal policy and confirms that the handler did not run.
+
 ## Installation
 
 ```bash
-npm install orvaxis
+npm install orvaxis express
 ```
 
-Install the HTTP adapter peer dependency you intend to use:
+Register authentication globally and ownership on the route that needs it:
+
+```ts
+import { Orvaxis, type Policy } from "orvaxis"
+import { createExpressServer } from "orvaxis/express"
+
+const authenticate: Policy = {
+  name: "authenticate-user",
+  evaluate(ctx) {
+    const userId = ctx.req.headers["x-user-id"]
+    return typeof userId === "string"
+      ? { allow: true, modify: { userId } }
+      : { allow: false, status: 401, reason: "X-User-ID header required" }
+  },
+}
+
+const ownerOnly: Policy = {
+  name: "report-owner",
+  evaluate(ctx) {
+    return ctx.meta.userId === ctx.params.ownerId
+      ? { allow: true }
+      : { allow: false, status: 403, reason: "Only the report owner can view it" }
+  },
+}
+
+const app = new Orvaxis()
+app.policy(authenticate)
+app.group({
+  prefix: "/api",
+  routes: [{
+    method: "GET",
+    path: "/reports/:ownerId",
+    policies: [ownerOnly],
+    handler: (ctx) => ctx.res.json({ ownerId: ctx.params.ownerId, report: "quarterly" }),
+  }],
+})
+
+createExpressServer(app).listen(3000)
+```
+
+Run the same [working example](examples/quickstart.ts) from a checkout with `pnpm exec tsx examples/quickstart.ts`, then try the allowed and denied requests:
 
 ```bash
-npm install express   # Express adapter
-npm install fastify   # Fastify adapter
+curl -i -H 'x-user-id: bob' http://localhost:3000/api/reports/alice  # 403: policy denied
+curl -i -H 'x-user-id: alice' http://localhost:3000/api/reports/alice # 200: handler ran
 ```
 
-The package ships both **CommonJS** (`require`) and **ES Module** (`import`) builds. Bundlers and native ESM consumers pick up the ESM build automatically via the `"exports"` map; no configuration needed.
+The `x-user-id` header is a demo identity input, not authentication. In an application, use the identity established by trusted authentication middleware or token verification.
 
-It is not a framework in the traditional sense.
-It is an **execution orchestration layer** designed to control, observe, and structure backend request flows in a predictable and composable way.
+Orvaxis is an optional execution layer for APIs, not a replacement for Express or Fastify. Install only the adapter peer dependency you use; both are optional. The package ships CommonJS and ESM builds.
 
 ---
 
 ## Why Orvaxis
 
-Minimal frameworks like Express are flexible but unstructured at scale. Opinionated frameworks like NestJS are structured but heavy. Orvaxis is a third option: a **runtime execution layer** that brings explicit ordering, declarative control, and built-in observability without replacing your framework.
+Orvaxis makes authorization rules explicit and inspectable without taking routing or handler ownership away from your framework. The benefit is a named, testable explanation when a request is denied.
 
 [See a concrete side-by-side comparison →](docs/why-orvaxis.md)
 
 ---
 
-## Core Principles
-
-### 1. Execution is explicit
-Every request passes through a clearly defined lifecycle:
-- policies (decision layer)
-- hooks (event layer)
-- middleware (flow layer)
-- route handler (business logic)
-
----
-
-### 2. Control is declarative
-Policies define *what is allowed*, independently from implementation logic.
-
----
-
-### 3. Structure is hierarchical
-Routes are organized in groups with inheritance:
-- shared middleware
-- shared policies
-- scoped execution context
-
----
-
-### 4. Observability is built-in
-Every request produces a trace:
-- execution timeline
-- performance metrics
-- lifecycle events
-- debug summary
-
----
-
-### 5. Extensibility via plugins
-System capabilities are extended through plugins that attach to lifecycle hooks.
-
----
-
 ## Architecture Overview
-```
-Request
-↓
-onRequest hook
-↓
-Route lookup
-├─ not found  → onNotFound hook  → [404 or custom response] → afterPipeline
-└─ wrong method → onMethodNotAllowed hook → [405 or custom response] → afterPipeline
-↓
-Policy Engine (global → group → route)
-↓
-beforePipeline hook
-↓
-Global Pipeline (app.use() middleware)
-↓
-Group Middleware (inherited)
-↓
-Route Middleware (scoped)
-↓
-onValidation hook and post-validation policies
-beforeHandler hook
-↓
-Route Handler
-↓
-afterHandler hook
-↓
-Trace finalization
-↓
-afterPipeline hook
-↓
-Debug output (if enabled)
-```
+The runtime checks pre-validation policies before middleware, validates declared input before post-validation policies, and calls the handler only after those stages allow the request. The [lifecycle reference](docs/reference/lifecycle.md) documents the exact order, short-circuit behavior, and error hooks.
 
 ---
 
 ## Core Concepts
 
-### Runtime
-The central execution engine responsible for orchestrating the full request lifecycle.
+Orvaxis groups authorization policies, middleware, hooks, and route handlers into a predictable request flow. Route declarations can inherit policies and middleware from groups; validators and plugins add opt-in behavior.
 
-### Router
-Handles route resolution and grouping:
-- method + path matching via a per-method radix trie — `O(d)` in path depth, independent of total route count
-- static segments always take priority over param segments, which take priority over wildcard catch-alls at the same level; backtracking is automatic
-- group-based inheritance
-- route metadata resolution
-
-Route paths support three segment types:
-
-| Syntax | Example | Matches | Captured as |
-|--------|---------|---------|-------------|
-| Static | `/users` | exact string | — |
-| Param | `/:id` | one segment | `params.id` |
-| Wildcard | `/*` or `/*name` | all remaining segments | `params["*"]` or `params.name` |
-
-The wildcard must be the last segment in the pattern. More specific routes always win: `/users/me` beats `/:id`, which beats `/*`.
-
-`HEAD` requests automatically fall back to the matching `GET` route when no dedicated `HEAD` route is registered. The `GET` handler executes in full — policies, middleware, and hooks all run — but the response body is suppressed and the connection is closed cleanly. `Content-Length` and `Content-Type` are computed from the body the `GET` handler would have sent and set on the response before closing, so clients using `HEAD` for prefetch or cache validation see accurate metadata. A dedicated `HEAD` route always takes priority over the fallback.
-
-```ts
-// GET /api/users → { users: [] }
-// HEAD /api/users → 200, correct headers, no body  (automatic, no extra code needed)
-app.group({
-  prefix: "/api",
-  routes: [{ method: "GET", path: "/users", handler: async (ctx) => ctx.res.json({ users: [] }) }],
-})
-```
-
-When a path is registered but the incoming method is not, the router responds with `405 Method Not Allowed` and sets an `Allow` response header listing every method registered on that path. `HEAD` is included automatically whenever `GET` is registered.
-
-```ts
-app.group({
-  prefix: "/api",
-  routes: [{ method: "GET", path: "/users", handler: async (ctx) => ctx.res.json([]) }],
-})
-
-// POST /api/users → 405 Method Not Allowed
-//                    Allow: GET, HEAD
-```
-
-Registering two routes with the same method and pattern throws a `TypeError` immediately at registration time:
-
-```ts
-app.group({ prefix: "/api", routes: [{ method: "GET", path: "/users", handler }] })
-app.group({ prefix: "/api", routes: [{ method: "GET", path: "/users", handler }] })
-// TypeError: Duplicate route: GET /api/users
-
-// param name conflict at the same trie position
-app.group({ prefix: "/api", routes: [{ method: "GET", path: "/:id",     handler }] })
-app.group({ prefix: "/api", routes: [{ method: "GET", path: "/:userId", handler }] })
-// TypeError: Route conflict: GET /api/:userId — param ":userId" conflicts with ":id" already registered at this position
-```
-
-Routes that share a path but differ in HTTP method, or that share a pattern across different group prefixes, are allowed.
-
-`Route.method` is typed as `HttpMethod` (`"GET" | "POST" | "PUT" | "DELETE" | "PATCH" | "HEAD" | "OPTIONS"`). Methods are normalised to uppercase at both registration and match time, so a route registered as `"get"` and a request arriving as `"GET"` always find each other. Unknown method strings are rejected at registration with a `TypeError`.
-
-```ts
-app.group({
-  prefix: "/files",
-  routes: [
-    // named wildcard — captures the full remaining path
-    {
-      method: "GET",
-      path: "/*filepath",
-      handler: async (ctx) => {
-        const { filepath } = ctx.params // e.g. "docs/readme.md"
-        ctx.res.json({ filepath })
-      },
-    },
-  ],
-})
-```
-
-### Groups
-Logical grouping of routes:
-- shared middleware
-- shared policies
-- prefix-based organization
-
-Example:
-```ts
-app.group({
-  prefix: "/api",
-  middleware: [traceMiddleware()],
-  policies: [rateLimitPolicy],
-  routes: [...]
-})
-```
-
----
-
-### Middleware
-
-Functions that participate in execution flow and can:
-
-- mutate context
-- control execution flow
-- enrich request state
-
-Middleware uses an onion-style `next()` chain. `await next()` runs the remaining middleware in the current layer and then returns to the caller. Call `next()` at most once. If middleware returns without calling it, Orvaxis stops the rest of the request lifecycle, including later middleware layers and the route handler. A response sent with `ctx.res.json()`, `send()`, `end()`, `write()`, or `pipe()` also stops later application phases, even if middleware then calls `next()`.
-
-When the lifecycle stops, `afterPipeline` still runs once for final logging and tracing. `afterHandler` runs only if the route handler ran. Hooks that send a response at `onRequest`, `beforePipeline`, `onValidation`, or `beforeHandler` likewise stop later application phases. If middleware stops without sending a response, it must arrange for a response elsewhere or throw an error; otherwise the HTTP connection may remain open.
-
----
-
-### Policies
-
-Pre-execution rules that determine whether a request is allowed.
-
-- can block execution
-- can modify context metadata
-- can be scoped (route/group/global)
-- can be prioritized
-
-Example:
-```ts
-type AuthState = { userId: string; role: "user" | "admin" }
-
-export const requireApiKey: Policy<AuthState> = {
-  name: "require-api-key",
-  priority: 100,
-  async evaluate(ctx) {
-    const key = ctx.req.headers["x-api-key"] as string
-    const identity = IDENTITIES[key]
-    if (!identity) return { allow: false, reason: "Missing X-API-Key header", status: 401 }
-    ctx.state = identity   // typed write — no cast needed
-    return { allow: true }
-  }
-}
-
-// handler — ctx.state is typed as AuthState
-const handler = async (ctx: OrvaxisContext<AuthState>) => {
-  ctx.state.role   // "user" | "admin"
-  ctx.state.userId // string
-}
-```
-
-`scope.method` is typed as `HttpMethod` (always uppercase). The request method is normalised to uppercase before the comparison, so a request arriving as `"get"` still matches a scope with `method: "GET"`.
-
-`scope.path` supports three forms:
-
-| Form | Example | Matches |
-|---|---|---|
-| `string` | `"/api"` | `/api` and any sub-path (`/api/v1/users`) but not `/apiv2` |
-| `RegExp` | `/^\/admin/` | any path matching the pattern |
-| `(path) => boolean` | `p => p.startsWith("/admin") && !p.startsWith("/admin/public")` | custom predicate |
-
-String matching is prefix-based: `"/api"` covers the entire sub-tree without requiring a RegExp. There are no false positives — `"/api"` does not match `"/apiv2"`.
-
-Scopes filter global, group, and route policies with the same rules. Policies execute in fixed layers: global first, then group, then route. Within each layer, higher `priority` runs first; equal priorities keep registration order (global) or declaration order (group and route). A priority in one layer never moves that policy ahead of another layer. The first denial stops evaluation. RegExp scopes with `g` or `y` flags are reset for each request, so reuse does not make matches alternate.
-
----
-
-### Hooks
-
-Lifecycle events that allow observation of execution:
-
-- `onRequest` — fired first, before routing; every request passes through this hook
-- `onNotFound` — fired when no route matches the requested path, before the 404 error is thrown
-- `onMethodNotAllowed` — fired when the path is registered but the HTTP method is not, before the 405 error is thrown; `ctx.meta.allowedMethods` is already populated
-- `beforePipeline` — fired before the global pipeline runs
-- `onValidation` — fired after all middleware, before post-validation policies; `schemaValidationPlugin` validates/coerces `route.schema` fields here
-- `beforeHandler` — fired after validation and post-validation policies, immediately before the route handler
-- `afterHandler` — fired immediately after the route handler completes
-- `afterPipeline` — fired after the handler and trace finalization (also fires when `onNotFound` / `onMethodNotAllowed` send a response)
-- `onError` — fired on any unhandled error
-
-`beforeHandler` / `afterHandler` wrap only the handler itself, independent from the pipeline. Use them for per-handler timing, logging, or auditing without interfering with middleware. They do not fire when the handler throws — use `onError` for that case.
-
-Policies run in two phases. Existing policies default to `preValidation`, so authentication and other early checks keep their current behavior. A policy that depends on parsed input can use `phase: "postValidation"` and declare a non-empty `requires` list (`body`, `params`, `query`, or `headers`). It runs only after `onValidation`; Orvaxis rejects the request with a configuration error if `schemaValidationPlugin` is missing or the matched route does not define every required schema. Invalid input fails validation (422) before such a policy runs.
-
-Policy decisions are added to `ctx.meta.trace.events` as `POLICY_DECISION` events. Each event reports the policy name, layer (`global`, `group`, or `route`), phase, order within that layer, priority, elapsed time, and outcome (`allow`, `deny`, `skipped`, or `error`). Denials and evaluation errors are terminal; later request stages do not run. The same events appear in `buildExecutionSummary().policyDecisions` and are forwarded to OpenTelemetry spans.
-
-Collection defaults to a bounded summary of at most 100 decisions per request. `maxEvents` accepts 1–1000. Policy decision events do not copy request bodies, headers, cookies, identity values, free-form denial reasons, or exception messages. Names should be stable configuration labels, never values derived from a request. Configure collection on `Orvaxis`:
-
-```ts
-const app = new Orvaxis({
-  policyTrace: { mode: "summary", maxEvents: 100 }, // default
-  // policyTrace: { mode: "off" },
-  // Detailed mode requires a redactor for free-form denial reasons.
-  // policyTrace: { mode: "detailed", redact: (reason) => redact(reason) },
-})
-```
-
-Detailed mode adds static scope descriptions and denial reasons only after the supplied redactor processes them. If redaction throws, the reason is omitted and request handling continues. When the event limit is reached, one `POLICY_TRACE_LIMIT` marker reports truncation. Choose `off` for requests where policy-trace collection is unnecessary.
-
-`onNotFound` and `onMethodNotAllowed` can short-circuit the error path: if a listener sends a response (`ctx.res.sent === true`), the runtime skips the `HttpError` and returns normally without triggering `onError`. If no listener sends a response, the error is thrown as usual.
-
-`afterPipeline` runs after a successful runtime lifecycle, including a handled 404/405 and middleware short-circuit. It is not called for a failed request; use `onError` for failure logging and cleanup. The trace is finalized before either completion hook runs.
-
-```ts
-// custom 404 response
-app.on("onNotFound", (ctx) => {
-  ctx.res.status(404).json({ error: "Not Found", path: ctx.req.path })
-})
-
-// custom 405 response — ctx.meta.allowedMethods is already set
-app.on("onMethodNotAllowed", (ctx) => {
-  const allowed = ctx.meta.allowedMethods as string[]
-  ctx.res.status(405).json({ error: "Method Not Allowed", allowed })
-})
-
-// redirect legacy URLs inside onNotFound
-app.on("onNotFound", (ctx) => {
-  if (ctx.req.path.startsWith("/old/")) {
-    ctx.res.status(301).setHeader("Location", ctx.req.path.replace("/old/", "/api/")).end()
-  }
-})
-```
-
-Hooks do not modify flow; they observe and react.
-
-All registered listeners for a hook always run, even if an earlier one throws. If exactly one listener throws, that error is re-thrown as-is. If more than one throws, a native `AggregateError` is raised with all errors available in `.errors[]`:
-
-```ts
-app.on("afterPipeline", async (ctx) => {
-  // inspect all hook errors when multiple listeners fail
-  try {
-    // ...
-  } catch (err) {
-    if (err instanceof AggregateError) {
-      for (const e of err.errors) console.error(e)
-    }
-  }
-})
-```
-
-`onError` hook listeners that throw are logged via the injected logger and never re-thrown.
-
-Use `HttpError` to throw errors with an explicit HTTP status code from anywhere in the lifecycle — handlers, middleware, policies, or hooks:
-
-```ts
-import { HttpError } from "orvaxis"
-
-// basic — status + message
-throw new HttpError(404, "User not found")
-
-// with a machine-readable code (forwarded to the client in the error envelope)
-throw new HttpError(403, "Forbidden", { code: "FORBIDDEN" })
-
-// with validation details
-throw new HttpError(422, "Validation failed", {
-  code: "VALIDATION_ERROR",
-  details: [{ path: ["email"], message: "Invalid email" }],
-})
-
-// in onError — check the type before accessing .status / .code
-app.on("onError", (ctx) => {
-  if (ctx.error instanceof HttpError) {
-    console.error(`[${ctx.error.status}] ${ctx.error.code ?? ""} ${ctx.error.message}`)
-  }
-})
-```
-
-`HttpError` extends the native `Error` class and also accepts a `cause` in the third argument (e.g. `{ cause: originalError }`) for error chaining.
-
----
-
-### Plugins
-
-Plugins extend runtime capabilities by registering hooks, middleware, or policies.
-
-Orvaxis ships with two built-in plugins:
-
-**`loggerPlugin`** — logs every request/response cycle and unhandled errors. It is a factory function that accepts an optional `{ logger, format }` argument:
-
-```ts
-import { Orvaxis, loggerPlugin } from "orvaxis"
-
-// default: JSON format, uses console
-const app = new Orvaxis()
-app.register(loggerPlugin())
-
-// custom logger (pino, winston, or any object satisfying Logger)
-app.register(loggerPlugin({ logger: pinoInstance }))
-
-// text format — human-readable plain strings, useful in development
-app.register(loggerPlugin({ format: "text" }))
-```
-
-By default `format` is `"json"`, emitting one structured object per event — ready for Datadog, Elasticsearch, Loki, and similar aggregation stacks without a custom parser:
-
-```
-// onRequest
-{ type: "request", method: "GET", path: "/api/users", requestId: "550e8400-…" }
-
-// afterPipeline — includes status code and total duration
-{ type: "response", method: "GET", path: "/api/users", status: 200, durationMs: 12, requestId: "550e8400-…" }
-
-// onError
-{ type: "error", requestId: "550e8400-…", message: "Not Found", error: Error }
-```
-
-With `format: "text"` the output is plain strings suitable for a terminal:
-
-```
-[REQ] GET /api/users 550e8400-…
-[RES] GET /api/users 200 12ms 550e8400-…
-[ERR] 550e8400-… Error: Not Found
-```
-
-The `Logger` interface requires only `info` and `error` methods, making it compatible with `console`, pino, winston, and most structured loggers:
-
-```ts
-import type { Logger } from "orvaxis"
-
-const myLogger: Logger = {
-  info: (...args) => pino.info(args),
-  error: (...args) => pino.error(args),
-}
-```
-
-The same logger can be passed to `new Orvaxis({ logger })` to capture hook system meta-errors, and to the adapter options to capture post-response errors:
-
-```ts
-const logger = pinoInstance
-const app = new Orvaxis({ logger })
-const server = createExpressServer(app, undefined, { logger })
-app.register(loggerPlugin({ logger }))
-```
-
-**`schemaValidationPlugin`** — validates `body`, `params`, `query`, and `headers` against a `route.schema` after middleware and before post-validation policies and the handler. Any library whose objects expose a `.parse(data)` method works (Zod, TypeBox, custom validators):
-
-```ts
-import { Orvaxis, schemaValidationPlugin } from "orvaxis"
-import { z } from "zod"
-
-const app = new Orvaxis()
-app.register(schemaValidationPlugin)
-
-app.group({
-  prefix: "/api",
-  routes: [
-    {
-      method: "POST",
-      path: "/users",
-      schema: {
-        body: z.object({ name: z.string(), age: z.number().int().min(0) }),
-      },
-      handler: async (ctx) => {
-        // ctx.req.body   — parsed, coerced body
-        // ctx.req.query  — typed as Record<string, string | string[]>, populated by both adapters
-        ctx.res.status(201).json(ctx.req.body)
-      },
-    },
-  ],
-})
-```
-
-On validation failure the plugin throws an error with `status: 422`, a `field` property indicating which part failed (`"body"`, `"params"`, `"query"`, or `"headers"`), and the original validator error as `cause`. When the validator error exposes an `.issues` array (Zod and any library following the same convention), the adapter error response includes a `details` field with `{ path, message }` pairs so clients receive actionable feedback:
-
-```json
-{
-  "error": "Validation failed: body",
-  "details": [
-    { "path": ["name"], "message": "Required" },
-    { "path": ["age"],  "message": "Expected number, received string" }
-  ]
-}
-```
-
-The plugin is opt-in. A plain `Route` with a `schema` field is ignored unless `schemaValidationPlugin` is registered. `defineRoute()` makes the dependency explicit: a request matching a route created with it fails with a configuration error if the plugin is missing. Post-validation policies also require this plugin plus matching route schemas.
-
-**`corsPlugin`** — handles cross-origin requests for any adapter (Express, Fastify, or custom):
-
-```ts
-import { Orvaxis, corsPlugin } from "orvaxis"
-
-const app = new Orvaxis()
-
-// wildcard — open public API
-app.register(corsPlugin())
-
-// restricted to specific origins
-app.register(corsPlugin({
-  origin: ["https://app.example.com", "https://admin.example.com"],
-  credentials: true,
-  exposedHeaders: ["X-Request-ID"],
-  maxAge: 3600,
-}))
-```
-
-| Option | Type | Default | Description |
-|---|---|---|---|
-| `origin` | `string \| string[] \| RegExp` | `"*"` | Allowed origin(s) |
-| `methods` | `string[]` | registered methods | `Access-Control-Allow-Methods` for preflight |
-| `allowedHeaders` | `string[]` | mirrors request | `Access-Control-Allow-Headers` for preflight |
-| `exposedHeaders` | `string[]` | — | `Access-Control-Expose-Headers` on all responses |
-| `credentials` | `boolean` | `false` | `Access-Control-Allow-Credentials` |
-| `maxAge` | `number` | — | `Access-Control-Max-Age` (seconds) for preflight cache |
-
-`OPTIONS` preflight requests on known paths automatically receive a `204` response with all CORS headers populated, no route registration required. `OPTIONS` on an unknown path returns `404` as usual.
-
-When `origin` is not `"*"` the plugin also sets `Vary: Origin` so CDNs cache responses per origin correctly.
-
-**`otelPlugin`** — emits an OpenTelemetry `SERVER` span for every request. Requires `@opentelemetry/api` (optional peer dependency) and a pre-configured SDK with your chosen exporter (OTLP, Zipkin, Jaeger, etc.):
-
-```ts
-import { Orvaxis } from "orvaxis"
-import { otelPlugin } from "orvaxis/otel"
-import { trace } from "@opentelemetry/api"
-
-// configure SDK + exporter once at startup (outside this file)
-
-const app = new Orvaxis()
-app.register(otelPlugin({ tracer: trace.getTracer("my-service") }))
-```
-
-Each matched request produces **three nested spans**:
-
-| Span | Lifecycle window | What it covers |
-|---|---|---|
-| `GET /users/:id` (root) | `onRequest` → `afterPipeline` | full request duration |
-| `orvaxis.pipeline` | `beforePipeline` → `beforeHandler` | global pipeline + group/route middleware + validation + post-validation policies |
-| `orvaxis.handler` | `beforeHandler` → `afterHandler` | route handler only |
-
-The root span attributes:
-
-| Attribute | Value |
-|---|---|
-| `http.request.method` | `GET`, `POST`, … |
-| `url.path` | request path |
-| `orvaxis.request_id` | `ctx.req.id` |
-| `http.response.status_code` | response status |
-
-The root span name is initially set to the raw path (`GET /users/42`) and updated to the route template (`GET /users/:id`) before the handler runs, so parameterised routes group correctly in your trace backend.
-
-Distributed trace context is extracted from incoming `traceparent` / `tracestate` headers so Orvaxis participates in upstream traces automatically. Both child spans are parented to the root span via the stored OTel context and appear correctly nested in Jaeger, Zipkin, and any W3C-compliant backend. `traceMiddleware` events are forwarded to the root span as OTel span events. On error the exception is recorded via `span.recordException`, any open child spans are closed first, and the root span is marked `ERROR`.
-
-Requests that fail before routing (404, 405) produce only the root span — `orvaxis.pipeline` and `orvaxis.handler` are never opened.
-
-To write a custom plugin:
-
-```ts
-import type { Plugin } from "orvaxis"
-
-const metricsPlugin: Plugin = {
-  name: "metrics",
-  apply(ctx) {
-    ctx.hooks.on("afterPipeline", (reqCtx) => {
-      const duration = reqCtx.meta.trace?.endTime - reqCtx.meta.trace?.startTime
-      recordMetric("request.duration", duration)
-    })
-  }
-}
-
-app.register(metricsPlugin)
-```
-
-The `apply` parameter is typed as `PluginContext`, a minimal interface that exposes only `hooks.on`. If you need explicit typing on `apply`, import `PluginContext` directly:
-
-```ts
-import type { Plugin, PluginContext } from "orvaxis"
-
-const myPlugin: Plugin = {
-  name: "my-plugin",
-  apply(ctx: PluginContext) {
-    ctx.hooks.on("onRequest", (reqCtx) => { /* ... */ })
-  }
-}
-```
-
-Registered plugins are tracked in `runtime.plugins` and applied immediately on registration. `PluginManager` is also exported for custom orchestration.
-
----
-
-### Tracing System
-
-Each request generates a structured execution trace available as `ctx.meta.trace`:
-
-- `requestId` — unique identifier per request
-- `events` — timestamped lifecycle events (`TraceEvent[]`); timestamps are wall-clock-aligned with sub-millisecond decimal precision, guaranteed monotonically increasing within a request
-- `startTime` / `endTime` — wall-clock boundaries in integer milliseconds (`Date.now()`); `endTime` marks completion of request processing before the completion hook runs
-- `outcome` — `"success"` or `"error"`, including failures in policies, middleware, handlers, and hooks
-- `responseSentAtRuntimeEnd` — whether the response API had been used when runtime execution completed
-- `responseCompletedAtRuntimeEnd` — whether the adapter reported the underlying HTTP response stream finished at that moment; may be `undefined` for custom adapters
-
-The runtime trace and the HTTP response have separate lifetimes. A handler can return after starting an SSE or other streamed response, so `outcome: "success"` and `responseSentAtRuntimeEnd: true` can coexist with `responseCompletedAtRuntimeEnd: false`. These response fields are a snapshot at the end of request processing; they do not update when the network stream later completes. Errors are finalized before `onError` runs, so error hooks, the logger plugin, and OpenTelemetry can inspect the trace. `afterPipeline` runs after successful request processing, including a short-circuit; failures use `onError` and do not also invoke `afterPipeline`.
-
-Use `traceMiddleware()` to automatically record timing around middleware execution:
-
-```ts
-import { traceMiddleware } from "orvaxis"
-
-app.group({ prefix: "/api", middleware: [traceMiddleware()], routes: [...] })
-```
-
-Emit custom events from anywhere in the call chain with `traceEvent()` — no need to pass `ctx`:
-
-```ts
-import { traceEvent } from "orvaxis"
-
-async function fetchUser(id: string) {
-  traceEvent("db:query", { table: "users", id })
-  // ...
-}
-```
-
-`traceEvent` is a no-op when called outside a request scope.
-
----
-
-### Debug Layer
-
-When enabled, the debugger records a structured timeline of every lifecycle step:
-
-```ts
-app.debugger.enable()   // start collecting debug timeline
-app.debugger.disable()  // stop collecting (e.g. after warm-up)
-```
-
-`enabled` is a read-only getter — direct assignment throws at runtime. Always use `enable()` / `disable()` to toggle the state.
-
-Use `buildExecutionSummary(ctx)` to get a structured view of both the trace and the debug timeline:
-
-```ts
-import { buildExecutionSummary } from "orvaxis"
-
-app.on("afterPipeline", (ctx) => {
-  const summary = buildExecutionSummary(ctx)
-  // summary.requestId      — from ctx.meta.trace
-  // summary.duration       — total ms
-  // summary.traceEvents    — all trace events, including custom and policy events
-  // summary.policyDecisions — automatic policy outcomes in execution order
-  // summary.stoppedByPolicy — the terminal deny/error decision, if any
-  // summary.notReachedStages — later policy/request stages skipped after that decision
-  // summary.debugSteps     — internal lifecycle events grouped by phase (requires debugger enabled)
-  // summary.combinedTimeline — all events merged and sorted by timestamp, each with a `kind` field ("trace" | "debug")
-  // summary.route          — matched route + group
-})
-```
-
-`combinedTimeline` is the easiest way to understand the full sequence of what happened during a request — it interleaves your custom trace events with the internal lifecycle steps in chronological order. Each entry carries `{ kind, name, timestamp, meta }`.
-
-`buildExecutionSummary` always returns an object — `traceEvents`, `combinedTimeline`, and `duration` are available even without the debugger enabled.
-
-For a compact, copyable diagnostic, use `formatExecutionSummary(ctx)`. It prints the matched route template, outcome, policy decisions and stages skipped after a denial. It deliberately omits request values, denial reasons and error messages, so the output is safer to attach to a bug report. For example, the same runnable demo shows an allowed request, a 403 and a handler failure:
-
-```sh
-pnpm exec tsx examples/policy-diagnostics.ts
-```
-
-```ts
-import { formatExecutionSummary } from "orvaxis"
-
-app.on("afterPipeline", (ctx) => {
-  console.log(formatExecutionSummary(ctx))
-})
-```
-
-The formatter only reports decisions already captured in the trace; it does not evaluate policies again. If policy tracing is disabled, it reports that no decisions were recorded.
-
----
-
-### Execution Model
-
-A request lifecycle is deterministic:
-
-```
-1   onRequest hook
-2   Route lookup
-    ├─ no match → onNotFound hook → (if !sent) throw 404 → afterPipeline → done
-    └─ method mismatch → onMethodNotAllowed hook → (if !sent) throw 405 → afterPipeline → done
-3   Policy evaluation     global → group → route; priority sorted within each layer
-4   beforePipeline hook
-5   Global pipeline       middleware registered via app.use()
-6   Group middleware
-7   Route middleware
-8   onValidation hook     schemaValidationPlugin parses declared fields
-9   Post-validation policies  global → group → route
-10  beforeHandler hook
-11  Route handler
-12  afterHandler hook
-13  Trace finalization    ctx.meta.trace is set
-14  afterPipeline hook
-    Debug output          lifecycle events are recorded if app.debugger.enable() was called
-```
-
----
-
-### Typed Context
-
-`OrvaxisContext` accepts two optional type parameters to add compile-time types to `ctx.state` and `ctx.meta`:
-
-```ts
-type AppState = { user: { id: string; role: string } }
-type AppMeta  = { requestId: string }
-
-type AppContext = OrvaxisContext<AppState, AppMeta>
-
-const handler = async (ctx: AppContext) => {
-  ctx.state.user.role   // string
-  ctx.meta.requestId    // string
-  ctx.meta.tracer       // TracerLike | undefined  (always present from ContextMeta)
-}
-```
-
-The second parameter is intersected with `ContextMeta`, so all framework-internal fields remain typed.
-
-#### `ctx.params` — URL parameter shortcut
-
-`ctx.params` is a shorthand for `ctx.meta.route?.params ?? {}`. It is always safe to access inside a handler — no `!` assertion needed:
-
-```ts
-// before
-const { id } = ctx.meta.route!.params
-
-// after
-const { id } = ctx.params
-```
-
-#### `ctx.logs` — request-scoped log accumulator
-
-`ctx.logs` is a `string[]` that lives for the duration of a single request. Push any formatted message from hooks, middleware, or handlers and read it back at any later lifecycle point — useful for short per-request audit trails, debugging, or test assertions without a real logger:
-
-```ts
-app.on("onRequest", (ctx) => {
-  ctx.logs.push(`[${ctx.req.method}] ${ctx.req.path}`)
-})
-
-app.on("afterPipeline", (ctx) => {
-  if (ctx.logs.length > 0) console.log("[request log]", ctx.logs)
-})
-```
-
-The array is initialised as `[]` by the framework. Nothing in the framework writes to it — it is entirely user-owned.
-
-`ctx.logs` is capped at **1 000 entries** by default. Pushes beyond the cap are dropped and `console.warn` fires once per request context. For high-volume output use a dedicated logger instead. The cap is configurable via `OrvaxisOptions`:
-
-```ts
-// raise the cap
-const app = new Orvaxis({ logsMaxSize: 5_000 })
-
-// disable (set to Infinity — not recommended for long-lived SSE connections)
-const app = new Orvaxis({ logsMaxSize: Infinity })
-```
-
----
-
-#### `defineRoute()` — types from parsed request schemas
-
-On an ordinary `Route`, request fields remain broadly typed. `defineRoute()` infers each field from the validator's **output** type, so coercion and transforms are reflected in the handler's types for body, params, query, and headers:
-
-```ts
-import { defineRoute, schemaValidationPlugin } from "orvaxis"
-import { z } from "zod"
-
-const CreateItem = {
-  body: z.object({ quantity: z.coerce.number() }),
-  params: z.object({ id: z.coerce.number() }),
-  query: z.object({ page: z.coerce.number().default(1) }),
-  headers: z.object({ "x-user": z.string().transform((value) => value.length) }),
-}
-
-app.group({
-  prefix: "/api",
-  routes: [
-    defineRoute({
-      method: "POST",
-      path: "/items/:id",
-      schema: CreateItem,
-      handler: async (ctx) => {
-        const quantity: number = ctx.req.body.quantity
-        const id: number = ctx.params.id
-        const page: number = ctx.req.query.page
-        const userHeaderLength: number = ctx.req.headers["x-user"]
-        ctx.res.status(201).json({ id, quantity, page, userHeaderLength })
-      },
-    }),
-  ],
-})
-```
-
-Register `schemaValidationPlugin` for every `defineRoute()` route. The plugin parses each declared field before the handler; omitting it produces an HTTP 500 configuration error rather than calling a handler with unvalidated data. The legacy explicit body generic remains supported for existing code:
-
-```ts
-defineRoute<z.infer<typeof CreateItem.body>, AuthState>({ ... })
-```
-
-For schema inference together with custom `ctx.state` or `ctx.meta` types, provide the schema type as the first generic argument and the state type as the second, or annotate the route's handler context. For example, with the `CreateItem` schema above, use `defineRoute<typeof CreateItem, AuthState>({ schema: CreateItem, ... })`. The older `defineRoute<TBody, TState>()` body-only form remains supported for compatibility.
-
-Run `pnpm exec tsx examples/typed-schema.ts` to see the transformed values produced by the same route at runtime.
-
-#### Response contracts and OpenAPI
-
-Routes may declare validators by response status. Register `responseValidationPlugin()` to validate values passed to `ctx.res.json()` or `ctx.res.send()`; the parsed value is sent, so validator transforms are preserved. The default `strict` mode turns invalid output into an HTTP 500 error. Use `mode: "warn"` to report safe route/status metadata and send the original value while migrating existing handlers.
-
-```ts
-import { responseValidationPlugin } from "orvaxis"
-
-app.register(responseValidationPlugin({ mode: "strict" }))
-app.group({
-  prefix: "/api",
-  routes: [{
-    method: "GET",
-    path: "/items/:id",
-    schema: { params: z.object({ id: z.string() }) },
-    responses: {
-      200: z.object({ id: z.string(), name: z.string() }),
-      404: z.object({ error: z.string() }),
-    },
-    handler: (ctx) => ctx.res.json({ id: ctx.params.id, name: "Example" }),
-  }],
-})
-```
-
-Response validation is opt-in and only covers JSON/body values sent through the Orvaxis response methods. It selects the schema using the final status code. Adapter-generated errors and failures that occur before the handler (for example, Express JSON parsing errors) are outside this plugin's boundary. Streaming routes are never buffered: in `strict` mode the first `write`, `pipe`, or chunked `end` fails if that status has a declared schema; in `warn` mode the plugin reports `stream-not-validated` and lets the stream pass through. Leave streaming response schemas undeclared.
-
-OpenAPI generation is available from the optional `orvaxis/openapi` subpath and has no runtime dependency on a validator library. Supply a converter because `.parse()` alone does not expose a JSON Schema:
-
-```ts
-import { generateOpenApiDocument } from "orvaxis/openapi"
-import { z } from "zod"
-
-const document = generateOpenApiDocument(app, {
-  title: "Example API",
-  version: "1.0.0",
-  schemaConverter: (validator) => z.toJSONSchema(validator as z.ZodType),
-})
-```
-
-The generator emits OpenAPI 3.1 paths, JSON request bodies, query/header/path parameters, declared JSON responses, and a default Orvaxis error envelope. It reads route metadata only; it never executes handlers or policies. Unsupported or non-object converter output raises a `TypeError` naming the route and schema field instead of silently omitting the contract. OpenAPI cannot express the runtime's streaming validation restriction, so streaming endpoints should omit response schemas and document their media type separately.
-
----
-
-### Request-scoped Context
-
-`getContext()` returns the `OrvaxisContext` for the currently executing request, from anywhere in the async call chain — no need to thread `ctx` through every function:
-
-```ts
-import { getContext } from "orvaxis"
-
-async function getCurrentUser() {
-  const ctx = getContext()
-  return ctx?.state.user
-}
-```
-
-Returns `undefined` when called outside a request scope. Backed by `AsyncLocalStorage` — concurrent requests are fully isolated.
+The [core concepts reference](docs/reference/core-concepts.md) covers the router, policy scopes and priority, hook contracts, plugins, traces, debugging, and typed context. The [lifecycle reference](docs/reference/lifecycle.md) shows the actual execution order.
 
 ---
 
@@ -884,37 +118,7 @@ Both adapters mount Orvaxis as a single catch-all handler (`server.use(...)` on 
 
 #### Add Orvaxis policies to one existing Express route
 
-If an Express application already owns routing and handlers, use `createExpressPolicyGuard` as route middleware. Mirror the protected method and path in Orvaxis so it can select the matching global, group, and route policies; Express still owns the handler and calls it once after authorization:
-
-```ts
-import express from "express"
-import { Orvaxis, type Policy } from "orvaxis"
-import { createExpressPolicyGuard } from "orvaxis/express"
-
-const security = new Orvaxis()
-const documentOwner: Policy = {
-  name: "document-owner",
-  evaluate(ctx) {
-    return ctx.req.headers["x-user-id"] === ctx.params.id
-      ? { allow: true, modify: { authorizedUserId: ctx.params.id } }
-      : { allow: false, reason: "You cannot access this document" }
-  },
-}
-
-security.group({
-  prefix: "/api",
-  routes: [{ method: "GET", path: "/documents/:id", policies: [documentOwner], handler: () => {} }],
-})
-
-const server = express()
-server.get(
-  "/api/documents/:id",
-  createExpressPolicyGuard(security),
-  (req, res) => res.json({ documentId: req.params.id }) // Existing handler stays here.
-)
-```
-
-The guard calls `next()` only after all matching pre-validation policies allow the request. A denial or policy error ends the response using Orvaxis's `ErrorResponse` format; an unmatched Orvaxis route returns 404. The authorized context, including values added through `PolicyResult.modify`, is available to later Express middleware as `res.locals.orvaxis`. The guard does not run Orvaxis plugins, middleware, validation, or route handlers. It rejects a matching route configured with post-validation policies or created with `defineRoute()`, because those require Orvaxis schema validation. For this integration, keep the mirrored Orvaxis route as a plain route and perform input validation in the existing Express stack. Mount the guard after body parsing and authentication middleware whose values the policies need, and before the existing handler. Remove the guard and the mirrored Orvaxis route declaration to roll back the integration.
+For a route whose handler should stay in Express, follow the [existing route integration guide](docs/guide/integrate-existing-route.md). It covers middleware placement, identity mapping, the mirrored route declaration, and validation boundaries.
 
 ### Query string parsing differs between adapters
 
@@ -931,7 +135,7 @@ GET /search?filter[status]=active
 
 Code that reads a query value directly and assumes it's a string (`ctx.req.query.filter.toUpperCase()`) compiles under the declared type but can throw at runtime on Express if a client sends bracketed keys. Two ways to avoid this:
 
-- Validate query params with `route.schema.query` (see [Plugins → `schemaValidationPlugin`](#plugins)) — this reshapes and checks `ctx.req.query` at the boundary regardless of adapter.
+- Validate query params with `route.schema.query` (see [Plugins → `schemaValidationPlugin`](docs/reference/core-concepts.md#plugins)) — this reshapes and checks `ctx.req.query` at the boundary regardless of adapter.
 - Or, if you don't use query schemas and want the declared type to actually hold, switch Express to the non-nesting parser: `expressApp.set("query parser", "simple")` before passing it to `createExpressServer`. This affects the whole Express app instance, including any routes you mount outside Orvaxis, so prefer it only when you control the entire app.
 
 ### Timeout
@@ -1334,6 +538,11 @@ Policies are listed in runtime order: pre-validation global → group → route,
 
 ## Documentation
 
+- [Quickstart](#quickstart) — protect one route and see the allowed/denied result
+- [Add Orvaxis to an existing Express route](docs/guide/integrate-existing-route.md) — add policy checks without moving the handler
+- [Diagnose a 403](docs/guide/diagnose-403.md) — find the terminal policy and verify skipped stages
+- [Request lifecycle reference](docs/reference/lifecycle.md) — hook, middleware, validation, and policy order
+- [Core concepts reference](docs/reference/core-concepts.md) — router, policies, hooks, plugins, tracing, and context
 - [Why Orvaxis](docs/why-orvaxis.md) — side-by-side comparison with plain Express: auth, rate limiting, and observability with and without Orvaxis
 - [Cookbook](docs/cookbook.md) — practical use cases with working examples (authentication, RBAC, rate limiting, tracing, feature flags, and more)
 - [Benchmarks](docs/benchmarks.md) — microbenchmark results for each execution layer, plus instructions to run them locally

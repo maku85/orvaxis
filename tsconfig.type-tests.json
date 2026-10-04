@@ -4,6 +4,11 @@
     "noEmit": true,
     "rootDir": "."
   },
-  "include": ["tests/defineRoute.types.ts", "examples/typed-schema.ts", "express.ts"],
+  "include": [
+    "tests/defineRoute.types.ts",
+    "examples/quickstart.ts",
+    "examples/typed-schema.ts",
+    "express.ts"
+  ],
   "exclude": ["node_modules", "dist"]
 }

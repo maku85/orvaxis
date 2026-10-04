@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Outcome-focused onboarding documentation** — the README now starts with an executable protected-route example; new guides cover adding Orvaxis to an existing Express route and tracing a 403 to its terminal policy. Detailed runtime concepts and lifecycle semantics live in linked reference pages.
+
 - **Status-specific response contracts and OpenAPI 3.1 generation** — routes may declare response validators and opt into strict or warning-mode output validation. Streaming responses are never buffered and are reported or rejected when a matching schema exists. `orvaxis/openapi` generates request/response documentation from route inspection using a caller-supplied validator-to-JSON-Schema converter, with no added runtime dependency.
 
 - **Full schema output inference in `defineRoute()`** — handler types now derive body, params, query, and headers from each validator's parsed output, including coercions and transforms. Typed routes fail with a configuration error if `schemaValidationPlugin` is absent instead of running with unvalidated values; explicit body-type calls remain supported.
@@ -30,6 +32,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Completed execution traces on errors** — `ctx.meta.trace` is finalized before `onError` runs and now reports `outcome`, whether a response had been sent when the runtime completed, and whether the adapter reported the response stream finished at that moment. The logger plugin includes these fields in structured error events, and OpenTelemetry records trace events on error spans as well as successful spans.
 
 ### Fixed
+
+- **Benchmark time units** — benchmark tables now report milliseconds derived from throughput (`1,000 / hz`), matching the existing values; the former microseconds label overstated operation speed by 1,000×.
 
 - **Policy scopes apply consistently across global, group, and route policies** — group and route policies now honor `scope.path` and `scope.method`, matching the global policy engine. RegExp scopes reset `lastIndex` around each check, making reused expressions with `g` and `y` flags deterministic.
 
