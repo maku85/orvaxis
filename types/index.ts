@@ -193,8 +193,8 @@ export type PolicyScope = {
   method?: HttpMethod
 }
 
-export type SchemaField = {
-  parse(data: unknown): unknown
+export type SchemaField<TOutput = unknown> = {
+  parse(data: unknown): TOutput
 }
 
 export type RouteSchema = {

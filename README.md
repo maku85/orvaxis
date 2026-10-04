@@ -486,7 +486,7 @@ On validation failure the plugin throws an error with `status: 422`, a `field` p
 }
 ```
 
-The plugin is opt-in — routes with a `schema` field are silently ignored unless `schemaValidationPlugin` is registered. Post-validation policies declare their dependencies and require this plugin plus matching route schemas.
+The plugin is opt-in. A plain `Route` with a `schema` field is ignored unless `schemaValidationPlugin` is registered. `defineRoute()` makes the dependency explicit: a request matching a route created with it fails with a configuration error if the plugin is missing. Post-validation policies also require this plugin plus matching route schemas.
 
 **`corsPlugin`** — handles cross-origin requests for any adapter (Express, Fastify, or custom):
 
@@ -764,37 +764,49 @@ const app = new Orvaxis({ logsMaxSize: Infinity })
 
 ---
 
-#### `defineRoute<TBody>()` — typed request body
+#### `defineRoute()` — types from parsed request schemas
 
-`ctx.req.body` is typed as `unknown` on all routes. Use `defineRoute` to propagate the Zod (or any `.parse()`-based) schema's inferred type directly into `ctx.req.body` inside the handler, eliminating the manual cast:
+On an ordinary `Route`, request fields remain broadly typed. `defineRoute()` infers each field from the validator's **output** type, so coercion and transforms are reflected in the handler's types for body, params, query, and headers:
 
 ```ts
 import { defineRoute, schemaValidationPlugin } from "orvaxis"
 import { z } from "zod"
 
-const CreateUserBody = z.object({ name: z.string(), age: z.number() })
+const CreateItem = {
+  body: z.object({ quantity: z.coerce.number() }),
+  params: z.object({ id: z.coerce.number() }),
+  query: z.object({ page: z.coerce.number().default(1) }),
+  headers: z.object({ "x-user": z.string().transform((value) => value.length) }),
+}
 
 app.group({
   prefix: "/api",
   routes: [
     defineRoute({
       method: "POST",
-      path: "/users",
-      schema: { body: CreateUserBody },
+      path: "/items/:id",
+      schema: CreateItem,
       handler: async (ctx) => {
-        const body = ctx.req.body          // z.infer<typeof CreateUserBody> — no cast
-        ctx.res.status(201).json({ name: body.name })
+        const quantity: number = ctx.req.body.quantity
+        const id: number = ctx.params.id
+        const page: number = ctx.req.query.page
+        const userHeaderLength: number = ctx.req.headers["x-user"]
+        ctx.res.status(201).json({ id, quantity, page, userHeaderLength })
       },
     }),
   ],
 })
 ```
 
-Pass `TState` as a second type argument to also type `ctx.state`:
+Register `schemaValidationPlugin` for every `defineRoute()` route. The plugin parses each declared field before the handler; omitting it produces an HTTP 500 configuration error rather than calling a handler with unvalidated data. The legacy explicit body generic remains supported for existing code:
 
 ```ts
-defineRoute<z.infer<typeof CreateUserBody>, AuthState>({ ... })
+defineRoute<z.infer<typeof CreateItem.body>, AuthState>({ ... })
 ```
+
+For schema inference together with custom `ctx.state` or `ctx.meta` types, provide the schema type as the first generic argument and the state type as the second, or annotate the route's handler context. For example, with the `CreateItem` schema above, use `defineRoute<typeof CreateItem, AuthState>({ schema: CreateItem, ... })`. The older `defineRoute<TBody, TState>()` body-only form remains supported for compatibility.
+
+Run `pnpm exec tsx examples/typed-schema.ts` to see the transformed values produced by the same route at runtime.
 
 ---
 
@@ -862,7 +874,7 @@ server.get(
 )
 ```
 
-The guard calls `next()` only after all matching pre-validation policies allow the request. A denial or policy error ends the response using Orvaxis's `ErrorResponse` format; an unmatched Orvaxis route returns 404. The authorized context, including values added through `PolicyResult.modify`, is available to later Express middleware as `res.locals.orvaxis`. The guard does not run Orvaxis plugins, middleware, validation, or route handlers. It rejects a matching route configured with post-validation policies because those require Orvaxis schema validation. Mount it after body parsing and authentication middleware whose values the policies need, and before the existing handler. Remove the guard and the mirrored Orvaxis route declaration to roll back the integration.
+The guard calls `next()` only after all matching pre-validation policies allow the request. A denial or policy error ends the response using Orvaxis's `ErrorResponse` format; an unmatched Orvaxis route returns 404. The authorized context, including values added through `PolicyResult.modify`, is available to later Express middleware as `res.locals.orvaxis`. The guard does not run Orvaxis plugins, middleware, validation, or route handlers. It rejects a matching route configured with post-validation policies or created with `defineRoute()`, because those require Orvaxis schema validation. For this integration, keep the mirrored Orvaxis route as a plain route and perform input validation in the existing Express stack. Mount the guard after body parsing and authentication middleware whose values the policies need, and before the existing handler. Remove the guard and the mirrored Orvaxis route declaration to roll back the integration.
 
 ### Query string parsing differs between adapters
 
@@ -1406,6 +1418,7 @@ orvaxis/
     policy-server.ts         global and route-level policies
     policy-matrix.ts         identity, ownership, tenant, and admin test scenarios
     policy-ci-check.ts       static policy requirements plus dynamic permission checks
+    typed-schema.ts          inferred body, params, query, and header outputs
     hooks-and-plugins.ts     lifecycle hooks and plugin registration
     debug-trace.ts           debugger, traceEvent, and buildExecutionSummary
     typed-context.ts         typed OrvaxisContext, getContext, traceEvent

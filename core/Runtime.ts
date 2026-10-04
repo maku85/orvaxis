@@ -12,6 +12,7 @@ import type {
 import { createContext } from "./Context"
 import { captureContext, runWithContext } from "./contextStore"
 import { Debugger } from "./Debugger"
+import { isTypedRoute } from "./defineRoute"
 import { HookSystem } from "./Hook"
 import { HttpError } from "./HttpError"
 import { Pipeline } from "./Pipeline"
@@ -162,6 +163,16 @@ export class Runtime {
 
         ctx.meta.route = match
 
+        if (
+          isTypedRoute(match.route) &&
+          !this.plugins.list().some((plugin) => plugin.name === "schema-validation")
+        ) {
+          throw new HttpError(
+            500,
+            "Route defined with defineRoute() requires schemaValidationPlugin to validate its typed request fields"
+          )
+        }
+
         if (req.method.toUpperCase() === "HEAD" && match.route.method === "GET") {
           ctx.res = wrapForHead(res)
         }
@@ -252,6 +263,13 @@ export class Runtime {
           throw new HttpError(404, "No matching Orvaxis route for the Express policy guard")
         }
         ctx.meta.route = match
+
+        if (isTypedRoute(match.route)) {
+          throw new HttpError(
+            500,
+            "Routes defined with defineRoute() require full Orvaxis execution; policy-only authorization does not parse their schemas"
+          )
+        }
 
         const hasPostValidationPolicies = [
           ...this.policies.list(),

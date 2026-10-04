@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Full schema output inference in `defineRoute()`** — handler types now derive body, params, query, and headers from each validator's parsed output, including coercions and transforms. Typed routes fail with a configuration error if `schemaValidationPlugin` is absent instead of running with unvalidated values; explicit body-type calls remain supported.
+
 - **Static policy requirements for CI** — `checkPolicyRequirements(app.inspectRoutes(), rules)` verifies required policies across route path sets with method filters and reasoned exceptions. Missing policies and selectors with no routes fail; conditional scopes are reported as unverifiable and can be made CI failures with `failOnUnverifiable`. The check never executes policy code; runtime behavior remains covered separately by `testPolicyMatrix()`.
 
 - **Permission matrix test helper** — `testPolicyMatrix()` runs named request scenarios once through `testRequest` and compares status, terminal policy, and handler execution. `formatPolicyMatrixReport()` produces a readable summary without request values; request traces now expose `handlerExecuted` for this assertion.

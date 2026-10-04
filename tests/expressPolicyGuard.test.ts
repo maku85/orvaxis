@@ -1,6 +1,8 @@
 import { EventEmitter } from "node:events"
 import type { Request, Response } from "express"
 import { describe, expect, it, vi } from "vitest"
+import { z } from "zod"
+import { defineRoute } from "../core/defineRoute"
 import { Orvaxis } from "../core/Orvaxis"
 import { createExpressPolicyGuard } from "../http/expressAdapter"
 
@@ -116,6 +118,30 @@ describe("createExpressPolicyGuard", () => {
           ],
           handler: () => {},
         },
+      ],
+    })
+    const req = expressRequest("/api/documents/42")
+    const res = expressResponse()
+    const next = vi.fn()
+
+    createExpressPolicyGuard(app)(req, res, next)
+    await vi.waitFor(() => expect(res.json).toHaveBeenCalledOnce())
+
+    expect(res.status).toHaveBeenCalledWith(500)
+    expect(next).not.toHaveBeenCalled()
+  })
+
+  it("does not bypass schemas on defineRoute routes", async () => {
+    const app = new Orvaxis()
+    app.group({
+      prefix: "/api",
+      routes: [
+        defineRoute({
+          method: "GET",
+          path: "/documents/:id",
+          schema: { params: z.object({ id: z.coerce.number() }) },
+          handler: () => {},
+        }),
       ],
     })
     const req = expressRequest("/api/documents/42")

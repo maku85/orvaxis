@@ -101,6 +101,75 @@ describe("defineRoute", () => {
     expect(res.status).toBe(422)
   })
 
+  it("infers transformed body, params, query, and headers at runtime", async () => {
+    const app = new Orvaxis()
+    app.register(schemaValidationPlugin)
+    let parsed: unknown
+    const schema = {
+      body: z.object({ amount: z.coerce.number() }),
+      params: z.object({ id: z.coerce.number() }),
+      query: z.object({ page: z.coerce.number().default(1) }),
+      headers: z.object({ "x-user": z.string().transform((value) => value.length) }),
+    }
+
+    app.group({
+      prefix: "/api",
+      routes: [
+        defineRoute({
+          method: "POST",
+          path: "/items/:id",
+          schema,
+          handler: (ctx) => {
+            parsed = {
+              amount: ctx.req.body.amount,
+              id: ctx.params.id,
+              routeId: ctx.meta.route?.params.id,
+              page: ctx.req.query.page,
+              user: ctx.req.headers["x-user"],
+            }
+            ctx.res.json({ ok: true })
+          },
+        }),
+      ],
+    })
+
+    const response = await testRequest(app, {
+      method: "POST",
+      path: "/api/items/42",
+      body: { amount: "12" },
+      query: { page: "3" },
+      headers: { "x-user": "alice" },
+    })
+
+    expect(response.status).toBe(200)
+    expect(parsed).toEqual({ amount: 12, id: 42, routeId: 42, page: 3, user: 5 })
+  })
+
+  it("fails clearly when a typed route has no runtime validation plugin", async () => {
+    const app = new Orvaxis()
+    app.group({
+      prefix: "/api",
+      routes: [
+        defineRoute({
+          method: "POST",
+          path: "/users",
+          schema: { body: BodySchema },
+          handler: (ctx) => ctx.res.json({ name: ctx.req.body.name }),
+        }),
+      ],
+    })
+
+    const response = await testRequest(app, {
+      method: "POST",
+      path: "/api/users",
+      body: { name: "Alice", age: 30 },
+    })
+
+    expect(response.status).toBe(500)
+    expect(response.error?.message).toContain("schemaValidationPlugin")
+    expect(response.ctx?.meta.trace?.handlerExecuted).toBe(false)
+  })
+
   it("threads TState through to the handler so ctx.state is typed", async () => {
     type AuthState = { userId: string }
     const app = new Orvaxis()
