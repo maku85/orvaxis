@@ -8,6 +8,7 @@ export {
   type ExecutionSummary,
   type UnifiedEvent,
 } from "./debug/buildExecutionSummary"
+export { formatExecutionSummary } from "./debug/formatExecutionSummary"
 export { traceEvent } from "./debug/traceEvent"
 export {
   type AdapterOptions,

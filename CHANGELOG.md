@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Copyable policy diagnostics** — `formatExecutionSummary(ctx)` formats the route template, outcome, policy decisions, and stages skipped after a denial while omitting request values and free-form denial/error messages. `examples/policy-diagnostics.ts` demonstrates allowed, denied, and failed requests with one command.
+
 - **Static route-policy inspection** — `app.inspectRoutes()` reports inherited global/group/route policies in runtime order with stable declaration IDs, duplicate-name diagnostics, phase, priority, order, scope, and conservative always/never/conditional applicability. It never runs policy predicates or handlers; the existing `app.routes()` result is unchanged.
 
 - **Bounded policy decision traces** — each evaluated policy records its layer, validation phase, order, priority, duration, and allow/deny/skipped/error outcome. `buildExecutionSummary()` exposes decisions and the terminal policy plus stages not reached; OpenTelemetry receives the events through the existing trace bridge and uses a generic message for policy-denial exceptions. Summary mode is bounded and omits free-form reasons and request data; detailed mode requires a caller-supplied reason redactor, while `policyTrace: { mode: "off" }` disables policy decision collection.

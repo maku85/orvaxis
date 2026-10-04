@@ -661,6 +661,22 @@ app.on("afterPipeline", (ctx) => {
 
 `buildExecutionSummary` always returns an object — `traceEvents`, `combinedTimeline`, and `duration` are available even without the debugger enabled.
 
+For a compact, copyable diagnostic, use `formatExecutionSummary(ctx)`. It prints the matched route template, outcome, policy decisions and stages skipped after a denial. It deliberately omits request values, denial reasons and error messages, so the output is safer to attach to a bug report. For example, the same runnable demo shows an allowed request, a 403 and a handler failure:
+
+```sh
+pnpm exec tsx examples/policy-diagnostics.ts
+```
+
+```ts
+import { formatExecutionSummary } from "orvaxis"
+
+app.on("afterPipeline", (ctx) => {
+  console.log(formatExecutionSummary(ctx))
+})
+```
+
+The formatter only reports decisions already captured in the trace; it does not evaluate policies again. If policy tracing is disabled, it reports that no decisions were recorded.
+
 ---
 
 ### Execution Model
