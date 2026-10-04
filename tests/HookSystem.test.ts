@@ -7,6 +7,7 @@ const ALL_HOOKS: HookName[] = [
   "onNotFound",
   "onMethodNotAllowed",
   "beforePipeline",
+  "onValidation",
   "beforeHandler",
   "afterHandler",
   "afterPipeline",

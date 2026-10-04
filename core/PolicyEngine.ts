@@ -1,4 +1,4 @@
-import type { OrvaxisContext, Policy, PolicyResult, PolicyScope } from "../types"
+import type { OrvaxisContext, Policy, PolicyPhase, PolicyResult, PolicyScope } from "../types"
 import { HttpError } from "./HttpError"
 import { mergeSafe } from "./utils"
 
@@ -42,11 +42,17 @@ export class PolicyEngine {
     this.policies.push(policy)
   }
 
-  async evaluate(ctx: OrvaxisContext) {
+  async evaluate(
+    ctx: OrvaxisContext,
+    phase: PolicyPhase = "preValidation",
+    beforeEvaluate?: (policy: Policy) => void
+  ) {
     const sorted = sortPolicies(this.policies)
 
     for (const policy of sorted) {
+      if ((policy.phase ?? "preValidation") !== phase) continue
       if (!matchesPolicyScope(policy.scope, ctx)) continue
+      beforeEvaluate?.(policy)
 
       const result: PolicyResult = await policy.evaluate(ctx)
 

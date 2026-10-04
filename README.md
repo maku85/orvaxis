@@ -103,6 +103,7 @@ Group Middleware (inherited)
 ↓
 Route Middleware (scoped)
 ↓
+onValidation hook and post-validation policies
 beforeHandler hook
 ↓
 Route Handler
@@ -225,7 +226,7 @@ Functions that participate in execution flow and can:
 
 Middleware uses an onion-style `next()` chain. `await next()` runs the remaining middleware in the current layer and then returns to the caller. Call `next()` at most once. If middleware returns without calling it, Orvaxis stops the rest of the request lifecycle, including later middleware layers and the route handler. A response sent with `ctx.res.json()`, `send()`, `end()`, `write()`, or `pipe()` also stops later application phases, even if middleware then calls `next()`.
 
-When the lifecycle stops, `afterPipeline` still runs once for final logging and tracing. `afterHandler` runs only if the route handler ran. Hooks that send a response at `onRequest`, `beforePipeline`, or `beforeHandler` likewise stop later application phases. If middleware stops without sending a response, it must arrange for a response elsewhere or throw an error; otherwise the HTTP connection may remain open.
+When the lifecycle stops, `afterPipeline` still runs once for final logging and tracing. `afterHandler` runs only if the route handler ran. Hooks that send a response at `onRequest`, `beforePipeline`, `onValidation`, or `beforeHandler` likewise stop later application phases. If middleware stops without sending a response, it must arrange for a response elsewhere or throw an error; otherwise the HTTP connection may remain open.
 
 ---
 
@@ -285,12 +286,15 @@ Lifecycle events that allow observation of execution:
 - `onNotFound` — fired when no route matches the requested path, before the 404 error is thrown
 - `onMethodNotAllowed` — fired when the path is registered but the HTTP method is not, before the 405 error is thrown; `ctx.meta.allowedMethods` is already populated
 - `beforePipeline` — fired before the global pipeline runs
-- `beforeHandler` — fired after all middleware, immediately before the route handler
+- `onValidation` — fired after all middleware, before post-validation policies; `schemaValidationPlugin` validates/coerces `route.schema` fields here
+- `beforeHandler` — fired after validation and post-validation policies, immediately before the route handler
 - `afterHandler` — fired immediately after the route handler completes
 - `afterPipeline` — fired after the handler and trace finalization (also fires when `onNotFound` / `onMethodNotAllowed` send a response)
 - `onError` — fired on any unhandled error
 
 `beforeHandler` / `afterHandler` wrap only the handler itself, independent from the pipeline. Use them for per-handler timing, logging, or auditing without interfering with middleware. They do not fire when the handler throws — use `onError` for that case.
+
+Policies run in two phases. Existing policies default to `preValidation`, so authentication and other early checks keep their current behavior. A policy that depends on parsed input can use `phase: "postValidation"` and declare a non-empty `requires` list (`body`, `params`, `query`, or `headers`). It runs only after `onValidation`; Orvaxis rejects the request with a configuration error if `schemaValidationPlugin` is missing or the matched route does not define every required schema. Invalid input fails validation (422) before such a policy runs.
 
 `onNotFound` and `onMethodNotAllowed` can short-circuit the error path: if a listener sends a response (`ctx.res.sent === true`), the runtime skips the `HttpError` and returns normally without triggering `onError`. If no listener sends a response, the error is thrown as usual.
 
@@ -427,7 +431,7 @@ const server = createExpressServer(app, undefined, { logger })
 app.register(loggerPlugin({ logger }))
 ```
 
-**`schemaValidationPlugin`** — validates `body`, `params`, `query`, and `headers` against a `route.schema` before the handler runs. Any library whose objects expose a `.parse(data)` method works (Zod, TypeBox, custom validators):
+**`schemaValidationPlugin`** — validates `body`, `params`, `query`, and `headers` against a `route.schema` after middleware and before post-validation policies and the handler. Any library whose objects expose a `.parse(data)` method works (Zod, TypeBox, custom validators):
 
 ```ts
 import { Orvaxis, schemaValidationPlugin } from "orvaxis"
@@ -467,7 +471,7 @@ On validation failure the plugin throws an error with `status: 422`, a `field` p
 }
 ```
 
-The plugin is opt-in — routes with a `schema` field are silently ignored unless `schemaValidationPlugin` is registered.
+The plugin is opt-in — routes with a `schema` field are silently ignored unless `schemaValidationPlugin` is registered. Post-validation policies declare their dependencies and require this plugin plus matching route schemas.
 
 **`corsPlugin`** — handles cross-origin requests for any adapter (Express, Fastify, or custom):
 
@@ -519,7 +523,7 @@ Each matched request produces **three nested spans**:
 | Span | Lifecycle window | What it covers |
 |---|---|---|
 | `GET /users/:id` (root) | `onRequest` → `afterPipeline` | full request duration |
-| `orvaxis.pipeline` | `beforePipeline` → `beforeHandler` | global pipeline + group/route middleware |
+| `orvaxis.pipeline` | `beforePipeline` → `beforeHandler` | global pipeline + group/route middleware + validation + post-validation policies |
 | `orvaxis.handler` | `beforeHandler` → `afterHandler` | route handler only |
 
 The root span attributes:
@@ -655,12 +659,14 @@ A request lifecycle is deterministic:
 5   Global pipeline       middleware registered via app.use()
 6   Group middleware
 7   Route middleware
-8   beforeHandler hook
-9   Route handler
-10  afterHandler hook
-11  Trace finalization    ctx.meta.trace is set
-12  afterPipeline hook
-13  Debug output          if app.debugger.enable() was called
+8   onValidation hook     schemaValidationPlugin parses declared fields
+9   Post-validation policies  global → group → route
+10  beforeHandler hook
+11  Route handler
+12  afterHandler hook
+13  Trace finalization    ctx.meta.trace is set
+14  afterPipeline hook
+    Debug output          lifecycle events are recorded if app.debugger.enable() was called
 ```
 
 ---

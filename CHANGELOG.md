@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Explicit post-validation policy phase** — policies can declare `phase: "postValidation"` and required schema fields. They run after `onValidation` and schema coercion; the runtime rejects a missing `schemaValidationPlugin` or route schema before invoking them. Existing policies remain pre-validation by default.
+
 - **Completed execution traces on errors** — `ctx.meta.trace` is finalized before `onError` runs and now reports `outcome`, whether a response had been sent when the runtime completed, and whether the adapter reported the response stream finished at that moment. The logger plugin includes these fields in structured error events, and OpenTelemetry records trace events on error spans as well as successful spans.
 
 ### Fixed

@@ -42,7 +42,7 @@ export const schemaValidationPlugin: Plugin = {
   name: "schema-validation",
 
   apply(runtime) {
-    runtime.hooks.on("beforeHandler", (ctx: OrvaxisContext) => {
+    runtime.hooks.on("onValidation", (ctx: OrvaxisContext) => {
       const schema = ctx.meta.route?.route.schema
       if (!schema) return
 

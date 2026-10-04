@@ -62,6 +62,7 @@ export type HookName =
   | "onNotFound"
   | "onMethodNotAllowed"
   | "beforePipeline"
+  | "onValidation"
   | "beforeHandler"
   | "afterHandler"
   | "afterPipeline"
@@ -107,7 +108,7 @@ export type OrvaxisContext<
   readonly params: Record<string, string>
 }
 
-export type Policy<
+type PolicyBase<
   TState extends Record<string, unknown> = Record<string, unknown>,
   TMeta extends Record<string, unknown> = Record<never, never>,
 > = {
@@ -116,6 +117,21 @@ export type Policy<
   scope?: PolicyScope
   evaluate: (ctx: OrvaxisContext<TState, TMeta>) => PolicyResult | Promise<PolicyResult>
 }
+
+export type ValidatedRequestField = keyof RouteSchema
+export type PolicyPhase = "preValidation" | "postValidation"
+
+export type Policy<
+  TState extends Record<string, unknown> = Record<string, unknown>,
+  TMeta extends Record<string, unknown> = Record<never, never>,
+> = PolicyBase<TState, TMeta> &
+  (
+    | { phase?: "preValidation"; requires?: never }
+    | {
+        phase: "postValidation"
+        requires: readonly [ValidatedRequestField, ...ValidatedRequestField[]]
+      }
+  )
 
 export type PolicyResult =
   | { allow: true; modify?: Record<string, unknown> }

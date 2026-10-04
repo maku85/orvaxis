@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest"
 import { createMockResponse } from "../core/mockResponse"
 import { Runtime } from "../core/Runtime"
+import { schemaValidationPlugin } from "../plugins/schemaValidationPlugin"
 import type { Group, Middleware, OrvaxisContext, OrvaxisRequest, Policy } from "../types"
 
 function makeReq(path: string, method = "GET"): OrvaxisRequest {
@@ -44,6 +45,132 @@ function makeGroup(
 }
 
 describe("Runtime", () => {
+  describe("policy validation phases", () => {
+    it("runs post-validation policies after schema coercion and pre-validation policies", async () => {
+      const runtime = new Runtime()
+      runtime.addPlugin(schemaValidationPlugin)
+      const order: string[] = []
+      runtime.policies.register({
+        name: "auth",
+        evaluate: () => {
+          order.push("auth")
+          return { allow: true }
+        },
+      })
+      runtime.policies.register({
+        name: "ownership",
+        phase: "postValidation",
+        requires: ["body"],
+        evaluate: (ctx) => {
+          order.push("ownership")
+          expect(ctx.req.body).toEqual({ id: 42 })
+          return { allow: true }
+        },
+      })
+      runtime.router.group({
+        prefix: "/api",
+        routes: [
+          {
+            method: "POST",
+            path: "/items",
+            schema: { body: { parse: () => ({ id: 42 }) } },
+            handler: () => {
+              order.push("handler")
+            },
+          },
+        ],
+      })
+
+      await runtime.execute({ ...makeReq("/api/items", "POST"), body: { id: "42" } }, makeRes())
+      expect(order).toEqual(["auth", "ownership", "handler"])
+    })
+
+    it("stops before post-validation policies when schema validation fails", async () => {
+      const runtime = new Runtime()
+      runtime.addPlugin(schemaValidationPlugin)
+      const post = vi.fn(() => ({ allow: true as const }))
+      runtime.policies.register({
+        name: "ownership",
+        phase: "postValidation",
+        requires: ["body"],
+        evaluate: post,
+      })
+      runtime.router.group({
+        prefix: "/api",
+        routes: [
+          {
+            method: "POST",
+            path: "/items",
+            schema: {
+              body: {
+                parse: () => {
+                  throw new Error("invalid")
+                },
+              },
+            },
+            handler: vi.fn(),
+          },
+        ],
+      })
+
+      await expect(
+        runtime.execute({ ...makeReq("/api/items", "POST"), body: {} }, makeRes())
+      ).rejects.toMatchObject({ status: 422 })
+      expect(post).not.toHaveBeenCalled()
+    })
+
+    it("rejects post-validation policies without a registered validator", async () => {
+      const runtime = new Runtime()
+      const post = vi.fn(() => ({ allow: true as const }))
+      runtime.policies.register({
+        name: "ownership",
+        phase: "postValidation",
+        requires: ["body"],
+        evaluate: post,
+      })
+      runtime.router.group({
+        prefix: "/api",
+        routes: [
+          {
+            method: "POST",
+            path: "/items",
+            schema: { body: { parse: (x) => x } },
+            handler: vi.fn(),
+          },
+        ],
+      })
+
+      await expect(
+        runtime.execute({ ...makeReq("/api/items", "POST"), body: {} }, makeRes())
+      ).rejects.toMatchObject({
+        status: 500,
+        message: expect.stringContaining("schemaValidationPlugin"),
+      })
+      expect(post).not.toHaveBeenCalled()
+    })
+
+    it("rejects policies whose required field has no route schema", async () => {
+      const runtime = new Runtime()
+      runtime.addPlugin(schemaValidationPlugin)
+      const post = vi.fn(() => ({ allow: true as const }))
+      runtime.policies.register({
+        name: "ownership",
+        phase: "postValidation",
+        requires: ["body"],
+        evaluate: post,
+      })
+      runtime.router.group({
+        prefix: "/api",
+        routes: [{ method: "POST", path: "/items", handler: vi.fn() }],
+      })
+
+      await expect(
+        runtime.execute({ ...makeReq("/api/items", "POST"), body: {} }, makeRes())
+      ).rejects.toMatchObject({ status: 500, message: expect.stringContaining("route schema") })
+      expect(post).not.toHaveBeenCalled()
+    })
+  })
+
   describe("route matching", () => {
     it("throws 404 when no route matches", async () => {
       const runtime = new Runtime()

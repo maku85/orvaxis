@@ -9,6 +9,7 @@ export class HookSystem {
     onNotFound: [],
     onMethodNotAllowed: [],
     beforePipeline: [],
+    onValidation: [],
     beforeHandler: [],
     afterHandler: [],
     afterPipeline: [],

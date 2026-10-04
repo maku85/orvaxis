@@ -49,6 +49,59 @@ createExpressServer(app).listen(3000)
 - Equal priorities preserve registration order globally and declaration order in groups/routes.
 - To scope a policy to specific routes, use [`scope`](#policy-scoping).
 
+## 2. Authorize using validated input
+
+Keep authentication in the default pre-validation phase, then use a post-validation policy for ownership checks. Its `requires` declaration makes the route schema and validation plugin mandatory before the policy can run.
+
+```ts
+import { Orvaxis, schemaValidationPlugin } from "orvaxis"
+import type { Policy } from "orvaxis"
+
+const app = new Orvaxis()
+app.register(schemaValidationPlugin)
+app.policy({
+  name: "authenticate",
+  evaluate(ctx) {
+    return ctx.req.headers.authorization
+      ? { allow: true, modify: { userItemId: 42 } } // replace with the authenticated user's ID
+      : { allow: false, status: 401, reason: "Unauthenticated" }
+  },
+})
+
+const authorizeItem: Policy = {
+  name: "authorize-item-owner",
+  phase: "postValidation",
+  requires: ["params"],
+  evaluate(ctx) {
+    const params = ctx.meta.route?.params as { itemId: number }
+    return params.itemId === ctx.meta.userItemId
+      ? { allow: true }
+      : { allow: false, status: 403, reason: "Not the item owner" }
+  },
+}
+
+app.group({
+  prefix: "/api",
+  routes: [{
+    method: "GET",
+    path: "/items/:itemId",
+    schema: {
+      params: {
+        parse: (raw) => {
+          const itemId = Number((raw as { itemId: string }).itemId)
+          if (!Number.isInteger(itemId)) throw new Error("itemId must be an integer")
+          return { itemId }
+        },
+      },
+    },
+    policies: [authorizeItem],
+    handler: async (ctx) => ctx.res.json({ item: ctx.meta.route?.params }),
+  }],
+})
+```
+
+The sequence is authentication, middleware, validation/coercion, ownership policy, then handler. Invalid values fail with 422 before ownership checks. The HTTP adapter still parses the body before Orvaxis receives the request; this phase validates and transforms the already-parsed value.
+
 ---
 
 ## 2. Role-based access control

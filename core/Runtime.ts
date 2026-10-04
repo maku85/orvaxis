@@ -6,6 +6,7 @@ import type {
   OrvaxisRequest,
   OrvaxisResponse,
   Policy,
+  PolicyPhase,
 } from "../types"
 import { createContext } from "./Context"
 import { runWithContext } from "./contextStore"
@@ -169,6 +170,16 @@ export class Runtime {
         this.debugger.log(ctx, "ROUTE_MIDDLEWARE_DONE")
         if (!routeContinues) return await this.finishRequest(ctx, tracer)
 
+        await this.hooks.trigger("onValidation", ctx)
+        this.debugger.log(ctx, "HOOK:onValidation")
+        if (ctx.res.sent) return await this.finishRequest(ctx, tracer)
+
+        await this.policies.evaluate(ctx, "postValidation", (policy) =>
+          this.assertPolicyRequirements(policy, ctx)
+        )
+        await this.evaluatePolicies(match.group.policies ?? [], ctx, "postValidation")
+        await this.evaluatePolicies(match.route.policies ?? [], ctx, "postValidation")
+
         await this.hooks.trigger("beforeHandler", ctx)
         this.debugger.log(ctx, "HOOK:beforeHandler")
         if (ctx.res.sent) return await this.finishRequest(ctx, tracer)
@@ -216,10 +227,16 @@ export class Runtime {
     return ctx
   }
 
-  private async evaluatePolicies(policies: Policy[], ctx: OrvaxisContext): Promise<void> {
+  private async evaluatePolicies(
+    policies: Policy[],
+    ctx: OrvaxisContext,
+    phase: PolicyPhase = "preValidation"
+  ): Promise<void> {
     const sorted = sortPolicies(policies)
     for (const policy of sorted) {
+      if ((policy.phase ?? "preValidation") !== phase) continue
       if (!matchesPolicyScope(policy.scope, ctx)) continue
+      if (phase === "postValidation") this.assertPolicyRequirements(policy, ctx)
       const result = await policy.evaluate(ctx)
       if (!result.allow) {
         throw new HttpError(result.status ?? 403, result.reason ?? `Blocked by ${policy.name}`)
@@ -227,6 +244,30 @@ export class Runtime {
       if (result.modify) {
         mergeSafe(ctx.meta, result.modify)
       }
+    }
+  }
+
+  private assertPolicyRequirements(policy: Policy, ctx: OrvaxisContext): void {
+    const required = policy.requires
+    if (!required?.length) {
+      throw new HttpError(
+        500,
+        `Post-validation policy "${policy.name}" must declare required fields`
+      )
+    }
+    if (!this.plugins.list().some((plugin) => plugin.name === "schema-validation")) {
+      throw new HttpError(
+        500,
+        `Post-validation policy "${policy.name}" requires schemaValidationPlugin`
+      )
+    }
+    const schema = ctx.meta.route?.route.schema
+    const missing = required.filter((field) => schema?.[field] === undefined)
+    if (missing.length > 0) {
+      throw new HttpError(
+        500,
+        `Post-validation policy "${policy.name}" requires route schema for: ${missing.join(", ")}`
+      )
     }
   }
 
