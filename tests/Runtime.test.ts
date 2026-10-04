@@ -378,6 +378,28 @@ describe("Runtime", () => {
   })
 
   describe("hooks", () => {
+    it.each([
+      "onRequest",
+      "beforePipeline",
+      "beforeHandler",
+    ] as const)("%s stops application phases after a hook sends a response", async (hookName) => {
+      const runtime = new Runtime()
+      const handler = vi.fn()
+      const afterHandler = vi.fn()
+      const afterPipeline = vi.fn()
+      runtime.router.group(makeGroup("/api", { handler }))
+      runtime.hooks.on(hookName, (ctx) => ctx.res.status(201).json({ stopped: true }))
+      runtime.hooks.on("afterHandler", afterHandler)
+      runtime.hooks.on("afterPipeline", afterPipeline)
+
+      const ctx = await runtime.execute(makeReq("/api/resource"), makeRes())
+
+      expect(handler).not.toHaveBeenCalled()
+      expect(afterHandler).not.toHaveBeenCalled()
+      expect(afterPipeline).toHaveBeenCalledOnce()
+      expect(ctx.meta.trace?.endTime).toBeDefined()
+    })
+
     it("triggers onRequest hook", async () => {
       const runtime = new Runtime()
       runtime.router.group(makeGroup("/api"))
@@ -574,6 +596,52 @@ describe("Runtime", () => {
 
       await runtime.execute(makeReq("/api/resource"), makeRes())
       expect(order).toEqual(["global", "group"])
+    })
+
+    it("stops later phases when global middleware omits next()", async () => {
+      const runtime = new Runtime()
+      const handler = vi.fn()
+      const afterPipeline = vi.fn()
+      runtime.pipeline.use(async () => {})
+      runtime.router.group(makeGroup("/api", { handler }))
+      runtime.hooks.on("afterPipeline", afterPipeline)
+
+      const ctx = await runtime.execute(makeReq("/api/resource"), makeRes())
+
+      expect(handler).not.toHaveBeenCalled()
+      expect(afterPipeline).toHaveBeenCalledOnce()
+      expect(ctx.meta.trace?.endTime).toBeDefined()
+    })
+
+    it.each([
+      "global",
+      "group",
+      "route",
+    ] as const)("stops later phases when %s middleware sends a response, even if it calls next()", async (layer) => {
+      const runtime = new Runtime()
+      const handler = vi.fn()
+      const afterPipeline = vi.fn()
+      const stop: Middleware = async (ctx, next) => {
+        ctx.res.status(202).json({ stopped: true })
+        await next()
+      }
+      if (layer === "global") runtime.pipeline.use(stop)
+      runtime.router.group(
+        makeGroup("/api", {
+          handler,
+          groupMiddleware: layer === "group" ? [stop] : undefined,
+          middleware: layer === "route" ? [stop] : undefined,
+        })
+      )
+      runtime.hooks.on("afterPipeline", afterPipeline)
+
+      const res = makeRes()
+      const ctx = await runtime.execute(makeReq("/api/resource"), res)
+
+      expect(res.statusCode).toBe(202)
+      expect(handler).not.toHaveBeenCalled()
+      expect(afterPipeline).toHaveBeenCalledOnce()
+      expect(ctx.meta.trace?.endTime).toBeDefined()
     })
   })
 

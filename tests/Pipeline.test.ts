@@ -86,9 +86,27 @@ describe("Pipeline", () => {
     expect(second).not.toHaveBeenCalled()
   })
 
+  it("reports when middleware stops without calling next()", async () => {
+    const pipeline = new Pipeline()
+    pipeline.use(async () => {})
+
+    await expect(pipeline.execute(makeCtx())).resolves.toBe(false)
+  })
+
+  it("stops and reports when a middleware sends a response", async () => {
+    const pipeline = new Pipeline()
+    const ctx = makeCtx()
+    const second = vi.fn()
+    pipeline.use(async (current) => current.res.json({ ok: true }))
+    pipeline.use(second)
+
+    await expect(pipeline.execute(ctx)).resolves.toBe(false)
+    expect(second).not.toHaveBeenCalled()
+  })
+
   it("handles an empty pipeline without error", async () => {
     const pipeline = new Pipeline()
-    await expect(pipeline.execute(makeCtx())).resolves.toBeUndefined()
+    await expect(pipeline.execute(makeCtx())).resolves.toBe(true)
   })
 
   it("prevents double-invocation of next()", async () => {

@@ -109,6 +109,7 @@ export class Runtime {
 
         await this.hooks.trigger("onRequest", ctx)
         this.debugger.log(ctx, "HOOK:onRequest")
+        if (ctx.res.sent) return this.finishRequest(ctx, tracer)
 
         const match = this.router.match(req)
         if (!match) {
@@ -161,27 +162,28 @@ export class Runtime {
         this.debugger.log(ctx, "POLICY_END")
 
         await this.hooks.trigger("beforePipeline", ctx)
-        await this.pipeline.execute(ctx)
+        if (ctx.res.sent) return this.finishRequest(ctx, tracer)
+        const pipelineContinues = await this.pipeline.execute(ctx)
         this.debugger.log(ctx, "PIPELINE_DONE")
+        if (!pipelineContinues) return this.finishRequest(ctx, tracer)
 
-        await this.runMiddlewareChain(match.group.middleware ?? [], ctx)
+        const groupContinues = await this.runMiddlewareChain(match.group.middleware ?? [], ctx)
         this.debugger.log(ctx, "GROUP_MIDDLEWARE_DONE")
+        if (!groupContinues) return this.finishRequest(ctx, tracer)
 
-        await this.runMiddlewareChain(match.route.middleware ?? [], ctx)
+        const routeContinues = await this.runMiddlewareChain(match.route.middleware ?? [], ctx)
         this.debugger.log(ctx, "ROUTE_MIDDLEWARE_DONE")
+        if (!routeContinues) return this.finishRequest(ctx, tracer)
 
         await this.hooks.trigger("beforeHandler", ctx)
         this.debugger.log(ctx, "HOOK:beforeHandler")
+        if (ctx.res.sent) return this.finishRequest(ctx, tracer)
         await match.route.handler(ctx)
         this.debugger.log(ctx, "HANDLER_EXECUTED")
         await this.hooks.trigger("afterHandler", ctx)
         this.debugger.log(ctx, "HOOK:afterHandler")
 
-        ctx.meta.trace = tracer.end()
-        await this.hooks.trigger("afterPipeline", ctx)
-        this.debugger.log(ctx, "REQUEST_END")
-
-        return ctx
+        return this.finishRequest(ctx, tracer)
       } catch (err) {
         ctx.error = err as Error
         this.debugger.log(ctx, "ERROR", { error: String(err) })
@@ -189,6 +191,13 @@ export class Runtime {
         throw err
       }
     })
+  }
+
+  private async finishRequest(ctx: OrvaxisContext, tracer: Tracer): Promise<OrvaxisContext> {
+    ctx.meta.trace = tracer.end()
+    await this.hooks.trigger("afterPipeline", ctx)
+    this.debugger.log(ctx, "REQUEST_END")
+    return ctx
   }
 
   private async evaluatePolicies(policies: Policy[], ctx: OrvaxisContext): Promise<void> {
@@ -204,17 +213,29 @@ export class Runtime {
     }
   }
 
-  private async runMiddlewareChain(middlewares: Middleware[], ctx: OrvaxisContext): Promise<void> {
+  private async runMiddlewareChain(
+    middlewares: Middleware[],
+    ctx: OrvaxisContext
+  ): Promise<boolean> {
     let index = -1
+    let stopped = false
 
     const runner = async (i: number): Promise<void> => {
       if (i <= index) return
       index = i
+      if (ctx.res.sent) return
       const fn = middlewares[i]
       if (!fn) return
-      await fn(ctx, () => runner(i + 1))
+      let calledNext = false
+      await fn(ctx, async () => {
+        if (calledNext) return
+        calledNext = true
+        await runner(i + 1)
+      })
+      if (!calledNext || ctx.res.sent) stopped = true
     }
 
     await runner(0)
+    return !stopped && !ctx.res.sent
   }
 }

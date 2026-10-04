@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Breaking
+
+- **Middleware short-circuit the full request lifecycle** — returning without calling `next()` now stops later middleware layers and the route handler. Sending a response also prevents subsequent application phases, even if `next()` is called afterward. `afterPipeline` still runs for completion hooks; `afterHandler` runs only if the handler ran. Middleware that intentionally stops execution must send a response or throw, or the HTTP connection may remain open. See README "Middleware" for the lifecycle contract.
+
 ### Fixed
 
 - **`scripts/release.sh` no longer silently skips the CHANGELOG stamp when `## [Unreleased]` is missing** — the previous `sed` substitution matched nothing and exited 0 if that heading wasn't present (e.g. because a prior release already consumed it), leaving the CHANGELOG without a section for the new version and causing `.github/workflows/release.yml` to fail on the following tag push. The script now errors out up front if `## [Unreleased]` is missing, and after stamping the current release it re-inserts a fresh, empty `## [Unreleased]` heading above it — so the next release always has one to consume.

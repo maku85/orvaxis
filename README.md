@@ -223,6 +223,10 @@ Functions that participate in execution flow and can:
 - control execution flow
 - enrich request state
 
+Middleware uses an onion-style `next()` chain. `await next()` runs the remaining middleware in the current layer and then returns to the caller. Call `next()` at most once. If middleware returns without calling it, Orvaxis stops the rest of the request lifecycle, including later middleware layers and the route handler. A response sent with `ctx.res.json()`, `send()`, `end()`, `write()`, or `pipe()` also stops later application phases, even if middleware then calls `next()`.
+
+When the lifecycle stops, `afterPipeline` still runs once for final logging and tracing. `afterHandler` runs only if the route handler ran. Hooks that send a response at `onRequest`, `beforePipeline`, or `beforeHandler` likewise stop later application phases. If middleware stops without sending a response, it must arrange for a response elsewhere or throw an error; otherwise the HTTP connection may remain open.
+
 ---
 
 ### Policies
@@ -1124,6 +1128,7 @@ const routes: RouteInfo[] = app.routes()
 - [Why Orvaxis](docs/why-orvaxis.md) — side-by-side comparison with plain Express: auth, rate limiting, and observability with and without Orvaxis
 - [Cookbook](docs/cookbook.md) — practical use cases with working examples (authentication, RBAC, rate limiting, tracing, feature flags, and more)
 - [Benchmarks](docs/benchmarks.md) — microbenchmark results for each execution layer, plus instructions to run them locally
+- [Roadmap (Italian)](docs/roadmap.md) — proposed runtime fixes, policy diagnostics, incremental adoption, and acceptance criteria
 
 ---
 
