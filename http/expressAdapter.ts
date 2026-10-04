@@ -1,4 +1,10 @@
-import express, { type Application, type NextFunction, type Request, type Response } from "express"
+import express, {
+  type Application,
+  type NextFunction,
+  type Request,
+  type RequestHandler,
+  type Response,
+} from "express"
 import type { Orvaxis } from "../core/Orvaxis"
 import type { OrvaxisRequest, OrvaxisResponse, ServerAdapter } from "../types"
 import { type AdapterOptions, buildErrorBody, withTimeout } from "./timeout"
@@ -155,5 +161,75 @@ export function createExpressServer(
           else resolve()
         })
       }),
+  }
+}
+
+/**
+ * Create an Express middleware that runs matching Orvaxis pre-validation policies,
+ * then calls `next()` so Express can run the existing route handler.
+ */
+export function createExpressPolicyGuard(
+  app: Orvaxis,
+  options: AdapterOptions = {}
+): RequestHandler {
+  const timeoutMs = options.timeout ?? 30_000
+  const logger = options.logger ?? console
+  const requestIdHeader = options.requestIdHeader ?? "X-Request-ID"
+  const requestIdHeaderLower = requestIdHeader.toLowerCase()
+
+  return (req, res, next) => {
+    const requestId = (req.headers[requestIdHeaderLower] as string) || crypto.randomUUID()
+    const controller = new AbortController()
+    const routePath = `${req.baseUrl}${req.path}`.replace(/\/+/g, "/")
+    const adapted = Object.create(req) as OrvaxisRequest
+    Object.defineProperties(adapted, {
+      path: { value: routePath, writable: true, configurable: true, enumerable: true },
+      query: {
+        value: req.query as unknown as Record<string, string | string[]>,
+        writable: true,
+        configurable: true,
+        enumerable: true,
+      },
+      id: { value: requestId, writable: true, configurable: true, enumerable: true },
+      signal: { value: controller.signal, writable: true, configurable: true, enumerable: true },
+    })
+
+    const abort = () => controller.abort()
+    const cleanup = () => {
+      req.off("aborted", abort)
+      res.off("close", abort)
+      res.off("finish", cleanup)
+      res.off("close", cleanup)
+    }
+    req.once("aborted", abort)
+    res.once("close", abort)
+    res.once("finish", cleanup)
+
+    let cancelTimer: (() => void) | undefined
+    const wrapped = wrapExpressResponse(res, () => cancelTimer?.())
+    wrapped.setHeader(requestIdHeader, requestId)
+
+    const authorize = app.authorize(adapted, wrapped)
+    const pending =
+      timeoutMs > 0
+        ? withTimeout(authorize, timeoutMs, controller, (cancel) => {
+            cancelTimer = cancel
+          })
+        : authorize
+
+    void pending
+      .then((ctx) => {
+        res.locals.orvaxis = ctx
+        if (!wrapped.sent) next()
+      })
+      .catch((err: unknown) => {
+        if (res.headersSent || wrapped.sent) {
+          logger.error("[orvaxis] policy guard failed after response sent:", err)
+          return
+        }
+        const error = err as { status?: number }
+        wrapped.status(error.status ?? 500).json(buildErrorBody(err, requestId))
+      })
+      .finally(cleanup)
   }
 }

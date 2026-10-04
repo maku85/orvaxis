@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Incremental Express policy guard** — `createExpressPolicyGuard(app)` runs matching Orvaxis pre-validation policies before an existing Express handler, passing authorized context through `res.locals.orvaxis`. Policy denials and errors use the standard `ErrorResponse`; configurations requiring post-validation schema checks fail explicitly rather than bypassing them.
+
 - **Copyable policy diagnostics** — `formatExecutionSummary(ctx)` formats the route template, outcome, policy decisions, and stages skipped after a denial while omitting request values and free-form denial/error messages. `examples/policy-diagnostics.ts` demonstrates allowed, denied, and failed requests with one command.
 
 - **Static route-policy inspection** — `app.inspectRoutes()` reports inherited global/group/route policies in runtime order with stable declaration IDs, duplicate-name diagnostics, phase, priority, order, scope, and conservative always/never/conditional applicability. It never runs policy predicates or handlers; the existing `app.routes()` result is unchanged.

@@ -237,6 +237,62 @@ export class Runtime {
     })
   }
 
+  async authorize(req: OrvaxisRequest, res: OrvaxisResponse): Promise<OrvaxisContext> {
+    const ctx = createContext(req, res, this.logsMaxSize)
+    captureContext(ctx)
+    const tracer = new Tracer(req.id ?? generateId())
+    ctx.meta.tracer = tracer
+
+    return runWithContext(ctx, async () => {
+      try {
+        validateRequest(req)
+        const match = this.router.match(req)
+        if (!match) {
+          throw new HttpError(404, "No matching Orvaxis route for the Express policy guard")
+        }
+        ctx.meta.route = match
+
+        const hasPostValidationPolicies = [
+          ...this.policies.list(),
+          ...(match.group.policies ?? []),
+          ...(match.route.policies ?? []),
+        ].some((policy) => policy.phase === "postValidation")
+        if (hasPostValidationPolicies) {
+          throw new HttpError(
+            500,
+            "The Express policy guard supports pre-validation policies only; post-validation policies require Orvaxis schema validation"
+          )
+        }
+
+        await this.policies.evaluate(ctx, "preValidation", {
+          layer: "global",
+          trace: this.policyTrace,
+        })
+        await this.evaluatePolicies(match.group.policies ?? [], ctx, "group")
+        await this.evaluatePolicies(match.route.policies ?? [], ctx, "route")
+        ctx.meta.trace = tracer.end({
+          outcome: "success",
+          responseSentAtRuntimeEnd: ctx.res.sent,
+          responseCompletedAtRuntimeEnd: ctx.res.completed,
+        })
+        return ctx
+      } catch (err) {
+        ctx.error = err as Error
+        ctx.meta.trace = tracer.end({
+          outcome: "error",
+          responseSentAtRuntimeEnd: ctx.res.sent,
+          responseCompletedAtRuntimeEnd: ctx.res.completed,
+        })
+        try {
+          await this.hooks.trigger("onError", ctx, err as Error)
+        } catch {
+          // Preserve the original policy or configuration error.
+        }
+        throw err
+      }
+    })
+  }
+
   private async finishRequest(ctx: OrvaxisContext, tracer: Tracer): Promise<OrvaxisContext> {
     ctx.meta.trace = tracer.end({
       outcome: "success",

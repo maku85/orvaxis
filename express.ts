@@ -1,1 +1,1 @@
-export { createExpressServer } from "./http/expressAdapter"
+export { createExpressPolicyGuard, createExpressServer } from "./http/expressAdapter"

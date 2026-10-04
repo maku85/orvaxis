@@ -59,4 +59,9 @@ export class Orvaxis {
   async handle(req: OrvaxisRequest, res: OrvaxisResponse) {
     return this.runtime.execute(req, res)
   }
+
+  /** Run global, group, and route pre-validation policies without invoking the route handler. */
+  async authorize(req: OrvaxisRequest, res: OrvaxisResponse) {
+    return this.runtime.authorize(req, res)
+  }
 }

@@ -830,6 +830,40 @@ Install only the framework you intend to use — both peer dependencies are opti
 
 Both adapters mount Orvaxis as a single catch-all handler (`server.use(...)` on Express, `fastify.all("/*", ...)` on Fastify) and delegate all routing, hooks, and validation to the Orvaxis runtime. On Express this costs nothing, since Express has no comparable router/validation layer of its own. On Fastify it means you don't benefit from Fastify's own route trie or its compiled (ajv-based) schema validation — those are bypassed, not used. Pick the Fastify adapter for the transport (HTTP/1.1, HTTP/2, its plugin ecosystem for things unrelated to routing) or for consistency with an existing Fastify deployment, not for a routing or validation performance win over Express.
 
+#### Add Orvaxis policies to one existing Express route
+
+If an Express application already owns routing and handlers, use `createExpressPolicyGuard` as route middleware. Mirror the protected method and path in Orvaxis so it can select the matching global, group, and route policies; Express still owns the handler and calls it once after authorization:
+
+```ts
+import express from "express"
+import { Orvaxis, type Policy } from "orvaxis"
+import { createExpressPolicyGuard } from "orvaxis/express"
+
+const security = new Orvaxis()
+const documentOwner: Policy = {
+  name: "document-owner",
+  evaluate(ctx) {
+    return ctx.req.headers["x-user-id"] === ctx.params.id
+      ? { allow: true, modify: { authorizedUserId: ctx.params.id } }
+      : { allow: false, reason: "You cannot access this document" }
+  },
+}
+
+security.group({
+  prefix: "/api",
+  routes: [{ method: "GET", path: "/documents/:id", policies: [documentOwner], handler: () => {} }],
+})
+
+const server = express()
+server.get(
+  "/api/documents/:id",
+  createExpressPolicyGuard(security),
+  (req, res) => res.json({ documentId: req.params.id }) // Existing handler stays here.
+)
+```
+
+The guard calls `next()` only after all matching pre-validation policies allow the request. A denial or policy error ends the response using Orvaxis's `ErrorResponse` format; an unmatched Orvaxis route returns 404. The authorized context, including values added through `PolicyResult.modify`, is available to later Express middleware as `res.locals.orvaxis`. The guard does not run Orvaxis plugins, middleware, validation, or route handlers. It rejects a matching route configured with post-validation policies because those require Orvaxis schema validation. Mount it after body parsing and authentication middleware whose values the policies need, and before the existing handler. Remove the guard and the mirrored Orvaxis route declaration to roll back the integration.
+
 ### Query string parsing differs between adapters
 
 `ctx.req.query` is typed as `Record<string, string | string[]>` on both adapters, but Express's default query parser (`qs`, in "extended" mode) does not actually guarantee that shape: bracket notation is parsed into **nested objects**.
@@ -1269,7 +1303,7 @@ server.listen(3000)
 ```
 orvaxis/
   index.ts                   entry point, public API (no optional peer dependencies)
-  express.ts                 orvaxis/express entry point (createExpressServer)
+  express.ts                 orvaxis/express entry point (server adapter and policy guard)
   fastify.ts                 orvaxis/fastify entry point (createFastifyServer)
   otel.ts                    orvaxis/otel entry point (otelPlugin)
   testing.ts                 orvaxis/testing entry point
