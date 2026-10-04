@@ -1154,6 +1154,25 @@ const routes: RouteInfo[] = app.routes()
 // ]
 ```
 
+For policy configuration, `app.inspectRoutes()` returns one static description per route with its inherited global, group, and route policies:
+
+```ts
+const inspected = app.inspectRoutes()
+const users = inspected.find((route) => route.path === "/api/users/:id")
+
+users?.policies.map(({ id, name, layer, phase, priority, order, applicability }) => ({
+  id,
+  name,
+  layer,
+  phase,
+  priority,
+  order,
+  applicability,
+}))
+```
+
+Policies are listed in runtime order: pre-validation global → group → route, then post-validation global → group → route. `id` distinguishes declarations even when names repeat; `nameAmbiguous` flags duplicate names across the endpoint's effective policy set. `applicability.status` is `always`, `never`, or `conditional`: string scopes are compared conservatively with the route template and method, while regexes, predicates, paths crossing route parameters or wildcards, and implicit GET-to-HEAD fallback stay conditional. The inspector never calls policy evaluators, handlers, or scope predicates. This is configuration metadata, not a prediction of the policy result or a security guarantee based on policy names. The existing `app.routes()` API and its `RouteInfo[]` result are unchanged.
+
 ---
 
 ## Documentation

@@ -1,4 +1,14 @@
-import type { Group, Route, RouteInfo, RouteMatch } from "../types"
+import type {
+  Group,
+  HttpMethod,
+  Policy,
+  PolicyInspection,
+  PolicyPhase,
+  Route,
+  RouteInfo,
+  RouteInspection,
+  RouteMatch,
+} from "../types"
 import { HttpError } from "./HttpError"
 import { validateGroup } from "./validation"
 
@@ -140,6 +150,139 @@ class Trie {
   }
 }
 
+type PolicyLayer = PolicyInspection["layer"]
+type PolicySource = { policy: Policy; index: number; layer: PolicyLayer }
+
+function fullRoutePath(prefix: string, routePath: string): string {
+  if (prefix === "/") return routePath || "/"
+  return routePath ? prefix + routePath : prefix
+}
+
+function describeScope(policy: Policy): PolicyInspection["scope"] {
+  const scope = policy.scope
+  if (!scope) return undefined
+  const path = scope.path
+  return {
+    ...(scope.method ? { method: scope.method } : {}),
+    ...(path !== undefined
+      ? {
+          path:
+            typeof path === "function"
+              ? "predicate"
+              : path instanceof RegExp
+                ? path.toString()
+                : path,
+          pathType:
+            typeof path === "function"
+              ? "predicate"
+              : path instanceof RegExp
+                ? "regexp"
+                : "literal",
+        }
+      : {}),
+  }
+}
+
+function scopeApplicability(
+  policy: Policy,
+  routeMethod: HttpMethod,
+  routePath: string,
+  headFallbackAvailable: boolean
+): PolicyInspection["applicability"] {
+  const scope = policy.scope
+  if (!scope) return { status: "always", reason: "no-scope" }
+  if (scope.method) {
+    const scopedMethod = scope.method.toUpperCase()
+    const methodMatches = scopedMethod === routeMethod.toUpperCase()
+    const matchesHeadFallback =
+      routeMethod === "GET" && scopedMethod === "HEAD" && headFallbackAvailable
+    if (!methodMatches && !matchesHeadFallback) {
+      return { status: "never", reason: "method-mismatch" }
+    }
+    if (routeMethod === "GET" && headFallbackAvailable) {
+      return { status: "conditional", reason: "method-alias" }
+    }
+  }
+  const scopePath = scope.path
+  if (scopePath === undefined) {
+    return { status: "always", reason: scope.method ? "method-match" : "no-scope" }
+  }
+  if (typeof scopePath !== "string") return { status: "conditional", reason: "dynamic-path" }
+  if (scopePath.includes("//") || routePath.includes("//")) {
+    return { status: "conditional", reason: "dynamic-path" }
+  }
+
+  const routeSegments = routePath.split("/").filter(Boolean)
+  const scopeSegments = scopePath.split("/").filter(Boolean)
+  let dynamicBeforeMismatch = false
+  for (let i = 0; i < scopeSegments.length; i++) {
+    const routeSegment = routeSegments[i]
+    if (routeSegment === undefined) return { status: "never", reason: "path-no-match" }
+    if (routeSegment.startsWith("*")) {
+      return { status: "conditional", reason: "dynamic-path" }
+    }
+    if (routeSegment.startsWith(":")) {
+      dynamicBeforeMismatch = true
+      continue
+    }
+    if (routeSegment !== scopeSegments[i]) {
+      return dynamicBeforeMismatch
+        ? { status: "conditional", reason: "dynamic-path" }
+        : { status: "never", reason: "path-no-match" }
+    }
+  }
+
+  if (scopePath.endsWith("/") && scopeSegments.length === routeSegments.length) {
+    return { status: "conditional", reason: "dynamic-path" }
+  }
+  return dynamicBeforeMismatch
+    ? { status: "conditional", reason: "dynamic-path" }
+    : { status: "always", reason: "path-prefix" }
+}
+
+function inspectPolicies(
+  sourcesByLayer: Record<PolicyLayer, Policy[]>,
+  routeMethod: HttpMethod,
+  routePath: string,
+  headFallbackAvailable: boolean
+): PolicyInspection[] {
+  const sources: PolicySource[] = (Object.keys(sourcesByLayer) as PolicyLayer[]).flatMap((layer) =>
+    sourcesByLayer[layer].map((policy, index) => ({ policy, index, layer }))
+  )
+  const counts = new Map<string, number>()
+  for (const { policy } of sources) counts.set(policy.name, (counts.get(policy.name) ?? 0) + 1)
+
+  const output: PolicyInspection[] = []
+  const phases: PolicyPhase[] = ["preValidation", "postValidation"]
+  const layers: PolicyLayer[] = ["global", "group", "route"]
+  for (const phase of phases) {
+    for (const layer of layers) {
+      const ordered = sources
+        .filter(({ policy, layer: sourceLayer }) => {
+          return sourceLayer === layer && (policy.phase ?? "preValidation") === phase
+        })
+        .sort((a, b) => (b.policy.priority ?? 0) - (a.policy.priority ?? 0) || a.index - b.index)
+      ordered.forEach(({ policy, index }, order) => {
+        output.push({
+          id: `${layer}:${index}`,
+          name: policy.name,
+          nameAmbiguous: (counts.get(policy.name) ?? 0) > 1,
+          layer,
+          phase,
+          priority: policy.priority ?? 0,
+          order: order + 1,
+          ...(phase === "postValidation" && policy.phase === "postValidation"
+            ? { requires: policy.requires }
+            : {}),
+          ...(describeScope(policy) ? { scope: describeScope(policy) } : {}),
+          applicability: scopeApplicability(policy, routeMethod, routePath, headFallbackAvailable),
+        })
+      })
+    }
+  }
+  return output
+}
+
 export class Router {
   private groups: Group[] = []
   private trie = new Trie()
@@ -157,13 +300,42 @@ export class Router {
     const result: RouteInfo[] = []
     for (const group of this.groups) {
       for (const route of group.routes) {
-        const path =
-          group.prefix === "/"
-            ? route.path || "/"
-            : route.path
-              ? group.prefix + route.path
-              : group.prefix
+        const path = fullRoutePath(group.prefix, route.path)
         result.push({ method: route.method, path, prefix: group.prefix })
+      }
+    }
+    return result
+  }
+
+  inspectRoutes(globalPolicies: readonly Policy[] = []): RouteInspection[] {
+    const result: RouteInspection[] = []
+    for (const group of this.groups) {
+      for (const route of group.routes) {
+        const path = fullRoutePath(group.prefix, route.path)
+        const headFallbackAvailable =
+          route.method === "GET" &&
+          !this.groups.some((candidateGroup) =>
+            candidateGroup.routes.some(
+              (candidateRoute) =>
+                candidateRoute.method === "HEAD" &&
+                fullRoutePath(candidateGroup.prefix, candidateRoute.path) === path
+            )
+          )
+        result.push({
+          method: route.method,
+          path,
+          prefix: group.prefix,
+          policies: inspectPolicies(
+            {
+              global: [...globalPolicies],
+              group: group.policies ?? [],
+              route: route.policies ?? [],
+            },
+            route.method,
+            path,
+            headFallbackAvailable
+          ),
+        })
       }
     }
     return result

@@ -224,6 +224,10 @@ export class PolicyEngine {
     this.policies.push(policy)
   }
 
+  list(): readonly Policy[] {
+    return [...this.policies]
+  }
+
   async evaluate(
     ctx: OrvaxisContext,
     phase: PolicyPhase = "preValidation",

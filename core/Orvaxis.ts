@@ -8,6 +8,7 @@ import type {
   OrvaxisRequest,
   OrvaxisResponse,
   Policy,
+  RouteInspection,
 } from "../types"
 import { Runtime } from "./Runtime"
 
@@ -49,6 +50,10 @@ export class Orvaxis {
 
   routes() {
     return this.runtime.router.routes()
+  }
+
+  inspectRoutes(): RouteInspection[] {
+    return this.runtime.router.inspectRoutes(this.runtime.policies.list())
   }
 
   async handle(req: OrvaxisRequest, res: OrvaxisResponse) {

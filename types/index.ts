@@ -96,6 +96,40 @@ export type RouteInfo = {
   prefix: string
 }
 
+export type PolicyInspection = {
+  /** Stable within the inspected route and distinct even when names are duplicated. */
+  id: string
+  name: string
+  nameAmbiguous: boolean
+  layer: "global" | "group" | "route"
+  phase: PolicyPhase
+  priority: number
+  /** Position after priority sorting within this layer and phase. */
+  order: number
+  requires?: readonly ValidatedRequestField[]
+  scope?: {
+    method?: HttpMethod
+    path?: string
+    pathType?: "literal" | "regexp" | "predicate"
+  }
+  applicability: {
+    status: "always" | "never" | "conditional"
+    reason:
+      | "no-scope"
+      | "method-match"
+      | "method-alias"
+      | "method-mismatch"
+      | "path-prefix"
+      | "path-no-match"
+      | "dynamic-path"
+  }
+}
+
+export type RouteInspection = RouteInfo & {
+  /** Static policy configuration only; no policy, predicate, or handler is executed. */
+  policies: PolicyInspection[]
+}
+
 export type RouteMatch = {
   route: Route
   group: Group
