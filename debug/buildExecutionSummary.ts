@@ -12,6 +12,9 @@ export type ExecutionSummary = {
   route: OrvaxisContext["meta"]["route"]
   duration: number | null
   traceEvents: TraceEvent[]
+  policyDecisions: TraceEvent[]
+  stoppedByPolicy: TraceEvent | undefined
+  notReachedStages: string[]
   debugSteps: Record<string, DebugEntry[]>
   combinedTimeline: UnifiedEvent[]
 }
@@ -22,6 +25,32 @@ export function buildExecutionSummary(ctx: OrvaxisContext): ExecutionSummary {
 
   const duration =
     trace?.endTime != null && trace?.startTime != null ? trace.endTime - trace.startTime : null
+
+  const policyDecisions = (trace?.events ?? []).filter((event) => event.type === "POLICY_DECISION")
+  const stoppedByPolicy = policyDecisions.find((event) => {
+    const outcome = event.meta?.outcome
+    return outcome === "deny" || outcome === "error"
+  })
+  const policyStages = [
+    "global.preValidation",
+    "group.preValidation",
+    "route.preValidation",
+    "beforePipeline",
+    "globalPipeline",
+    "groupMiddleware",
+    "routeMiddleware",
+    "validation",
+    "global.postValidation",
+    "group.postValidation",
+    "route.postValidation",
+    "beforeHandler",
+    "handler",
+  ]
+  const stoppedStage = stoppedByPolicy
+    ? `${String(stoppedByPolicy.meta?.layer)}.${String(stoppedByPolicy.meta?.phase)}`
+    : undefined
+  const stopIndex = stoppedStage ? policyStages.indexOf(stoppedStage) : -1
+  const notReachedStages = stopIndex >= 0 ? policyStages.slice(stopIndex + 1) : []
 
   const debugSteps = (debug?.timeline ?? []).reduce<Record<string, DebugEntry[]>>((acc, ev) => {
     const group = ev.event.split(":")[0]
@@ -50,6 +79,9 @@ export function buildExecutionSummary(ctx: OrvaxisContext): ExecutionSummary {
     route: ctx.meta.route,
     duration,
     traceEvents: trace?.events ?? [],
+    policyDecisions,
+    stoppedByPolicy,
+    notReachedStages,
     debugSteps,
     combinedTimeline,
   }

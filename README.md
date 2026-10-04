@@ -296,6 +296,21 @@ Lifecycle events that allow observation of execution:
 
 Policies run in two phases. Existing policies default to `preValidation`, so authentication and other early checks keep their current behavior. A policy that depends on parsed input can use `phase: "postValidation"` and declare a non-empty `requires` list (`body`, `params`, `query`, or `headers`). It runs only after `onValidation`; Orvaxis rejects the request with a configuration error if `schemaValidationPlugin` is missing or the matched route does not define every required schema. Invalid input fails validation (422) before such a policy runs.
 
+Policy decisions are added to `ctx.meta.trace.events` as `POLICY_DECISION` events. Each event reports the policy name, layer (`global`, `group`, or `route`), phase, order within that layer, priority, elapsed time, and outcome (`allow`, `deny`, `skipped`, or `error`). Denials and evaluation errors are terminal; later request stages do not run. The same events appear in `buildExecutionSummary().policyDecisions` and are forwarded to OpenTelemetry spans.
+
+Collection defaults to a bounded summary of at most 100 decisions per request. `maxEvents` accepts 1–1000. Policy decision events do not copy request bodies, headers, cookies, identity values, free-form denial reasons, or exception messages. Names should be stable configuration labels, never values derived from a request. Configure collection on `Orvaxis`:
+
+```ts
+const app = new Orvaxis({
+  policyTrace: { mode: "summary", maxEvents: 100 }, // default
+  // policyTrace: { mode: "off" },
+  // Detailed mode requires a redactor for free-form denial reasons.
+  // policyTrace: { mode: "detailed", redact: (reason) => redact(reason) },
+})
+```
+
+Detailed mode adds static scope descriptions and denial reasons only after the supplied redactor processes them. If redaction throws, the reason is omitted and request handling continues. When the event limit is reached, one `POLICY_TRACE_LIMIT` marker reports truncation. Choose `off` for requests where policy-trace collection is unnecessary.
+
 `onNotFound` and `onMethodNotAllowed` can short-circuit the error path: if a listener sends a response (`ctx.res.sent === true`), the runtime skips the `HttpError` and returns normally without triggering `onError`. If no listener sends a response, the error is thrown as usual.
 
 `afterPipeline` runs after a successful runtime lifecycle, including a handled 404/405 and middleware short-circuit. It is not called for a failed request; use `onError` for failure logging and cleanup. The trace is finalized before either completion hook runs.
@@ -632,7 +647,10 @@ app.on("afterPipeline", (ctx) => {
   const summary = buildExecutionSummary(ctx)
   // summary.requestId      — from ctx.meta.trace
   // summary.duration       — total ms
-  // summary.traceEvents    — user-emitted events (traceEvent / traceMiddleware)
+  // summary.traceEvents    — all trace events, including custom and policy events
+  // summary.policyDecisions — automatic policy outcomes in execution order
+  // summary.stoppedByPolicy — the terminal deny/error decision, if any
+  // summary.notReachedStages — later policy/request stages skipped after that decision
   // summary.debugSteps     — internal lifecycle events grouped by phase (requires debugger enabled)
   // summary.combinedTimeline — all events merged and sorted by timestamp, each with a `kind` field ("trace" | "debug")
   // summary.route          — matched route + group
@@ -1101,7 +1119,7 @@ const streamed = await testRequest(app, { path: "/api/stream" })
 // streamed.ended   → true                   (ctx.res.end was called)
 ```
 
-`TestRequestInit` accepts `path`, `method` (defaults to `"GET"`), `headers`, `query`, `id`, and any additional field (e.g. `body`) which is forwarded directly onto `req`. `query` is typed as `Record<string, string | string[]>` and maps directly to `ctx.req.query` inside the handler: `testRequest` never throws — errors thrown during execution are captured in `result.error`, the request context remains available in `result.ctx`, and the error's `.status` property (if present) is reflected in `result.status`. Failed traces are finalized before `onError`, and `trace.events` includes each evaluated policy's name, phase, allow/deny result, and denial reason. The error remains the original thrown error; `testRequest` does not build the HTTP `ErrorResponse` envelope produced by adapters. For streaming handlers, `result.chunks` holds all values passed to `ctx.res.write` and `ctx.res.end`, and `result.ended` is `true` when `ctx.res.end` was called.
+`TestRequestInit` accepts `path`, `method` (defaults to `"GET"`), `headers`, `query`, `id`, and any additional field (e.g. `body`) which is forwarded directly onto `req`. `query` is typed as `Record<string, string | string[]>` and maps directly to `ctx.req.query` inside the handler: `testRequest` never throws — errors thrown during execution are captured in `result.error`, the request context remains available in `result.ctx`, and the error's `.status` property (if present) is reflected in `result.status`. Failed traces are finalized before `onError`, and `trace.events` contains bounded policy decisions according to the configured `policyTrace` mode. The error remains the original thrown error; `testRequest` does not build the HTTP `ErrorResponse` envelope produced by adapters. For streaming handlers, `result.chunks` holds all values passed to `ctx.res.write` and `ctx.res.end`, and `result.ended` is `true` when `ctx.res.end` was called.
 
 All testing utilities are available from the `orvaxis/testing` sub-path and are excluded from the production bundle:
 

@@ -104,9 +104,17 @@ describe("testRequest", () => {
       expect(res.ctx?.meta.trace?.events).toContainEqual(
         expect.objectContaining({
           type: "POLICY_DECISION",
-          meta: { policy: "blocker", phase: "preValidation", allowed: false, reason: "Forbidden" },
+          meta: expect.objectContaining({
+            policy: "blocker",
+            layer: "global",
+            phase: "preValidation",
+            outcome: "deny",
+            terminal: true,
+            allowed: false,
+          }),
         })
       )
+      expect(JSON.stringify(res.ctx?.meta.trace)).not.toContain("Forbidden")
     })
 
     it("reflects a custom error status from a thrown error", async () => {

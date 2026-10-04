@@ -50,6 +50,21 @@ const engineMeta = makeEngine([allowWithMeta])
 const engineScoped = makeEngine([scopedToPath])
 const engineScopedNoMatch = makeEngine([scopedToPath])
 const engineRegex = makeEngine([scopedToRegex])
+const tracingEngine = makeEngine(makeAllowAllPolicies(5))
+const denyingEngine = makeEngine([
+  { name: "private-check", evaluate: () => ({ allow: false, reason: "user 42 is not an owner" }) },
+])
+const detailedTrace = {
+  mode: "detailed" as const,
+  redact: (reason: string) => reason,
+  maxEvents: 100,
+}
+
+function makeTraceContext() {
+  const context = createContext({ path: "/api/users", method: "GET", headers: {} }, createMockResponse())
+  context.meta.tracer = { event: () => {} }
+  return context
+}
 
 describe("PolicyEngine — N always-allow policies", () => {
   bench("1 policy", async () => {
@@ -83,5 +98,34 @@ describe("PolicyEngine — modify/scope overhead", () => {
     await engineRegex.evaluate(
       createContext({ path: "/api/users/99", method: "GET", headers: {} }, createMockResponse()),
     )
+  })
+})
+
+describe("PolicyEngine — policy trace overhead", () => {
+  bench("trace disabled", async () => {
+    await tracingEngine.evaluate(makeTraceContext(), "preValidation", {
+      layer: "global",
+      trace: { mode: "off" },
+    })
+  })
+
+  bench("summary trace", async () => {
+    await tracingEngine.evaluate(makeTraceContext(), "preValidation", {
+      layer: "global",
+      trace: { mode: "summary", maxEvents: 100 },
+    })
+  })
+
+  bench("detailed trace", async () => {
+    await tracingEngine.evaluate(makeTraceContext(), "preValidation", {
+      layer: "global",
+      trace: detailedTrace,
+    })
+  })
+
+  bench("detailed denial with redaction", async () => {
+    await denyingEngine
+      .evaluate(makeTraceContext(), "preValidation", { layer: "global", trace: detailedTrace })
+      .catch(() => {})
   })
 })

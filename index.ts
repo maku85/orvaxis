@@ -39,6 +39,7 @@ export type {
   Policy,
   PolicyResult,
   PolicyScope,
+  PolicyTraceOptions,
   Route,
   RouteInfo,
   RouteMatch,

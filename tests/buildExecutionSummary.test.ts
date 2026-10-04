@@ -95,6 +95,24 @@ describe("buildExecutionSummary", () => {
     expect(buildExecutionSummary(ctx).traceEvents).toEqual([])
   })
 
+  it("exposes policy decisions and later stages not reached after a denial", () => {
+    const denied: TraceEvent = {
+      type: "POLICY_DECISION",
+      timestamp: 12,
+      meta: {
+        policy: "owner",
+        layer: "route",
+        phase: "postValidation",
+        outcome: "deny",
+        terminal: true,
+      },
+    }
+    const summary = buildExecutionSummary(makeCtx({ traceEvents: [denied] }))
+    expect(summary.policyDecisions).toEqual([denied])
+    expect(summary.stoppedByPolicy).toBe(denied)
+    expect(summary.notReachedStages).toEqual(["beforeHandler", "handler"])
+  })
+
   it("groups debug timeline events by the prefix before ':'", () => {
     const ctx = makeCtx({
       timeline: [

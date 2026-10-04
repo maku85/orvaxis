@@ -7,6 +7,7 @@ import type {
   OrvaxisResponse,
   Policy,
   PolicyPhase,
+  PolicyTraceOptions,
 } from "../types"
 import { createContext } from "./Context"
 import { captureContext, runWithContext } from "./contextStore"
@@ -14,10 +15,13 @@ import { Debugger } from "./Debugger"
 import { HookSystem } from "./Hook"
 import { HttpError } from "./HttpError"
 import { Pipeline } from "./Pipeline"
-import { matchesPolicyScope, PolicyEngine, sortPolicies } from "./PolicyEngine"
+import {
+  evaluatePolicies as evaluatePolicySet,
+  PolicyEngine,
+  type PolicyLayer,
+} from "./PolicyEngine"
 import { Router } from "./Router"
 import { Tracer } from "./Tracer"
-import { mergeSafe } from "./utils"
 import { validateRequest } from "./validation"
 
 function generateId(): string {
@@ -82,10 +86,21 @@ export class Runtime {
   readonly router = new Router()
 
   private readonly logsMaxSize: number | undefined
+  private readonly policyTrace: PolicyTraceOptions
 
   constructor(options: OrvaxisOptions = {}) {
     this.hooks = new HookSystem(options.logger)
     this.logsMaxSize = options.logsMaxSize
+    const traceOptions = options.policyTrace
+    const requestedLimit = traceOptions?.maxEvents ?? 100
+    const maxEvents = Number.isFinite(requestedLimit)
+      ? Math.min(1000, Math.max(1, Math.floor(requestedLimit)))
+      : 100
+    if (traceOptions?.mode === "detailed") {
+      this.policyTrace = { ...traceOptions, maxEvents }
+    } else {
+      this.policyTrace = { mode: traceOptions?.mode ?? "summary", maxEvents }
+    }
   }
 
   addPlugin(plugin: Plugin) {
@@ -152,9 +167,12 @@ export class Runtime {
         }
 
         this.debugger.log(ctx, "POLICY_START")
-        await this.policies.evaluate(ctx)
-        await this.evaluatePolicies(match.group.policies ?? [], ctx)
-        await this.evaluatePolicies(match.route.policies ?? [], ctx)
+        await this.policies.evaluate(ctx, "preValidation", {
+          layer: "global",
+          trace: this.policyTrace,
+        })
+        await this.evaluatePolicies(match.group.policies ?? [], ctx, "group")
+        await this.evaluatePolicies(match.route.policies ?? [], ctx, "route")
         this.debugger.log(ctx, "POLICY_END")
 
         await this.hooks.trigger("beforePipeline", ctx)
@@ -175,11 +193,13 @@ export class Runtime {
         this.debugger.log(ctx, "HOOK:onValidation")
         if (ctx.res.sent) return await this.finishRequest(ctx, tracer)
 
-        await this.policies.evaluate(ctx, "postValidation", (policy) =>
-          this.assertPolicyRequirements(policy, ctx)
-        )
-        await this.evaluatePolicies(match.group.policies ?? [], ctx, "postValidation")
-        await this.evaluatePolicies(match.route.policies ?? [], ctx, "postValidation")
+        await this.policies.evaluate(ctx, "postValidation", {
+          layer: "global",
+          trace: this.policyTrace,
+          beforeEvaluate: (policy) => this.assertPolicyRequirements(policy, ctx),
+        })
+        await this.evaluatePolicies(match.group.policies ?? [], ctx, "group", "postValidation")
+        await this.evaluatePolicies(match.route.policies ?? [], ctx, "route", "postValidation")
 
         await this.hooks.trigger("beforeHandler", ctx)
         this.debugger.log(ctx, "HOOK:beforeHandler")
@@ -231,27 +251,16 @@ export class Runtime {
   private async evaluatePolicies(
     policies: Policy[],
     ctx: OrvaxisContext,
+    layer: PolicyLayer,
     phase: PolicyPhase = "preValidation"
   ): Promise<void> {
-    const sorted = sortPolicies(policies)
-    for (const policy of sorted) {
-      if ((policy.phase ?? "preValidation") !== phase) continue
-      if (!matchesPolicyScope(policy.scope, ctx)) continue
-      if (phase === "postValidation") this.assertPolicyRequirements(policy, ctx)
-      const result = await policy.evaluate(ctx)
-      ctx.meta.tracer?.event("POLICY_DECISION", {
-        policy: policy.name,
-        phase,
-        allowed: result.allow,
-        ...(result.allow ? {} : { reason: result.reason }),
-      })
-      if (!result.allow) {
-        throw new HttpError(result.status ?? 403, result.reason ?? `Blocked by ${policy.name}`)
-      }
-      if (result.modify) {
-        mergeSafe(ctx.meta, result.modify)
-      }
-    }
+    await evaluatePolicySet(policies, ctx, phase, {
+      layer,
+      trace: this.policyTrace,
+      ...(phase === "postValidation"
+        ? { beforeEvaluate: (policy: Policy) => this.assertPolicyRequirements(policy, ctx) }
+        : {}),
+    })
   }
 
   private assertPolicyRequirements(policy: Policy, ctx: OrvaxisContext): void {

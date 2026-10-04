@@ -115,8 +115,18 @@ export function otelPlugin({ tracer }: OtelPluginOptions) {
         state.pipeline?.end()
         state.handler?.end()
         const { root } = state
-        if (err) root.recordException(err)
-        root.setStatus({ code: SpanStatusCode.ERROR, message: err?.message })
+        const policyName = err instanceof HttpError ? err.policyName : undefined
+        if (policyName) {
+          const safeError = new Error(`Policy denied: ${policyName}`)
+          safeError.name = "PolicyDeniedError"
+          root.recordException(safeError)
+        } else if (err) {
+          root.recordException(err)
+        }
+        root.setStatus({
+          code: SpanStatusCode.ERROR,
+          message: policyName ? `Policy denied: ${policyName}` : err?.message,
+        })
         const statusCode = err instanceof HttpError ? err.status : ctx.res.statusCode
         root.setAttribute("http.response.status_code", statusCode)
         const orvaxisTrace = ctx.meta.trace as Trace | undefined

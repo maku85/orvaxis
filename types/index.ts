@@ -13,9 +13,24 @@ export interface Logger {
   error(...args: unknown[]): void
 }
 
+type PolicyTraceBase = {
+  /** Maximum recorded policy decisions per request (default: 100). */
+  maxEvents?: number
+}
+
+export type PolicyTraceOptions =
+  | (PolicyTraceBase & { mode?: "summary" | "off" })
+  | (PolicyTraceBase & {
+      mode: "detailed"
+      /** Redacts a policy's free-form denial reason before it enters the trace. */
+      redact: (reason: string, policyName: string) => string
+    })
+
 export type OrvaxisOptions = {
   logger?: Logger
   logsMaxSize?: number
+  /** Policy decision collection defaults to a bounded, privacy-safe summary. */
+  policyTrace?: PolicyTraceOptions
 }
 
 export interface TracerLike {
