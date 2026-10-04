@@ -1205,6 +1205,33 @@ it("enforces document permissions", async () => {
 
 For a complete anonymous/owner/other-user/other-tenant/admin example, run `pnpm exec tsx examples/policy-matrix.ts`. The report contains scenario names, status, policy, and handler reachability; it omits request headers and values. `ctx.meta.trace.handlerExecuted` records whether the runtime invoked the route handler, including when that handler throws.
 
+#### Static policy requirements for CI
+
+`checkPolicyRequirements` checks an inspected route inventory without executing policy predicates, evaluators, or handlers. Selectors use exact route templates or path globs: `*` matches one segment, and `**` matches zero or more trailing segments. Method filters and exceptions keep public endpoints explicit; every exception requires a reason. A selector matching no routes fails so a typo cannot pass vacuously.
+
+```ts
+import { expect, it } from "vitest"
+import { checkPolicyRequirements, formatPolicyRequirementReport } from "orvaxis/testing"
+
+it("keeps authentication on private endpoints", () => {
+  const report = checkPolicyRequirements(app.inspectRoutes(), [
+    {
+      name: "private API authentication",
+      paths: ["/api/private/**"],
+      methods: ["GET", "POST"],
+      requirePolicies: ["authenticate"],
+      exceptions: [
+        { path: "/api/private/health", methods: ["GET"], reason: "Public health probe" },
+      ],
+    },
+  ])
+
+  expect(report.passed, formatPolicyRequirementReport(report)).toBe(true)
+})
+```
+
+Each selected route is reported as `PASS`, `FAIL`, `UNVERIFIABLE`, or `EXCLUDED`. A required policy whose scope is conditional—such as a regex or predicate—is `UNVERIFIABLE` by default and does not fail the report; pass `{ failOnUnverifiable: true }` to make that strict in CI. Missing policies and selectors that match no routes always fail. The static check only verifies declared policy configuration; it cannot prove what an arbitrary `evaluate()` function does. Keep runtime permission cases in a separate `testPolicyMatrix` assertion. Run `pnpm exec tsx examples/policy-ci-check.ts` for both checks together.
+
 ### Route introspection
 
 `app.routes()` returns the flat list of all registered routes as `RouteInfo[]`, useful for OpenAPI generation and admin tooling:
@@ -1349,6 +1376,7 @@ orvaxis/
     contextStore.ts          AsyncLocalStorage store (getContext)
     HttpError.ts             HttpError class (status + message + cause)
     testHarness.ts           testRequest and policy-matrix helpers for unit testing
+    policyRequirements.ts    static route-policy checks for CI (exported via orvaxis/testing)
     mockResponse.ts          createMockResponse (exported via orvaxis/testing)
     utils.ts                 shared utilities (mergeSafe, UNSAFE_KEYS)
 
@@ -1377,6 +1405,7 @@ orvaxis/
     express-server.ts        minimal Express setup
     policy-server.ts         global and route-level policies
     policy-matrix.ts         identity, ownership, tenant, and admin test scenarios
+    policy-ci-check.ts       static policy requirements plus dynamic permission checks
     hooks-and-plugins.ts     lifecycle hooks and plugin registration
     debug-trace.ts           debugger, traceEvent, and buildExecutionSummary
     typed-context.ts         typed OrvaxisContext, getContext, traceEvent
