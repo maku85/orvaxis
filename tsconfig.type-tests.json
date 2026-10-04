@@ -7,6 +7,9 @@
   "include": [
     "tests/defineRoute.types.ts",
     "examples/quickstart.ts",
+    "examples/tenant-tasks.ts",
+    "examples/tenant-tasks-check.ts",
+    "examples/tenant-tasks-server.ts",
     "examples/typed-schema.ts",
     "express.ts"
   ],

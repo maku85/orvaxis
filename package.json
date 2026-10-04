@@ -103,6 +103,7 @@
     "format": "biome format . --write",
     "check": "biome check .",
     "typecheck:tests": "tsc --noEmit -p tsconfig.type-tests.json",
+    "check:tenant-demo": "tsx examples/tenant-tasks-check.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",

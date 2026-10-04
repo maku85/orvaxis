@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Runnable multi-tenant task example** — a shared Express demo now covers tenant isolation, task ownership, and admin roles with fixture identities; its trace output, seven-scenario permission matrix, and static route-policy requirements are executed by CI. Storage is explicitly in-memory and demo-only.
+
 - **Outcome-focused onboarding documentation** — the README now starts with an executable protected-route example; new guides cover adding Orvaxis to an existing Express route and tracing a 403 to its terminal policy. Detailed runtime concepts and lifecycle semantics live in linked reference pages.
 
 - **Status-specific response contracts and OpenAPI 3.1 generation** — routes may declare response validators and opt into strict or warning-mode output validation. Streaming responses are never buffered and are reported or rejected when a matching schema exists. `orvaxis/openapi` generates request/response documentation from route inspection using a caller-supplied validator-to-JSON-Schema converter, with no added runtime dependency.

@@ -25,6 +25,7 @@ pnpm install
 | `pnpm check` | Biome lint and format checks (same command as CI) |
 | `pnpm tsc --noEmit` | Type-check source without emitting files (same as CI) |
 | `pnpm typecheck:tests` | Type-check public API usage examples (same as CI) |
+| `pnpm check:tenant-demo` | Verify multi-tenant policy requirements, traces, and permission matrix (same as CI) |
 
 ## Project structure
 

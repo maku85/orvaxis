@@ -40,6 +40,9 @@ jobs:
       - name: Type-check API examples
         run: pnpm typecheck:tests
 
+      - name: Check multi-tenant demo policies and permission matrix
+        run: pnpm check:tenant-demo
+
       - name: Test
         run: pnpm test:coverage
 

@@ -540,6 +540,7 @@ Policies are listed in runtime order: pre-validation global → group → route,
 
 - [Quickstart](#quickstart) — protect one route and see the allowed/denied result
 - [Add Orvaxis to an existing Express route](docs/guide/integrate-existing-route.md) — add policy checks without moving the handler
+- [Multi-tenant task demo](docs/guide/multi-tenant-demo.md) — runnable tenant, ownership, roles, traces, permission matrix, and CI checks
 - [Diagnose a 403](docs/guide/diagnose-403.md) — find the terminal policy and verify skipped stages
 - [Request lifecycle reference](docs/reference/lifecycle.md) — hook, middleware, validation, and policy order
 - [Core concepts reference](docs/reference/core-concepts.md) — router, policies, hooks, plugins, tracing, and context
@@ -551,6 +552,8 @@ Policies are listed in runtime order: pre-validation global → group → route,
 ---
 
 ## Example Usage
+
+The [multi-tenant task demo](docs/guide/multi-tenant-demo.md) includes runnable server commands, fixture identities, expected responses, permission traces, and the CI check. Its fixture storage is in-memory and local to the process.
 
 ### Express
 ```ts
@@ -671,6 +674,10 @@ orvaxis/
     policy-server.ts         global and route-level policies
     policy-matrix.ts         identity, ownership, tenant, and admin test scenarios
     policy-ci-check.ts       static policy requirements plus dynamic permission checks
+    tenant-tasks.ts          shared multi-tenant task fixtures, policies, and permission matrix
+    tenant-tasks-server.ts   runnable Express API for the multi-tenant task example
+    tenant-tasks-check.ts    CI policy requirements, matrix assertions, and decision traces
+    quickstart.ts            protected-route Express quickstart
     typed-schema.ts          inferred body, params, query, and header outputs
     hooks-and-plugins.ts     lifecycle hooks and plugin registration
     debug-trace.ts           debugger, traceEvent, and buildExecutionSummary
