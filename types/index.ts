@@ -128,6 +128,8 @@ export type PolicyInspection = {
 export type RouteInspection = RouteInfo & {
   /** Static policy configuration only; no policy, predicate, or handler is executed. */
   policies: PolicyInspection[]
+  schema?: RouteSchema
+  responses?: RouteResponseSchemas
 }
 
 export type RouteMatch = {
@@ -204,6 +206,9 @@ export type RouteSchema = {
   headers?: SchemaField
 }
 
+/** Optional response validators keyed by the HTTP status returned by the handler. */
+export type RouteResponseSchemas = Record<number, SchemaField>
+
 export type Route<
   TState extends Record<string, unknown> = Record<string, unknown>,
   TMeta extends Record<string, unknown> = Record<never, never>,
@@ -214,6 +219,7 @@ export type Route<
   middleware?: Middleware<TState, TMeta>[]
   policies?: Policy<TState, TMeta>[]
   schema?: RouteSchema
+  responses?: RouteResponseSchemas
 }
 
 export type ServerAdapter = {

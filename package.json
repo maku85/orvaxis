@@ -55,6 +55,16 @@
         "types": "./dist/otel.d.ts",
         "default": "./dist/otel.js"
       }
+    },
+    "./openapi": {
+      "import": {
+        "types": "./dist/esm/openapi.d.ts",
+        "default": "./dist/esm/openapi.js"
+      },
+      "require": {
+        "types": "./dist/openapi.d.ts",
+        "default": "./dist/openapi.js"
+      }
     }
   },
   "files": [

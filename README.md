@@ -808,6 +808,46 @@ For schema inference together with custom `ctx.state` or `ctx.meta` types, provi
 
 Run `pnpm exec tsx examples/typed-schema.ts` to see the transformed values produced by the same route at runtime.
 
+#### Response contracts and OpenAPI
+
+Routes may declare validators by response status. Register `responseValidationPlugin()` to validate values passed to `ctx.res.json()` or `ctx.res.send()`; the parsed value is sent, so validator transforms are preserved. The default `strict` mode turns invalid output into an HTTP 500 error. Use `mode: "warn"` to report safe route/status metadata and send the original value while migrating existing handlers.
+
+```ts
+import { responseValidationPlugin } from "orvaxis"
+
+app.register(responseValidationPlugin({ mode: "strict" }))
+app.group({
+  prefix: "/api",
+  routes: [{
+    method: "GET",
+    path: "/items/:id",
+    schema: { params: z.object({ id: z.string() }) },
+    responses: {
+      200: z.object({ id: z.string(), name: z.string() }),
+      404: z.object({ error: z.string() }),
+    },
+    handler: (ctx) => ctx.res.json({ id: ctx.params.id, name: "Example" }),
+  }],
+})
+```
+
+Response validation is opt-in and only covers JSON/body values sent through the Orvaxis response methods. It selects the schema using the final status code. Adapter-generated errors and failures that occur before the handler (for example, Express JSON parsing errors) are outside this plugin's boundary. Streaming routes are never buffered: in `strict` mode the first `write`, `pipe`, or chunked `end` fails if that status has a declared schema; in `warn` mode the plugin reports `stream-not-validated` and lets the stream pass through. Leave streaming response schemas undeclared.
+
+OpenAPI generation is available from the optional `orvaxis/openapi` subpath and has no runtime dependency on a validator library. Supply a converter because `.parse()` alone does not expose a JSON Schema:
+
+```ts
+import { generateOpenApiDocument } from "orvaxis/openapi"
+import { z } from "zod"
+
+const document = generateOpenApiDocument(app, {
+  title: "Example API",
+  version: "1.0.0",
+  schemaConverter: (validator) => z.toJSONSchema(validator as z.ZodType),
+})
+```
+
+The generator emits OpenAPI 3.1 paths, JSON request bodies, query/header/path parameters, declared JSON responses, and a default Orvaxis error envelope. It reads route metadata only; it never executes handlers or policies. Unsupported or non-object converter output raises a `TypeError` naming the route and schema field instead of silently omitting the contract. OpenAPI cannot express the runtime's streaming validation restriction, so streaming endpoints should omit response schemas and document their media type separately.
+
 ---
 
 ### Request-scoped Context
@@ -1409,6 +1449,10 @@ orvaxis/
     loggerPlugin.ts          built-in logger plugin
     otelPlugin.ts            OpenTelemetry SERVER span per request + orvaxis.pipeline/orvaxis.handler child spans (exported via orvaxis/otel, requires @opentelemetry/api)
     schemaValidationPlugin.ts body/params/query/headers validation via route.schema
+    responseValidationPlugin.ts status-specific handler response validation; streaming is not buffered
+
+  openapi/
+    generateOpenApiDocument.ts  optional-converter OpenAPI 3.1 generation from inspected routes (orvaxis/openapi)
 
   types/
     index.ts                 all shared types

@@ -21,6 +21,12 @@ export { traceMiddleware } from "./middleware/traceMiddleware"
 export { type CorsOptions, corsPlugin } from "./plugins/corsPlugin"
 export { loggerPlugin } from "./plugins/loggerPlugin"
 export { type Plugin, PluginManager } from "./plugins/PluginManager"
+export {
+  type ResponseValidationIssue,
+  type ResponseValidationMode,
+  type ResponseValidationOptions,
+  responseValidationPlugin,
+} from "./plugins/responseValidationPlugin"
 export { schemaValidationPlugin } from "./plugins/schemaValidationPlugin"
 export type {
   ContextMeta,
@@ -46,6 +52,7 @@ export type {
   RouteInfo,
   RouteInspection,
   RouteMatch,
+  RouteResponseSchemas,
   RouteSchema,
   SchemaField,
   ServerAdapter,

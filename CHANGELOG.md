@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Status-specific response contracts and OpenAPI 3.1 generation** — routes may declare response validators and opt into strict or warning-mode output validation. Streaming responses are never buffered and are reported or rejected when a matching schema exists. `orvaxis/openapi` generates request/response documentation from route inspection using a caller-supplied validator-to-JSON-Schema converter, with no added runtime dependency.
+
 - **Full schema output inference in `defineRoute()`** — handler types now derive body, params, query, and headers from each validator's parsed output, including coercions and transforms. Typed routes fail with a configuration error if `schemaValidationPlugin` is absent instead of running with unvalidated values; explicit body-type calls remain supported.
 
 - **Static policy requirements for CI** — `checkPolicyRequirements(app.inspectRoutes(), rules)` verifies required policies across route path sets with method filters and reasoned exceptions. Missing policies and selectors with no routes fail; conditional scopes are reported as unverifiable and can be made CI failures with `failOnUnverifiable`. The check never executes policy code; runtime behavior remains covered separately by `testPolicyMatrix()`.

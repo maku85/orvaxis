@@ -325,6 +325,8 @@ export class Router {
           method: route.method,
           path,
           prefix: group.prefix,
+          ...(route.schema ? { schema: route.schema } : {}),
+          ...(route.responses ? { responses: route.responses } : {}),
           policies: inspectPolicies(
             {
               global: [...globalPolicies],

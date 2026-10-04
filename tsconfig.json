@@ -18,6 +18,8 @@
     "express.ts",
     "fastify.ts",
     "otel.ts",
+    "openapi.ts",
+    "openapi/**/*.ts",
     "core/**/*.ts",
     "debug/**/*.ts",
     "http/**/*.ts",
