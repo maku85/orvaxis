@@ -1,4 +1,5 @@
 import type { OrvaxisContext, OrvaxisRequest, OrvaxisResponse } from "../types"
+import { runWithContextCapture } from "./contextStore"
 import { createMockResponse } from "./mockResponse"
 
 export type TestRequestInit = {
@@ -32,7 +33,12 @@ export async function testRequest(
   let error: Error | undefined
 
   try {
-    ctx = await app.handle(req, res)
+    ctx = await runWithContextCapture(
+      (captured) => {
+        ctx = captured
+      },
+      () => app.handle(req, res)
+    )
   } catch (err) {
     error = err as Error
   }

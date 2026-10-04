@@ -55,6 +55,12 @@ export class PolicyEngine {
       beforeEvaluate?.(policy)
 
       const result: PolicyResult = await policy.evaluate(ctx)
+      ctx.meta.tracer?.event("POLICY_DECISION", {
+        policy: policy.name,
+        phase,
+        allowed: result.allow,
+        ...(result.allow ? {} : { reason: result.reason }),
+      })
 
       if (!result.allow) {
         throw new HttpError(result.status ?? 403, result.reason ?? `Blocked by ${policy.name}`)

@@ -82,12 +82,15 @@ describe("testRequest", () => {
       expect(res.status).toBe(404)
       expect(res.error).toBeDefined()
       expect(res.error?.message).toContain("Not Found")
-      expect(res.ctx).toBeUndefined()
+      expect(res.ctx?.meta.trace?.outcome).toBe("error")
     })
 
-    it("returns status 403 when a policy blocks the request", async () => {
+    it("returns the failed context, finalized trace, and denying policy decision on 403", async () => {
       const app = new Orvaxis()
-      app.policy({ name: "blocker", evaluate: async () => ({ allow: false, reason: "Forbidden" }) })
+      app.policy({
+        name: "blocker",
+        evaluate: async () => ({ allow: false, reason: "Forbidden" }),
+      })
       app.group({
         prefix: "/secure",
         routes: [{ method: "GET", path: "/data", handler: async () => {} }],
@@ -96,6 +99,14 @@ describe("testRequest", () => {
       const res = await testRequest(app, { path: "/secure/data" })
       expect(res.status).toBe(403)
       expect(res.error?.message).toBe("Forbidden")
+      expect(res.ctx?.error).toBe(res.error)
+      expect(res.ctx?.meta.trace).toMatchObject({ outcome: "error", endTime: expect.any(Number) })
+      expect(res.ctx?.meta.trace?.events).toContainEqual(
+        expect.objectContaining({
+          type: "POLICY_DECISION",
+          meta: { policy: "blocker", phase: "preValidation", allowed: false, reason: "Forbidden" },
+        })
+      )
     })
 
     it("reflects a custom error status from a thrown error", async () => {
@@ -116,10 +127,12 @@ describe("testRequest", () => {
       const res = await testRequest(app, { path: "/api/fail" })
       expect(res.status).toBe(410)
       expect(res.error?.message).toBe("Gone")
+      expect(res.ctx?.error).toBe(res.error)
     })
 
     it("does not throw even when the handler throws", async () => {
       const app = new Orvaxis()
+      const originalError = new Error("unexpected")
       app.group({
         prefix: "/api",
         routes: [
@@ -127,7 +140,7 @@ describe("testRequest", () => {
             method: "GET",
             path: "/boom",
             handler: async () => {
-              throw new Error("unexpected")
+              throw originalError
             },
           },
         ],
@@ -136,6 +149,8 @@ describe("testRequest", () => {
       await expect(testRequest(app, { path: "/api/boom" })).resolves.not.toThrow()
       const res = await testRequest(app, { path: "/api/boom" })
       expect(res.error?.message).toBe("unexpected")
+      expect(res.error).toBe(originalError)
+      expect(res.ctx?.error).toBe(res.error)
     })
   })
 

@@ -9,7 +9,7 @@ import type {
   PolicyPhase,
 } from "../types"
 import { createContext } from "./Context"
-import { runWithContext } from "./contextStore"
+import { captureContext, runWithContext } from "./contextStore"
 import { Debugger } from "./Debugger"
 import { HookSystem } from "./Hook"
 import { HttpError } from "./HttpError"
@@ -95,6 +95,7 @@ export class Runtime {
 
   async execute(req: OrvaxisRequest, res: OrvaxisResponse): Promise<OrvaxisContext> {
     const ctx = createContext(req, res, this.logsMaxSize)
+    captureContext(ctx)
     const tracer = new Tracer(req.id ?? generateId())
     ctx.meta.tracer = tracer
 
@@ -238,6 +239,12 @@ export class Runtime {
       if (!matchesPolicyScope(policy.scope, ctx)) continue
       if (phase === "postValidation") this.assertPolicyRequirements(policy, ctx)
       const result = await policy.evaluate(ctx)
+      ctx.meta.tracer?.event("POLICY_DECISION", {
+        policy: policy.name,
+        phase,
+        allowed: result.allow,
+        ...(result.allow ? {} : { reason: result.reason }),
+      })
       if (!result.allow) {
         throw new HttpError(result.status ?? 403, result.reason ?? `Blocked by ${policy.name}`)
       }
