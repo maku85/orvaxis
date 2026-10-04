@@ -45,7 +45,8 @@ createExpressServer(app).listen(3000)
 
 **Notes:**
 - `modify` injects data into `ctx.meta`, available to all downstream handlers.
-- Global policies run before group and route policies, in priority order.
+- Policy layers run global → group → route; priority is sorted within each layer.
+- Equal priorities preserve registration order globally and declaration order in groups/routes.
 - To scope a policy to specific routes, use [`scope`](#policy-scoping).
 
 ---
@@ -95,6 +96,7 @@ app.policy(requireAdmin)
 ## 3. Policy scoping
 
 Apply a policy only to specific paths or methods without modifying route definitions.
+The same scope matching rules apply to global, group, and route policies.
 
 ```ts
 const rateLimitApi: Policy = {
@@ -119,6 +121,7 @@ const rateLimitApi: Policy = {
 - `(path: string) => boolean` — custom predicate for complex rules (e.g. exclude a specific sub-path)
 
 `scope.method` is one of `GET | POST | PUT | DELETE | PATCH | HEAD | OPTIONS`.
+Within each policy layer, higher priorities run first and ties preserve declaration order; policy layers remain global → group → route.
 
 ---
 

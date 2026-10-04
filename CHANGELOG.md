@@ -11,6 +11,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Completed execution traces on errors** — `ctx.meta.trace` is finalized before `onError` runs and now reports `outcome`, whether a response had been sent when the runtime completed, and whether the adapter reported the response stream finished at that moment. The logger plugin includes these fields in structured error events, and OpenTelemetry records trace events on error spans as well as successful spans.
 
+### Fixed
+
+- **Policy scopes apply consistently across global, group, and route policies** — group and route policies now honor `scope.path` and `scope.method`, matching the global policy engine. RegExp scopes reset `lastIndex` around each check, making reused expressions with `g` and `y` flags deterministic.
+
+### Changed
+
+- **Policy ordering is explicit and stable** — evaluation remains global → group → route; within each layer, higher priority runs first and equal priorities preserve registration/declaration order. Priority does not reorder policies across layers.
+
 ### Breaking
 
 - **Middleware short-circuit the full request lifecycle** — returning without calling `next()` now stops later middleware layers and the route handler. Sending a response also prevents subsequent application phases, even if `next()` is called afterward. `afterPipeline` still runs for completion hooks; `afterHandler` runs only if the handler ran. Middleware that intentionally stops execution must send a response or throw, or the HTTP connection may remain open. See README "Middleware" for the lifecycle contract.

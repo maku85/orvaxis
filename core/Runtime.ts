@@ -13,7 +13,7 @@ import { Debugger } from "./Debugger"
 import { HookSystem } from "./Hook"
 import { HttpError } from "./HttpError"
 import { Pipeline } from "./Pipeline"
-import { PolicyEngine } from "./PolicyEngine"
+import { matchesPolicyScope, PolicyEngine, sortPolicies } from "./PolicyEngine"
 import { Router } from "./Router"
 import { Tracer } from "./Tracer"
 import { mergeSafe } from "./utils"
@@ -217,8 +217,9 @@ export class Runtime {
   }
 
   private async evaluatePolicies(policies: Policy[], ctx: OrvaxisContext): Promise<void> {
-    const sorted = [...policies].sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0))
+    const sorted = sortPolicies(policies)
     for (const policy of sorted) {
+      if (!matchesPolicyScope(policy.scope, ctx)) continue
       const result = await policy.evaluate(ctx)
       if (!result.allow) {
         throw new HttpError(result.status ?? 403, result.reason ?? `Blocked by ${policy.name}`)

@@ -375,6 +375,90 @@ describe("Runtime", () => {
       const ctx = await runtime.execute(makeReq("/api/resource"), makeRes())
       expect(ctx.meta.fromRoute).toBe(true)
     })
+
+    it("applies scope filtering to group and route policies", async () => {
+      const runtime = new Runtime()
+      const evaluated: string[] = []
+      runtime.router.group(
+        makeGroup("/api", {
+          groupPolicies: [
+            {
+              name: "group-scope-match",
+              scope: { path: "/api", method: "GET" },
+              evaluate: async () => {
+                evaluated.push("group-match")
+                return { allow: true }
+              },
+            },
+            {
+              name: "group-scope-skip",
+              scope: { path: "/admin" },
+              evaluate: async () => {
+                evaluated.push("group-skip")
+                return { allow: true }
+              },
+            },
+          ],
+          policies: [
+            {
+              name: "route-scope-match",
+              scope: { method: "GET" },
+              evaluate: async () => {
+                evaluated.push("route-match")
+                return { allow: true }
+              },
+            },
+            {
+              name: "route-scope-skip",
+              scope: { method: "POST" },
+              evaluate: async () => {
+                evaluated.push("route-skip")
+                return { allow: true }
+              },
+            },
+          ],
+        })
+      )
+
+      await runtime.execute(makeReq("/api/resource"), makeRes())
+      expect(evaluated).toEqual(["group-match", "route-match"])
+    })
+
+    it("runs policy layers global, group, route, with priority and stable ties inside each layer", async () => {
+      const runtime = new Runtime()
+      const order: string[] = []
+      const record = (name: string, priority = 0): Policy => ({
+        name,
+        priority,
+        evaluate: async () => {
+          order.push(name)
+          return { allow: true }
+        },
+      })
+      runtime.policies.register(record("global-tie-1"))
+      runtime.policies.register(record("global-high", 10))
+      runtime.policies.register(record("global-tie-2"))
+      runtime.router.group(
+        makeGroup("/api", {
+          groupPolicies: [record("group-tie-1"), record("group-high", 10), record("group-tie-2")],
+          policies: [record("route-tie-1"), record("route-high", 10), record("route-tie-2")],
+        })
+      )
+
+      await runtime.execute(makeReq("/api/resource"), makeRes())
+
+      expect(order).toEqual([
+        "global-high",
+        "global-tie-1",
+        "global-tie-2",
+        "group-high",
+        "group-tie-1",
+        "group-tie-2",
+        "route-high",
+        "route-tie-1",
+        "route-tie-2",
+      ])
+    })
   })
 
   describe("hooks", () => {

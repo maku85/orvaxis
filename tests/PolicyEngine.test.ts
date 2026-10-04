@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest"
+import { describe, expect, it, vi } from "vitest"
 import { createMockResponse } from "../core/mockResponse"
 import { PolicyEngine } from "../core/PolicyEngine"
 import type { OrvaxisContext, Policy } from "../types"
@@ -101,6 +101,26 @@ describe("PolicyEngine", () => {
 
     await engine.evaluate(makeCtx())
     expect(order).toEqual([10, 1])
+  })
+
+  it("keeps registration order for policies with equal priority", async () => {
+    const order: string[] = []
+    const engine = new PolicyEngine()
+    for (const name of ["first", "second", "third"]) {
+      engine.register(
+        makePolicy({
+          name,
+          priority: 10,
+          evaluate: async () => {
+            order.push(name)
+            return { allow: true }
+          },
+        })
+      )
+    }
+
+    await engine.evaluate(makeCtx())
+    expect(order).toEqual(["first", "second", "third"])
   })
 
   it("skips policy when scope method does not match", async () => {
@@ -249,6 +269,20 @@ describe("PolicyEngine", () => {
 
     await engine.evaluate(makeCtx("/admin/dashboard"))
     expect(called).toBe(true)
+  })
+
+  it.each([
+    "g",
+    "y",
+  ] as const)("resets RegExp lastIndex for repeated %s scope checks", async (flag) => {
+    const engine = new PolicyEngine()
+    const evaluate = vi.fn(async () => ({ allow: true as const }))
+    engine.register(makePolicy({ scope: { path: new RegExp("^/api", flag) }, evaluate }))
+
+    await engine.evaluate(makeCtx("/api/one"))
+    await engine.evaluate(makeCtx("/api/two"))
+
+    expect(evaluate).toHaveBeenCalledTimes(2)
   })
 
   it("stops evaluation and throws on first denial", async () => {

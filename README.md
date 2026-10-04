@@ -273,6 +273,8 @@ const handler = async (ctx: OrvaxisContext<AuthState>) => {
 
 String matching is prefix-based: `"/api"` covers the entire sub-tree without requiring a RegExp. There are no false positives — `"/api"` does not match `"/apiv2"`.
 
+Scopes filter global, group, and route policies with the same rules. Policies execute in fixed layers: global first, then group, then route. Within each layer, higher `priority` runs first; equal priorities keep registration order (global) or declaration order (group and route). A priority in one layer never moves that policy ahead of another layer. The first denial stops evaluation. RegExp scopes with `g` or `y` flags are reset for each request, so reuse does not make matches alternate.
+
 ---
 
 ### Hooks
@@ -648,7 +650,7 @@ A request lifecycle is deterministic:
 2   Route lookup
     ├─ no match → onNotFound hook → (if !sent) throw 404 → afterPipeline → done
     └─ method mismatch → onMethodNotAllowed hook → (if !sent) throw 405 → afterPipeline → done
-3   Policy evaluation     global → group → route, sorted by priority
+3   Policy evaluation     global → group → route; priority sorted within each layer
 4   beforePipeline hook
 5   Global pipeline       middleware registered via app.use()
 6   Group middleware
