@@ -544,6 +544,9 @@ Policies are listed in runtime order: pre-validation global → group → route,
 - [Diagnose a 403](docs/guide/diagnose-403.md) — find the terminal policy and verify skipped stages
 - [Request lifecycle reference](docs/reference/lifecycle.md) — hook, middleware, validation, and policy order
 - [Core concepts reference](docs/reference/core-concepts.md) — router, policies, hooks, plugins, tracing, and context
+- [Diagnosing an API 403](docs/articles/diagnosing-a-403.md) — trace a denial to its terminal policy
+- [Tenant authorization](docs/articles/tenant-authorization.md) — separate tenant access, ownership, and roles
+- [Authorization requirements in CI](docs/articles/authorization-requirements-in-ci.md) — combine static route checks with permission tests
 - [Why Orvaxis](docs/why-orvaxis.md) — side-by-side comparison with plain Express: auth, rate limiting, and observability with and without Orvaxis
 - [Cookbook](docs/cookbook.md) — practical use cases with working examples (authentication, RBAC, rate limiting, tracing, feature flags, and more)
 - [Benchmarks](docs/benchmarks.md) — microbenchmark results for each execution layer, plus instructions to run them locally
