@@ -556,7 +556,6 @@ Browse the [Orvaxis documentation site](https://maku85.github.io/orvaxis/) for t
 - [Why Orvaxis](docs/why-orvaxis.md) — side-by-side comparison with plain Express: auth, rate limiting, and observability with and without Orvaxis
 - [Cookbook](docs/cookbook.md) — practical use cases with working examples (authentication, RBAC, rate limiting, tracing, feature flags, and more)
 - [Benchmarks](docs/benchmarks.md) — microbenchmark results for each execution layer, plus instructions to run them locally
-- [Roadmap (Italian)](docs/roadmap.md) — proposed runtime fixes, policy diagnostics, incremental adoption, and acceptance criteria
 
 ---
 

@@ -20,7 +20,6 @@ export default defineConfig({
           { text: "Cookbook", link: "/cookbook" },
           { text: "Benchmarks", link: "/benchmarks" },
           { text: "Changelog", link: "https://github.com/maku85/orvaxis/blob/main/CHANGELOG.md" },
-          { text: "Roadmap", link: "https://github.com/maku85/orvaxis/blob/main/docs/roadmap.md" },
           { text: "Report an issue", link: "https://github.com/maku85/orvaxis/issues/new/choose" },
           { text: "Repository", link: "https://github.com/maku85/orvaxis" },
         ],
