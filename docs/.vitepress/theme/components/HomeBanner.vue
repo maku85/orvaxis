@@ -6,11 +6,11 @@ import banner from "./orvaxis-banner.png"
   <figure class="home-banner">
     <img
       :src="banner"
-      alt="An API request is denied by the report-owner policy. The diagnostic trace identifies the policy and shows that the route handler did not run."
+      alt="Orvaxis organizes Node.js API execution with routing, policies, middleware and hooks, typed input and response contracts, OpenAPI, tracing and testing, using Express or Fastify transport."
       width="1536"
       height="1024"
     />
-    <figcaption>Follow a denied request from its policy decision to the handler it prevented.</figcaption>
+    <figcaption>Structure request execution, validate contracts, and observe and test your API.</figcaption>
   </figure>
 </template>
 

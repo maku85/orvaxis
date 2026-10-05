@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="./assets/orvaxis-banner.png" width="800" alt="Orvaxis explains an API denial by showing the responsible policy and the skipped handler"/>
+  <img src="./assets/orvaxis-banner.png" width="800" alt="Orvaxis structures Node.js API execution with routing, policies, middleware, hooks, typed contracts, tracing, and testing"/>
 </p>
 
 <h1 align="center">Orvaxis</h1>
@@ -12,16 +12,38 @@
 </p>
 
 <p align="center">
-  See which rule stopped an API request, then test the permissions that protect every route.
+  Structured, observable, and testable execution for Node.js APIs.
 </p>
 
 <p align="center"><a href="https://maku85.github.io/orvaxis/">Read the documentation →</a></p>
 
 ---
 
+## What Orvaxis does
+
+Orvaxis is a framework-agnostic execution runtime for Node.js APIs. It coordinates routing, policies, middleware, validation, lifecycle hooks, and handlers in an explicit request flow. Express and Fastify adapters provide the HTTP transport; the core has no mandatory runtime dependencies.
+
+Use it to organize how requests run, enforce input and response contracts, observe execution, and test behavior without starting an HTTP server. Named policy decisions also explain why a request was blocked and which stages were never reached.
+
+| Capability | What you can do | Learn more |
+|---|---|---|
+| **Routing and lifecycle** | Declare route groups, parameters and wildcards; compose global, group and route middleware with lifecycle hooks | [Lifecycle](docs/reference/lifecycle.md), [router](docs/reference/core-concepts.md#router), [hooks and plugins example](examples/hooks-and-plugins.ts) |
+| **Declarative policies** | Apply named rules by scope and priority, before or after input validation; implement permissions, feature gates or other request conditions | [Policies](docs/reference/core-concepts.md#policies), [cookbook](docs/cookbook.md), [403 diagnostics](docs/guide/diagnose-403.md) |
+| **Validated, typed input** | Parse and transform body, params, query and headers; infer handler types from validator outputs with `defineRoute()` | [Typed schemas](docs/reference/core-concepts.md#typed-context), [working example](examples/typed-schema.ts) |
+| **Response contracts and OpenAPI** | Validate declared responses by status in strict or warning mode; generate OpenAPI 3.1 using your schema converter | [Contracts and OpenAPI](docs/reference/core-concepts.md#response-contracts-and-openapi) |
+| **Observability** | Inspect request traces and debug timelines, emit custom events, use structured logging and export spans through OpenTelemetry | [Tracing](docs/reference/core-concepts.md#tracing-system), [debugging](docs/reference/core-concepts.md#debug-layer), [OpenTelemetry example](examples/otel-plugin.ts) |
+| **Testing and inspection** | Execute requests without a server, test permission matrices, inspect route declarations and check required policies in CI | [Testing](#testing), [route inspection](#route-introspection) |
+| **HTTP and streaming** | Use Express or Fastify transport, stream SSE/files, propagate request IDs and handle cancellation, timeouts and graceful shutdown | [Adapters](#http-adapters), [streaming](#streaming), [shutdown](#graceful-shutdown) |
+| **Extensibility and context** | Register opt-in plugins, use CORS and logging plugins, and access isolated request context across async calls | [Plugins](docs/reference/core-concepts.md#plugins), [async context](docs/reference/core-concepts.md#request-scoped-context) |
+
+Choose the integration that fits your application:
+
+- **Full runtime:** declare routes and handlers in Orvaxis and use an Express or Fastify adapter. Orvaxis owns routing and execution within the mounted API.
+- **Incremental Express guard:** add pre-validation policies to selected existing Express routes while keeping their handlers in Express. This mode evaluates policies; it does not run the full middleware, validation and handler lifecycle. See the [integration guide](docs/guide/integrate-existing-route.md).
+
 ## Quickstart
 
-Protect a route with named authorization policies. When a request is denied, Orvaxis records the terminal policy and confirms that the handler did not run.
+Start with a small full-runtime API: declare a route and its policies, then serve it through Express. This example demonstrates an allowed request and a denied request whose handler never runs. Validation, plugins and streaming can be added as needed.
 
 ## Installation
 
@@ -78,26 +100,38 @@ curl -i -H 'x-user-id: alice' http://localhost:3000/api/reports/alice # 200: han
 
 The `x-user-id` header is a demo identity input, not authentication. In an application, use the identity established by trusted authentication middleware or token verification.
 
-Orvaxis is an optional execution layer for APIs, not a replacement for Express or Fastify. Install only the adapter peer dependency you use; both are optional. The package ships CommonJS and ESM builds.
+Express supplies HTTP transport in this example; Orvaxis matches the declared routes and executes their lifecycle. Install only the adapter peer dependency you use; Express and Fastify are optional. The package ships CommonJS and ESM builds.
 
 ---
 
 ## Why Orvaxis
 
-Orvaxis makes authorization rules explicit and inspectable without taking routing or handler ownership away from your framework. The benefit is a named, testable explanation when a request is denied.
+Orvaxis gives requests a shared execution model: explicit policy phases, composable middleware, validation boundaries, lifecycle hooks, and a trace of what ran. This structure supports reusable rules and plugins, consistent diagnostics, and tests against the same runtime used by the HTTP adapters.
+
+Authorization is one practical use case. Other uses include feature gates, validated request transformations, response contract checks, streaming APIs, and request-scoped observability. Application-specific policies and integrations remain under your control.
 
 [See a concrete side-by-side comparison →](docs/why-orvaxis.md)
 
 ---
 
 ## Architecture Overview
-The runtime checks pre-validation policies before middleware, validates declared input before post-validation policies, and calls the handler only after those stages allow the request. The [lifecycle reference](docs/reference/lifecycle.md) documents the exact order, short-circuit behavior, and error hooks.
+For a matched request, the main execution stages are:
+
+```text
+onRequest → route match → pre-validation policies
+          → beforePipeline → global/group/route middleware
+          → input validation → post-validation policies
+          → beforeHandler → handler → afterHandler
+          → trace finalization → afterPipeline
+```
+
+Request validation and response validation are opt-in plugins. Response contracts are checked when handlers send values through the Orvaxis response API. Denials, errors and successful short-circuits stop later stages; errors finalize the trace before `onError`. The [lifecycle reference](docs/reference/lifecycle.md) documents the complete order and hook contracts.
 
 ---
 
 ## Core Concepts
 
-Orvaxis groups authorization policies, middleware, hooks, and route handlers into a predictable request flow. Route declarations can inherit policies and middleware from groups; validators and plugins add opt-in behavior.
+Orvaxis groups policies, middleware, hooks, and route handlers into a predictable request flow. Route declarations inherit policies and middleware from their group. Typed request context carries application state through async work; validators and plugins add opt-in behavior.
 
 The [core concepts reference](docs/reference/core-concepts.md) covers the router, policy scopes and priority, hook contracts, plugins, traces, debugging, and typed context. The [lifecycle reference](docs/reference/lifecycle.md) shows the actual execution order.
 
@@ -116,7 +150,7 @@ Two adapters are included out of the box:
 
 Install only the framework you intend to use — both peer dependencies are optional. Each adapter lives on its own subpath (`orvaxis/express`, `orvaxis/fastify`) precisely so that importing the main `orvaxis` entry point never requires either peer dependency to be installed.
 
-Both adapters mount Orvaxis as a single catch-all handler (`server.use(...)` on Express, `fastify.all("/*", ...)` on Fastify) and delegate all routing, hooks, and validation to the Orvaxis runtime. On Express this costs nothing, since Express has no comparable router/validation layer of its own. On Fastify it means you don't benefit from Fastify's own route trie or its compiled (ajv-based) schema validation — those are bypassed, not used. Pick the Fastify adapter for the transport (HTTP/1.1, HTTP/2, its plugin ecosystem for things unrelated to routing) or for consistency with an existing Fastify deployment, not for a routing or validation performance win over Express.
+Both full-runtime adapters mount Orvaxis as a catch-all handler and delegate routing, lifecycle hooks, and declared validation to the Orvaxis runtime. Express routes within that mount are handled by Orvaxis's router. With Fastify, those endpoints use Orvaxis routing and validation instead of Fastify's native route trie and compiled schema validation. Choose the adapter for the HTTP transport and surrounding framework integrations; benchmark your application before drawing performance conclusions.
 
 #### Add Orvaxis policies to one existing Express route
 
@@ -540,7 +574,7 @@ Policies are listed in runtime order: pre-validation global → group → route,
 
 ## Documentation
 
-See [Migrating from 0.3.1](docs/migration/next.md) for behavior changes in the next release.
+See [Migrating from 0.3.1 to 0.4.0](docs/migration/next.md) for the released behavior changes.
 
 Browse the [Orvaxis documentation site](https://maku85.github.io/orvaxis/) for the getting-started guide, navigable references, examples, and articles. The Markdown sources remain available below and in `docs/`.
 
@@ -552,6 +586,11 @@ Browse the [Orvaxis documentation site](https://maku85.github.io/orvaxis/) for t
 - [Diagnose a 403](docs/guide/diagnose-403.md) — find the terminal policy and verify skipped stages
 - [Request lifecycle reference](docs/reference/lifecycle.md) — hook, middleware, validation, and policy order
 - [Core concepts reference](docs/reference/core-concepts.md) — router, policies, hooks, plugins, tracing, and context
+- [Typed request schemas](docs/reference/core-concepts.md#typed-context) — infer handler types from parsed and transformed values
+- [Response contracts and OpenAPI](docs/reference/core-concepts.md#response-contracts-and-openapi) — validate outgoing values and generate API metadata
+- [Tracing and debugging](docs/reference/core-concepts.md#tracing-system) — lifecycle traces, custom events, and combined debug timelines
+- [Plugins and OpenTelemetry](docs/reference/core-concepts.md#plugins) — logging, validation, CORS, and optional span export
+- [Streaming](#streaming), [timeouts](#timeout), and [graceful shutdown](#graceful-shutdown) — request and connection lifecycle in the HTTP adapters
 - [Diagnosing an API 403](docs/articles/diagnosing-a-403.md) — trace a denial to its terminal policy
 - [Tenant authorization](docs/articles/tenant-authorization.md) — separate tenant access, ownership, and roles
 - [Authorization requirements in CI](docs/articles/authorization-requirements-in-ci.md) — combine static route checks with permission tests
@@ -635,6 +674,7 @@ orvaxis/
   express.ts                 orvaxis/express entry point (server adapter and policy guard)
   fastify.ts                 orvaxis/fastify entry point (createFastifyServer)
   otel.ts                    orvaxis/otel entry point (otelPlugin)
+  openapi.ts                 orvaxis/openapi entry point (generateOpenApiDocument)
   testing.ts                 orvaxis/testing entry point
 
   core/
@@ -669,6 +709,7 @@ orvaxis/
   plugins/
     PluginManager.ts         plugin registry (Plugin type + PluginManager class)
     loggerPlugin.ts          built-in logger plugin
+    corsPlugin.ts            configurable CORS and preflight handling
     otelPlugin.ts            OpenTelemetry SERVER span per request + orvaxis.pipeline/orvaxis.handler child spans (exported via orvaxis/otel, requires @opentelemetry/api)
     schemaValidationPlugin.ts body/params/query/headers validation via route.schema
     responseValidationPlugin.ts status-specific handler response validation; streaming is not buffered
@@ -730,10 +771,6 @@ Not yet recommended for production. Known gaps before production use:
 Graceful shutdown is supported via `server.close()` on the `ServerAdapter`. Both built-in adapters enforce a `shutdownTimeout` (default 10 s) so the process exits cleanly even when active connections stall.
 
 ---
-
-## Future Directions
-
-- **OpenTelemetry export** — the trace system already produces structured spans; a plugin exporting to OTLP/Zipkin is a natural next step
 
 ## Contributing
 
