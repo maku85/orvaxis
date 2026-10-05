@@ -542,6 +542,8 @@ Policies are listed in runtime order: pre-validation global → group → route,
 
 Browse the [Orvaxis documentation site](https://maku85.github.io/orvaxis/) for the getting-started guide, navigable references, examples, and articles. The Markdown sources remain available below and in `docs/`.
 
+[Explore the recorded allow, deny, and handler-error traces](docs/demo/policy-traces.md) in the static documentation demo.
+
 - [Quickstart](#quickstart) — protect one route and see the allowed/denied result
 - [Add Orvaxis to an existing Express route](docs/guide/integrate-existing-route.md) — add policy checks without moving the handler
 - [Multi-tenant task demo](docs/guide/multi-tenant-demo.md) — runnable tenant, ownership, roles, traces, permission matrix, and CI checks

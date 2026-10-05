@@ -6,12 +6,24 @@
   },
   "include": [
     "tests/defineRoute.types.ts",
+    "examples/debug-trace.ts",
+    "examples/express-existing-route.ts",
+    "examples/otel-plugin.ts",
+    "examples/policies/**/*.ts",
+    "examples/policy-ci-check.ts",
+    "examples/policy-diagnostics-types.ts",
+    "examples/policy-diagnostics.ts",
+    "examples/policy-matrix.ts",
     "examples/quickstart.ts",
-    "examples/tenant-tasks.ts",
+    "examples/schema-validation.ts",
+    "examples/streaming.ts",
     "examples/tenant-tasks-check.ts",
     "examples/tenant-tasks-server.ts",
-    "examples/typed-schema.ts",
-    "express.ts"
+    "examples/tenant-tasks.ts",
+    "express.ts",
+    "scripts/generate-policy-demo.ts",
+    "tests/expressExistingRouteDemo.test.ts",
+    "tests/policyDiagnosticsDemo.test.ts"
   ],
   "exclude": ["node_modules", "dist"]
 }

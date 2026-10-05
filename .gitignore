@@ -3,5 +3,7 @@ dist/
 coverage/
 benchmarks/baseline.json
 .pnpm-store/
+docs/.vitepress/.temp/
 docs/.vitepress/cache/
 docs/.vitepress/dist/
+docs/public/demo/policy-scenarios.json

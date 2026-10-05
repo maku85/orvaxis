@@ -40,6 +40,7 @@ If a request is rejected, start with [Diagnose a 403](/guide/diagnose-403). To u
 ## Examples and guides
 
 - [Multi-tenant authorization demo](/guide/multi-tenant-demo)
+- [Explore recorded policy traces](/demo/policy-traces)
 - [Authorization requirements in CI](/articles/authorization-requirements-in-ci)
 - [Tenant authorization patterns](/articles/tenant-authorization)
 - [Cookbook](/cookbook)

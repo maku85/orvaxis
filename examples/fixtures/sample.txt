@@ -1,0 +1,1 @@
+This is a small, fixed fixture streamed by the Orvaxis example.

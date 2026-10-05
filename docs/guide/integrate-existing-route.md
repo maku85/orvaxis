@@ -10,35 +10,18 @@ npm install orvaxis express
 
 Declare the policy and mirror the protected method and path in Orvaxis. Keep the actual handler in Express:
 
-```ts
-import express from "express"
-import { Orvaxis, type Policy } from "orvaxis"
-import { createExpressPolicyGuard } from "orvaxis/express"
-
-const security = new Orvaxis()
-const documentOwner: Policy = {
-  name: "document-owner",
-  evaluate(ctx) {
-    return ctx.req.headers["x-user-id"] === ctx.params.id
-      ? { allow: true, modify: { authorizedUserId: ctx.params.id } }
-      : { allow: false, reason: "You cannot access this document", status: 403 }
-  },
-}
-
-security.group({
-  prefix: "/api",
-  routes: [
-    { method: "GET", path: "/documents/:id", policies: [documentOwner], handler: () => {} },
-  ],
-})
-
-const server = express()
-server.get(
-  "/api/documents/:id",
-  createExpressPolicyGuard(security),
-  (req, res) => res.json({ documentId: req.params.id }),
-)
+```bash
+pnpm exec tsx examples/express-existing-route.ts
 ```
+
+This starts the working example on port `3005`. Try one request where the owner matches and one where it does not:
+
+```bash
+curl -i -H 'x-user-id: alice' http://localhost:3005/api/documents/alice  # 200
+curl -i -H 'x-user-id: bob' http://localhost:3005/api/documents/alice    # 403
+```
+
+The implementation lives in [`examples/express-existing-route.ts`](https://github.com/maku85/orvaxis/blob/main/examples/express-existing-route.ts) so the guide and runnable source stay aligned.
 
 Mount the guard after middleware that parses the body or establishes identity, and before the existing handler. The guard adapts the Express request for Orvaxis, so policies can inspect request fields established by earlier Express middleware. The header in this example is only a demonstration input; use verified authentication state in production. Values returned through `modify` are available to later Express middleware at `res.locals.orvaxis`.
 

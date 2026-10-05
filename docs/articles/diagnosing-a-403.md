@@ -11,17 +11,7 @@ pnpm install
 pnpm exec tsx examples/policy-diagnostics.ts
 ```
 
-The denied case prints a summary like this:
-
-```text
-=== DENIED (403) ===
-GET /:id
-Outcome: denied (403)
-Policy decisions:
-  [route.preValidation #1] document-owner: deny, terminal
-Stopped by: document-owner
-Not reached: beforePipeline → globalPipeline → groupMiddleware → routeMiddleware → validation → global.postValidation → group.postValidation → route.postValidation → beforeHandler → handler
-```
+The denied case produces a sanitized summary. The [interactive trace demo](/demo/policy-traces) shows that runtime-generated output and the matching allowed and handler-error cases.
 
 `formatExecutionSummary()` formats decisions already captured by the runtime. It does not call policy code a second time, and its default output omits request values and free-form denial reasons. A maintainer can see that `document-owner` denied this request before any middleware or handler ran.
 

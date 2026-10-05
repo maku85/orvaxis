@@ -1,4 +1,5 @@
 import { createReadStream } from "node:fs"
+import { resolve } from "node:path"
 import { createExpressServer } from "../express"
 import { Orvaxis } from "../index"
 
@@ -50,11 +51,10 @@ app.group({
     // File streaming via pipe
     {
       method: "GET",
-      path: "/file/*filepath",
+      path: "/file",
       handler: async (ctx) => {
-        const filepath = ctx.meta.route?.params.filepath
         ctx.res.setHeader("Content-Type", "application/octet-stream")
-        ctx.res.pipe(createReadStream(filepath))
+        ctx.res.pipe(createReadStream(resolve(process.cwd(), "examples/fixtures/sample.txt")))
       },
     },
   ],

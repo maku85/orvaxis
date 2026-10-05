@@ -11,6 +11,7 @@ export default defineConfig({
     logo: "/orvaxis-mark.svg",
     nav: [
       { text: "Guide", link: "/guide/getting-started" },
+      { text: "Trace demo", link: "/demo/policy-traces" },
       { text: "Examples", link: "/examples/" },
       { text: "Reference", link: "/reference/core-concepts" },
       {
@@ -44,6 +45,12 @@ export default defineConfig({
             { text: "Core concepts", link: "/reference/core-concepts" },
             { text: "Request lifecycle", link: "/reference/lifecycle" },
           ],
+        },
+      ],
+      "/demo/": [
+        {
+          text: "Interactive demo",
+          items: [{ text: "Policy traces", link: "/demo/policy-traces" }],
         },
       ],
       "/articles/": [
