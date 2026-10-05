@@ -10,8 +10,8 @@ import {
   type Tracer,
   trace,
 } from "@opentelemetry/api"
-import { HttpError } from "../core/HttpError"
-import type { OrvaxisContext, PluginContext, Trace } from "../types"
+import { HttpError } from "../core/HttpError.js"
+import type { OrvaxisContext, PluginContext, Trace } from "../types/index.js"
 
 export type OtelPluginOptions = {
   tracer: Tracer
@@ -90,6 +90,8 @@ export function otelPlugin({ tracer }: OtelPluginOptions) {
       runtime.hooks.on("afterPipeline", (ctx: OrvaxisContext) => {
         const state = states.get(ctx)
         if (!state) return
+        state.pipeline?.end()
+        state.handler?.end()
         const { root } = state
         root.setAttribute("http.response.status_code", ctx.res.statusCode)
         const orvaxisTrace = ctx.meta.trace as Trace | undefined
@@ -127,7 +129,11 @@ export function otelPlugin({ tracer }: OtelPluginOptions) {
           code: SpanStatusCode.ERROR,
           message: policyName ? `Policy denied: ${policyName}` : err?.message,
         })
-        const statusCode = err instanceof HttpError ? err.status : ctx.res.statusCode
+        const statusCode = ctx.res.sent
+          ? ctx.res.statusCode
+          : err instanceof HttpError
+            ? err.status
+            : 500
         root.setAttribute("http.response.status_code", statusCode)
         const orvaxisTrace = ctx.meta.trace as Trace | undefined
         root.setAttribute("orvaxis.runtime.outcome", orvaxisTrace?.outcome ?? "error")

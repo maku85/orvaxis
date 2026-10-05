@@ -4,7 +4,7 @@ import { createContext } from "../core/Context"
 import { createMockResponse } from "../core/mockResponse"
 import { Orvaxis } from "../core/Orvaxis"
 import { schemaValidationPlugin } from "../plugins/schemaValidationPlugin"
-import type { Middleware, OrvaxisContext, Policy } from "../types"
+import type { Middleware, OrvaxisContext, Policy, PolicyTraceOptions } from "../types"
 
 // ─── shared fixtures ──────────────────────────────────────────────────────────
 
@@ -21,8 +21,9 @@ function makeApp({
   policies = 0,
   middleware = 0,
   hooks = 0,
-}: { policies?: number; middleware?: number; hooks?: number }): Orvaxis {
-  const app = new Orvaxis()
+  policyTrace,
+}: { policies?: number; middleware?: number; hooks?: number; policyTrace?: PolicyTraceOptions }): Orvaxis {
+  const app = new Orvaxis({ policyTrace })
   for (let i = 0; i < policies; i++) app.policy({ ...allowAll, name: `policy-${i}` })
   for (let i = 0; i < middleware; i++) app.use(passThrough)
   for (let i = 0; i < hooks; i++) app.on("onRequest", logHook)
@@ -35,6 +36,11 @@ function makeApp({
 const appMinimal = makeApp({})
 const appTypical = makeApp({ policies: 1, middleware: 3, hooks: 2 })
 const appHeavy = makeApp({ policies: 3, middleware: 5, hooks: 5 })
+const traceApps = [
+  ["off", makeApp({ policies: 5, policyTrace: { mode: "off" } })],
+  ["summary", makeApp({ policies: 5, policyTrace: { mode: "summary" } })],
+  ["detailed", makeApp({ policies: 5, policyTrace: { mode: "detailed", redact: (reason) => reason } })],
+] as const
 
 const bodySchema = z.object({ name: z.string(), age: z.number() })
 const appWithSchema = new Orvaxis()
@@ -77,4 +83,12 @@ describe("Orvaxis overhead — schemaValidationPlugin with Zod body schema", () 
   bench("POST with valid body (parse + coerce)", async () => {
     await appWithSchema.handle(reqWithBody, createMockResponse())
   })
+})
+
+describe("Orvaxis overhead — five policies with real trace storage", () => {
+  for (const [mode, app] of traceApps) {
+    bench(`policy trace: ${mode}`, async () => {
+      await app.handle(req, createMockResponse())
+    })
+  }
 })

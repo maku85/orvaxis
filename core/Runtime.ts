@@ -1,4 +1,4 @@
-import { type Plugin, PluginManager } from "../plugins/PluginManager"
+import { type Plugin, PluginManager } from "../plugins/PluginManager.js"
 import type {
   Middleware,
   OrvaxisContext,
@@ -8,22 +8,22 @@ import type {
   Policy,
   PolicyPhase,
   PolicyTraceOptions,
-} from "../types"
-import { createContext } from "./Context"
-import { captureContext, runWithContext } from "./contextStore"
-import { Debugger } from "./Debugger"
-import { isTypedRoute } from "./defineRoute"
-import { HookSystem } from "./Hook"
-import { HttpError } from "./HttpError"
-import { Pipeline } from "./Pipeline"
+} from "../types/index.js"
+import { createContext } from "./Context.js"
+import { captureContext, runWithContext } from "./contextStore.js"
+import { Debugger } from "./Debugger.js"
+import { isTypedRoute } from "./defineRoute.js"
+import { HookSystem } from "./Hook.js"
+import { HttpError } from "./HttpError.js"
+import { Pipeline } from "./Pipeline.js"
 import {
   evaluatePolicies as evaluatePolicySet,
   PolicyEngine,
   type PolicyLayer,
-} from "./PolicyEngine"
-import { Router } from "./Router"
-import { Tracer } from "./Tracer"
-import { validateRequest } from "./validation"
+} from "./PolicyEngine.js"
+import { Router } from "./Router.js"
+import { Tracer } from "./Tracer.js"
+import { validateRequest } from "./validation.js"
 
 function generateId(): string {
   return crypto.randomUUID()

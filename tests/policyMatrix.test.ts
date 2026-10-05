@@ -57,6 +57,28 @@ function makeTenantApp() {
 }
 
 describe("testPolicyMatrix", () => {
+  it("fails an expected 200 when a policy throws a generic error", async () => {
+    const app = new Orvaxis()
+    app.policy({
+      name: "unstable-check",
+      evaluate: () => {
+        throw new Error("private failure")
+      },
+    })
+    app.group({ prefix: "/api", routes: [{ method: "GET", path: "/item", handler: () => {} }] })
+    const report = await testPolicyMatrix(app, [
+      {
+        name: "failed policy",
+        request: { path: "/api/item" },
+        expected: { status: 200, handlerExecuted: false },
+      },
+    ])
+    expect(report.passed).toBe(false)
+    expect(report.scenarios[0].status).toBe(500)
+    expect(report.scenarios[0].policy).toBe("unstable-check")
+    expect(formatPolicyMatrixReport(report)).not.toContain("private failure")
+  })
+
   it("checks identity, ownership, tenant, and admin scenarios from one execution each", async () => {
     const { app, handlerCalls, policyEvaluations } = makeTenantApp()
     const report = await testPolicyMatrix(app, [

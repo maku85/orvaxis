@@ -5,5 +5,5 @@ export type {
   OpenApiOptions,
   OpenApiSchemaContext,
   OpenApiSchemaConverter,
-} from "./openapi/generateOpenApiDocument"
-export { generateOpenApiDocument } from "./openapi/generateOpenApiDocument"
+} from "./openapi/generateOpenApiDocument.js"
+export { generateOpenApiDocument } from "./openapi/generateOpenApiDocument.js"

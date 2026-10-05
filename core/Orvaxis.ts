@@ -1,4 +1,4 @@
-import type { Plugin } from "../plugins/PluginManager"
+import type { Plugin } from "../plugins/PluginManager.js"
 import type {
   Group,
   HookName,
@@ -9,8 +9,8 @@ import type {
   OrvaxisResponse,
   Policy,
   RouteInspection,
-} from "../types"
-import { Runtime } from "./Runtime"
+} from "../types/index.js"
+import { Runtime } from "./Runtime.js"
 
 export class Orvaxis {
   private runtime: Runtime

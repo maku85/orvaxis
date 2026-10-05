@@ -5,9 +5,9 @@ import express, {
   type RequestHandler,
   type Response,
 } from "express"
-import type { Orvaxis } from "../core/Orvaxis"
-import type { OrvaxisRequest, OrvaxisResponse, ServerAdapter } from "../types"
-import { type AdapterOptions, buildErrorBody, withTimeout } from "./timeout"
+import type { Orvaxis } from "../core/Orvaxis.js"
+import type { OrvaxisRequest, OrvaxisResponse, ServerAdapter } from "../types/index.js"
+import { type AdapterOptions, buildErrorBody, withTimeout } from "./timeout.js"
 
 function wrapExpressResponse(res: Response, onStreamStart: () => void): OrvaxisResponse {
   const wrapped: OrvaxisResponse = {
@@ -204,6 +204,7 @@ export function createExpressPolicyGuard(
     req.once("aborted", abort)
     res.once("close", abort)
     res.once("finish", cleanup)
+    res.once("close", cleanup)
 
     let cancelTimer: (() => void) | undefined
     const wrapped = wrapExpressResponse(res, () => cancelTimer?.())
@@ -230,6 +231,5 @@ export function createExpressPolicyGuard(
         const error = err as { status?: number }
         wrapped.status(error.status ?? 500).json(buildErrorBody(err, requestId))
       })
-      .finally(cleanup)
   }
 }

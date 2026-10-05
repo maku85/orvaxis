@@ -5,9 +5,9 @@ import type {
   PolicyResult,
   PolicyScope,
   PolicyTraceOptions,
-} from "../types"
-import { HttpError } from "./HttpError"
-import { mergeSafe } from "./utils"
+} from "../types/index.js"
+import { HttpError } from "./HttpError.js"
+import { mergeSafe } from "./utils.js"
 
 export function sortPolicies(policies: Policy[]): Policy[] {
   return policies
@@ -86,6 +86,7 @@ export function recordPolicyDecision(
   state.count++
 
   const meta: Record<string, unknown> = { ...decision }
+  delete meta.reason
   if (options.mode === "detailed") {
     if (decision.scope) meta.scope = decision.scope
     if (decision.reason !== undefined) {

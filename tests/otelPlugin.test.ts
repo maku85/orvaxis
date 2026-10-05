@@ -348,7 +348,7 @@ describe("otelPlugin — error edge cases", () => {
     expect(created[0].end).toHaveBeenCalledOnce()
   })
 
-  it("falls back to ctx.res.statusCode when error is not an HttpError", async () => {
+  it("reports 500 for a generic error before a response is sent", async () => {
     const { tracer, created } = makeMockTracer()
     const app = new Orvaxis()
     app.group({
@@ -367,12 +367,35 @@ describe("otelPlugin — error edge cases", () => {
 
     await testRequest(app, { path: "/plain-error" })
 
-    // plain Error has no .status — falls back to ctx.res.statusCode (200, no status set before error)
-    expect(created[0].setAttribute).toHaveBeenCalledWith("http.response.status_code", 200)
+    expect(created[0].setAttribute).toHaveBeenCalledWith("http.response.status_code", 500)
   })
 })
 
 describe("otelPlugin — correctness", () => {
+  it("ends the pipeline span when middleware short-circuits before the handler", async () => {
+    const { tracer, created } = makeMockTracer()
+    const app = makeApp()
+    app.register(otelPlugin({ tracer }))
+    app.use((ctx) => ctx.res.status(204).end())
+    const result = await testRequest(app, { path: "/api/hello" })
+    expect(result.status).toBe(204)
+    expect(created).toHaveLength(2)
+    expect(created[0].end).toHaveBeenCalledOnce()
+    expect(created[1].end).toHaveBeenCalledOnce()
+  })
+
+  it("preserves the sent HTTP status when a completion hook fails", async () => {
+    const { tracer, created } = makeMockTracer()
+    const app = makeApp()
+    app.register(otelPlugin({ tracer }))
+    app.on("afterHandler", () => {
+      throw new HttpError(503, "Cleanup failed")
+    })
+    await testRequest(app, { path: "/api/hello" })
+    expect(created[0].setAttribute).toHaveBeenCalledWith("http.response.status_code", 200)
+    expect(created[0].end).toHaveBeenCalledOnce()
+  })
+
   it("ends all three spans exactly once on a successful request", async () => {
     const { tracer, created } = makeMockTracer()
     const app = makeApp()

@@ -1,4 +1,4 @@
-import type { RouteInspection, SchemaField } from "../types"
+import type { RouteInspection, SchemaField } from "../types/index.js"
 
 export type OpenApiSchemaContext = {
   method: string
@@ -59,7 +59,10 @@ export function generateOpenApiDocument(
       if (!validator && names.length === 0) continue
       const objectSchema = validator
         ? convert(validator, route, field, options)
-        : { type: "object", properties: {} }
+        : {
+            type: "object",
+            properties: Object.fromEntries(names.map((name) => [name, { type: "string" }])),
+          }
       const properties = objectSchema.properties
       if (!properties || typeof properties !== "object") {
         throw new TypeError(

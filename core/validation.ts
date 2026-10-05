@@ -1,5 +1,5 @@
-import type { Group, OrvaxisRequest } from "../types"
-import { HttpError } from "./HttpError"
+import type { Group, OrvaxisRequest } from "../types/index.js"
+import { HttpError } from "./HttpError.js"
 
 const VALID_METHODS = new Set(["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"])
 

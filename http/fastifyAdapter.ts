@@ -1,7 +1,7 @@
 import Fastify, { type FastifyReply } from "fastify"
-import type { Orvaxis } from "../core/Orvaxis"
-import type { OrvaxisRequest, OrvaxisResponse, ServerAdapter } from "../types"
-import { type AdapterOptions, buildErrorBody, withTimeout } from "./timeout"
+import type { Orvaxis } from "../core/Orvaxis.js"
+import type { OrvaxisRequest, OrvaxisResponse, ServerAdapter } from "../types/index.js"
+import { type AdapterOptions, buildErrorBody, withTimeout } from "./timeout.js"
 
 function wrapFastifyResponse(reply: FastifyReply, onStreamStart: () => void): OrvaxisResponse {
   let statusCode = 200

@@ -1,4 +1,4 @@
-import type { Logger, OrvaxisContext, PluginContext } from "../types"
+import type { Logger, OrvaxisContext, PluginContext } from "../types/index.js"
 
 export type LoggerPluginOptions = {
   logger?: Logger

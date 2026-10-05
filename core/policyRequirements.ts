@@ -1,4 +1,4 @@
-import type { HttpMethod, RouteInspection } from "../types"
+import type { HttpMethod, RouteInspection } from "../types/index.js"
 
 export type PolicyRequirementException = {
   /** Exact path or glob (`*` matches one segment, `**` matches zero or more). */
@@ -53,6 +53,18 @@ export function checkPolicyRequirements(
   const results: PolicyRequirementResult[] = []
 
   for (const requirement of requirements) {
+    for (const pattern of [
+      ...requirement.paths,
+      ...(requirement.exceptions?.map((exception) => exception.path) ?? []),
+    ]) {
+      const segments = pattern.split("/").filter(Boolean)
+      if (segments.slice(0, -1).includes("**")) {
+        throw new TypeError("Policy requirement glob '**' must be the last path segment")
+      }
+    }
+    if (requirement.exceptions?.some((exception) => !exception.reason.trim())) {
+      throw new TypeError("Policy requirement exceptions must have a non-empty reason")
+    }
     const selected = routes.filter(
       (route) =>
         pathMatchesAny(route.path, requirement.paths) &&

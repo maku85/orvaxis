@@ -48,3 +48,6 @@ jobs:
 
       - name: Build package
         run: pnpm build
+
+      - name: Verify package imports and declarations without optional peers
+        run: pnpm check:package

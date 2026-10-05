@@ -20,6 +20,7 @@
     "examples/tenant-tasks-check.ts",
     "examples/tenant-tasks-server.ts",
     "examples/tenant-tasks.ts",
+    "examples/typed-schema.ts",
     "express.ts",
     "scripts/generate-policy-demo.ts",
     "tests/expressExistingRouteDemo.test.ts",

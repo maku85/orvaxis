@@ -1,4 +1,4 @@
-import type { OrvaxisContext, OrvaxisRequest, OrvaxisResponse } from "../types"
+import type { OrvaxisContext, OrvaxisRequest, OrvaxisResponse } from "../types/index.js"
 
 const DEFAULT_LOGS_MAX_SIZE = 1000
 

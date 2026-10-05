@@ -8,9 +8,9 @@ import type {
   RouteInfo,
   RouteInspection,
   RouteMatch,
-} from "../types"
-import { HttpError } from "./HttpError"
-import { validateGroup } from "./validation"
+} from "../types/index.js"
+import { HttpError } from "./HttpError.js"
+import { validateGroup } from "./validation.js"
 
 function decodeSafe(segment: string): string {
   try {

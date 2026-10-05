@@ -7,6 +7,92 @@ import type { SchemaField } from "../types"
 const schema = (parse: SchemaField["parse"]): SchemaField => ({ parse })
 
 describe("responseValidationPlugin", () => {
+  it("keeps rejecting strict streaming after the handler catches the first failure", async () => {
+    const app = new Orvaxis()
+    app.register(responseValidationPlugin())
+    app.group({
+      prefix: "/",
+      routes: [
+        {
+          method: "GET",
+          path: "/stream",
+          responses: { 200: schema((value) => value) },
+          handler: (ctx) => {
+            try {
+              ctx.res.write("first")
+            } catch {}
+            ctx.res.write("second")
+          },
+        },
+      ],
+    })
+    const result = await testRequest(app, { path: "/stream" })
+    expect(result.status).toBe(500)
+    expect(result.chunks).toEqual([])
+  })
+
+  it("warns once per status and passes chunks through without buffering", async () => {
+    const onViolation = vi.fn()
+    const app = new Orvaxis()
+    app.register(responseValidationPlugin({ mode: "warn", onViolation }))
+    app.group({
+      prefix: "/",
+      routes: [
+        {
+          method: "GET",
+          path: "/stream",
+          responses: { 200: schema((value) => value) },
+          handler: (ctx) => {
+            ctx.res.setHeader("content-type", "text/plain").write("first")
+            ctx.res.write("second")
+            ctx.res.end("last")
+          },
+        },
+      ],
+    })
+    const result = await testRequest(app, { path: "/stream" })
+    expect(result.status).toBe(200)
+    expect(result.chunks).toEqual(["first", "second", "last"])
+    expect(result.ended).toBe(true)
+    expect(onViolation).toHaveBeenCalledExactlyOnceWith({
+      method: "GET",
+      path: "/stream",
+      status: 200,
+      kind: "stream-not-validated",
+    })
+  })
+
+  it("validates send() and ignores failures in the warning callback", async () => {
+    const app = new Orvaxis()
+    app.register(
+      responseValidationPlugin({
+        mode: "warn",
+        onViolation: () => {
+          throw Error("diagnostic failure")
+        },
+      })
+    )
+    app.group({
+      prefix: "/",
+      routes: [
+        {
+          method: "GET",
+          path: "/item",
+          responses: {
+            200: schema(() => {
+              throw Error("invalid")
+            }),
+          },
+          handler: (ctx) => ctx.res.send({ ok: true }),
+        },
+      ],
+    })
+    const result = await testRequest(app, { path: "/item" })
+    expect(result.status).toBe(200)
+    expect(result.body).toEqual({ ok: true })
+    expect(result.error).toBeUndefined()
+  })
+
   it("validates and forwards transformed JSON responses", async () => {
     const app = new Orvaxis()
     app.register(responseValidationPlugin())

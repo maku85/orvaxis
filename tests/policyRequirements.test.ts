@@ -3,6 +3,43 @@ import { Orvaxis } from "../core/Orvaxis"
 import { checkPolicyRequirements, formatPolicyRequirementReport } from "../core/policyRequirements"
 
 describe("checkPolicyRequirements", () => {
+  it("rejects a non-terminal ** selector instead of ignoring its suffix", () => {
+    const requirement = {
+      name: "private endpoints",
+      paths: ["/api/**/private"],
+      requirePolicies: ["authenticate"],
+    }
+    expect(() => checkPolicyRequirements([], [requirement])).toThrow(/last path segment/)
+    expect(() =>
+      checkPolicyRequirements(
+        [],
+        [
+          {
+            ...requirement,
+            paths: ["/api/**"],
+            exceptions: [{ path: "/api/**/health", reason: "Health probe" }],
+          },
+        ]
+      )
+    ).toThrow(/last path segment/)
+  })
+
+  it("rejects exceptions with an empty reason", () => {
+    expect(() =>
+      checkPolicyRequirements(
+        [],
+        [
+          {
+            name: "private endpoints",
+            paths: ["/api/**"],
+            requirePolicies: ["authenticate"],
+            exceptions: [{ path: "/api/health", reason: "  " }],
+          },
+        ]
+      )
+    ).toThrow(/non-empty reason/)
+  })
+
   it("checks route sets, explicit exceptions, and dynamic scopes without evaluating policies", () => {
     const evaluate = vi.fn(() => ({ allow: true as const }))
     const app = new Orvaxis()

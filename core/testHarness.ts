@@ -1,7 +1,7 @@
-import { buildExecutionSummary } from "../debug/buildExecutionSummary"
-import type { OrvaxisContext, OrvaxisRequest, OrvaxisResponse } from "../types"
-import { runWithContextCapture } from "./contextStore"
-import { createMockResponse } from "./mockResponse"
+import { buildExecutionSummary } from "../debug/buildExecutionSummary.js"
+import type { OrvaxisContext, OrvaxisRequest, OrvaxisResponse } from "../types/index.js"
+import { runWithContextCapture } from "./contextStore.js"
+import { createMockResponse } from "./mockResponse.js"
 
 export type TestRequestInit = {
   path: string
@@ -32,6 +32,7 @@ export async function testRequest(
 
   let ctx: OrvaxisContext | undefined
   let error: Error | undefined
+  let failed = false
 
   try {
     ctx = await runWithContextCapture(
@@ -41,12 +42,13 @@ export async function testRequest(
       () => app.handle(req, res)
     )
   } catch (err) {
+    failed = true
     error = err as Error
   }
 
   const errStatus = (error as (Error & { status?: number }) | undefined)?.status
   return {
-    status: errStatus ?? res.statusCode,
+    status: res.sent ? res.statusCode : (errStatus ?? (failed ? 500 : res.statusCode)),
     body: res.body,
     headers: res.sentHeaders,
     chunks: res.chunks,

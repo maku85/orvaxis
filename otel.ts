@@ -1,1 +1,1 @@
-export { type OtelPluginOptions, otelPlugin } from "./plugins/otelPlugin"
+export { type OtelPluginOptions, otelPlugin } from "./plugins/otelPlugin.js"

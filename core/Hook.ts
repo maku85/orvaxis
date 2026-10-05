@@ -1,4 +1,4 @@
-import type { HookName, Logger, OrvaxisContext } from "../types"
+import type { HookName, Logger, OrvaxisContext } from "../types/index.js"
 
 type HookFn = (ctx: OrvaxisContext, error?: Error) => Promise<void> | void
 

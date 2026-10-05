@@ -16,9 +16,21 @@ if [ -n "$(git status --porcelain)" ]; then
   exit 1
 fi
 
+# Validate release notes before changing the package version.
+if [ "$DIST_TAG" = "latest" ] && ! grep -q '^## \[Unreleased\]$' CHANGELOG.md; then
+  echo "error: CHANGELOG.md has no '## [Unreleased]' heading to stamp — add release notes there before releasing" >&2
+  exit 1
+fi
+
 # ── checks + tests ────────────────────────────────────────────────────────────
 pnpm run check
+pnpm exec tsc --noEmit
+pnpm run typecheck:tests
+pnpm run check:tenant-demo
 pnpm test
+pnpm run build
+pnpm run check:package
+pnpm run docs:build
 
 # ── bump version (no git operations yet) ──────────────────────────────────────
 if [ "$DIST_TAG" != "latest" ]; then
@@ -32,10 +44,6 @@ echo "releasing v$VERSION (tag: $DIST_TAG)"
 
 # ── stamp changelog (stable releases only) ────────────────────────────────────
 if [ "$DIST_TAG" = "latest" ]; then
-  if ! grep -q '^## \[Unreleased\]$' CHANGELOG.md; then
-    echo "error: CHANGELOG.md has no '## [Unreleased]' heading to stamp — add release notes there before releasing" >&2
-    exit 1
-  fi
   TODAY=$(date +%Y-%m-%d)
   # awk (not sed -i) to avoid GNU/BSD -i flag incompatibilities, and because this needs
   # to both rename the heading and leave a fresh, empty "## [Unreleased]" above it for

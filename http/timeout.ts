@@ -1,5 +1,5 @@
-import { HttpError } from "../core/HttpError"
-import type { Logger } from "../types"
+import { HttpError } from "../core/HttpError.js"
+import type { Logger } from "../types/index.js"
 
 export type AdapterOptions = {
   timeout?: number

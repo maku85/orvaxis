@@ -540,6 +540,8 @@ Policies are listed in runtime order: pre-validation global → group → route,
 
 ## Documentation
 
+See [Migrating from 0.3.1](docs/migration/next.md) for behavior changes in the next release.
+
 Browse the [Orvaxis documentation site](https://maku85.github.io/orvaxis/) for the getting-started guide, navigable references, examples, and articles. The Markdown sources remain available below and in `docs/`.
 
 [Explore the recorded allow, deny, and handler-error traces](docs/demo/policy-traces.md) in the static documentation demo.
@@ -717,7 +719,7 @@ It favors:
 
 ## Current Status
 
-The core execution model is stable, tested, and covered by 347 passing tests.
+The core execution model is covered by runtime, adapter, public API type, and example tests. CI runs the suite with coverage checks.
 
 Not yet recommended for production. Known gaps before production use:
 

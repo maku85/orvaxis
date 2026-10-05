@@ -1,11 +1,16 @@
 import { defineConfig } from "vitepress"
+import { version } from "../../package.json"
 
 export default defineConfig({
   title: "Orvaxis",
   description: "Policy-driven execution and authorization diagnostics for Node.js APIs.",
   lang: "en-US",
   base: "/orvaxis/",
+  srcExclude: ["roadmap.md"],
   lastUpdated: true,
+  transformPageData(pageData) {
+    pageData.frontmatter.packageVersion = version
+  },
   themeConfig: {
     siteTitle: "Orvaxis",
     logo: "/orvaxis-mark.svg",
@@ -14,6 +19,7 @@ export default defineConfig({
       { text: "Trace demo", link: "/demo/policy-traces" },
       { text: "Examples", link: "/examples/" },
       { text: "Reference", link: "/reference/core-concepts" },
+      { text: "Migration", link: "/migration/next" },
       {
         text: "Resources",
         items: [

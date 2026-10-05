@@ -1,5 +1,5 @@
-import type { OrvaxisContext, PluginContext } from "../types"
-import type { Plugin } from "./PluginManager"
+import type { OrvaxisContext, PluginContext } from "../types/index.js"
+import type { Plugin } from "./PluginManager.js"
 
 export type CorsOptions = {
   origin?: string | string[] | RegExp

@@ -1,4 +1,4 @@
-import type { OrvaxisContext, OrvaxisRequest, Route, RouteSchema } from "../types"
+import type { OrvaxisContext, OrvaxisRequest, Route, RouteSchema } from "../types/index.js"
 
 type ZodLike<T> = { parse(data: unknown): T }
 

@@ -4,7 +4,7 @@ layout: home
 hero:
   name: Orvaxis
   text: Make authorization decisions visible
-  tagline: Keep your Express or Fastify routes, and make policy outcomes inspectable, testable, and easier to debug.
+  tagline: Make policy outcomes inspectable, testable, and easier to debug in Express and Fastify APIs.
   actions:
     - theme: brand
       text: Get started
@@ -17,7 +17,7 @@ features:
   - title: Explain denied requests
     details: See which policy made the terminal decision and whether the handler ran.
   - title: Add authorization incrementally
-    details: Keep your framework and existing handlers while introducing named policies on selected routes.
+    details: Keep existing Express handlers while introducing named policies on selected routes.
   - title: Test declared permissions
     details: Inspect route configuration and check that required policies are attached before deployment.
 ---
@@ -46,4 +46,4 @@ If a request is rejected, start with [Diagnose a 403](/guide/diagnose-403). To u
 - [Cookbook](/cookbook)
 - [Why Orvaxis?](/why-orvaxis)
 
-The documented release is **0.3.1**. The repository contains the [working examples](https://github.com/maku85/orvaxis/tree/main/examples) and [release history](https://github.com/maku85/orvaxis/blob/main/CHANGELOG.md). This site documents the current repository state, including clearly marked changes that may not be in the published package yet; package availability and versioned changes are listed on [npm](https://www.npmjs.com/package/orvaxis).
+This site documents the **current repository, including unreleased changes**. The repository package version is **{{ $frontmatter.packageVersion }}**. The policy guard, decision diagnostics, policy matrices, schema inference, and OpenAPI updates were added after 0.3.1. Until those changes appear in a published release, use the [working examples](https://github.com/maku85/orvaxis/tree/main/examples) from a checkout. Compare the [release history](https://github.com/maku85/orvaxis/blob/main/CHANGELOG.md) with [npm](https://www.npmjs.com/package/orvaxis) for package availability.

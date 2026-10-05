@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Migration guide from 0.3.1** — document middleware short circuits, corrected policy scopes, typed route validation requirements, and the default bounded policy trace.
+- **Recorded trace explorer** — generate the static demo's allowed, denied, and failed scenarios from actual runtime execution during the documentation build.
 - **VitePress documentation site** — add a getting-started page, navigable references, examples catalog, local search, and GitHub Pages workflow, with local development and preview commands.
 
 - **Runnable multi-tenant task example** — a shared Express demo now covers tenant isolation, task ownership, and admin roles with fixture identities; its trace output, seven-scenario permission matrix, and static route-policy requirements are executed by CI. Storage is explicitly in-memory and demo-only.
@@ -37,6 +39,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Strict response streaming checks** — keep rejecting unsupported streaming attempts when a handler catches the first validation error, instead of allowing subsequent writes to bypass the declared contract.
+- **Native Node.js ESM imports** — add explicit `.js` specifiers and directory index paths to internal imports so the ESM distribution and its declarations resolve without a bundler. CI and publication now check CJS/ESM consumption and NodeNext types in an isolated project without optional peer dependencies.
+- **Detailed trace redaction failures** — omit the original denial reason when the redactor throws.
+- **Test and telemetry error statuses** — report 500 for generic errors before a response, preserving the sent status if a completion hook fails; close OpenTelemetry pipeline spans on successful middleware short circuits.
+- **Express guard disconnect cancellation** — retain abort listeners while the existing handler runs and clean them up on response finish or close.
+- **OpenAPI paths without validators** — describe ordinary path parameters as strings instead of failing when no parameter schema is declared.
+- **Static CI rule validation** — reject non-terminal `**` globs and exceptions with empty reasons instead of ignoring path suffixes or allowing unexplained exclusions.
+- **Release preflight** — run source/example type checks, tenant checks, both package builds, and the documentation build before versioning or pushing; check for an Unreleased heading before modifying the package version.
 - **Benchmark time units** — benchmark tables now report milliseconds derived from throughput (`1,000 / hz`), matching the existing values; the former microseconds label overstated operation speed by 1,000×.
 
 - **Policy scopes apply consistently across global, group, and route policies** — group and route policies now honor `scope.path` and `scope.method`, matching the global policy engine. RegExp scopes reset `lastIndex` around each check, making reused expressions with `g` and `y` flags deterministic.
@@ -47,7 +57,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Breaking
 
-- **Middleware short-circuit the full request lifecycle** — returning without calling `next()` now stops later middleware layers and the route handler. Sending a response also prevents subsequent application phases, even if `next()` is called afterward. `afterPipeline` still runs for completion hooks; `afterHandler` runs only if the handler ran. Middleware that intentionally stops execution must send a response or throw, or the HTTP connection may remain open. See README "Middleware" for the lifecycle contract.
+- **Middleware short-circuit the full request lifecycle** — returning without calling `next()` now stops later middleware layers and the route handler. Sending a response also prevents subsequent application phases, even if `next()` is called afterward. `afterPipeline` still runs for completion hooks; `afterHandler` runs only after the handler completes. Middleware that intentionally stops execution must send a response or throw, or the HTTP connection may remain open. See [Migrating from 0.3.1](docs/migration/next.md) for the lifecycle contract and other behavior changes.
 
 ### Fixed
 

@@ -1,6 +1,6 @@
 # Get started
 
-This quickstart registers one authentication policy and one route-specific authorization policy. The HTTP framework still owns routing and request handling.
+This quickstart registers one authentication policy and one route-specific authorization policy. Express provides the HTTP transport; Orvaxis matches the declared route and invokes its handler.
 
 ## Install
 

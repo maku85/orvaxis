@@ -4,6 +4,21 @@ import { Orvaxis } from "../core/Orvaxis"
 import { generateOpenApiDocument } from "../openapi/generateOpenApiDocument"
 
 describe("generateOpenApiDocument", () => {
+  it("documents unvalidated path parameters as strings without needing a converter", () => {
+    const app = new Orvaxis()
+    app.group({
+      prefix: "/tenants/:tenantId",
+      routes: [{ method: "GET", path: "/items/:id", handler: () => undefined }],
+    })
+    const doc = generateOpenApiDocument(app, { title: "Demo", version: "1" })
+    expect(doc.paths["/tenants/{tenantId}/items/{id}"].get).toMatchObject({
+      parameters: [
+        { name: "tenantId", in: "path", required: true, schema: { type: "string" } },
+        { name: "id", in: "path", required: true, schema: { type: "string" } },
+      ],
+    })
+  })
+
   it("generates paths, request parameters, responses, and default errors", () => {
     const app = new Orvaxis()
     const body = { parse: (value: unknown) => value }

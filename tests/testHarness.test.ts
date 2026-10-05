@@ -77,6 +77,32 @@ describe("testRequest", () => {
   })
 
   describe("error paths", () => {
+    it.each([
+      null,
+      undefined,
+      false,
+      0,
+      "",
+    ])("reports 500 even when the thrown value is %s", async (value) => {
+      const app = new Orvaxis()
+      app.group({
+        prefix: "/api",
+        routes: [
+          {
+            method: "GET",
+            path: "/fail",
+            handler: () => {
+              throw value
+            },
+          },
+        ],
+      })
+      const result = await testRequest(app, { path: "/api/fail" })
+      expect(result.status).toBe(500)
+      expect(result.error).toBe(value)
+      expect(result.ctx?.meta.trace?.outcome).toBe("error")
+    })
+
     it("returns status 404 and an error when no route matches", async () => {
       const res = await testRequest(makeApp(), { path: "/not-found" })
       expect(res.status).toBe(404)
@@ -159,6 +185,18 @@ describe("testRequest", () => {
       expect(res.error?.message).toBe("unexpected")
       expect(res.error).toBe(originalError)
       expect(res.ctx?.error).toBe(res.error)
+      expect(res.status).toBe(500)
+    })
+
+    it("preserves a sent response status when a later hook throws", async () => {
+      const app = makeApp()
+      app.on("afterPipeline", () => {
+        throw new HttpError(503, "Cleanup failed")
+      })
+      const res = await testRequest(app, { path: "/api/ping" })
+      expect(res.status).toBe(200)
+      expect(res.body).toEqual({ pong: true })
+      expect(res.error?.message).toBe("Cleanup failed")
     })
   })
 

@@ -20,6 +20,7 @@ pnpm install
 | Command | Description |
 |---|---|
 | `pnpm build` | Compile CommonJS and ESM distributions (same as CI) |
+| `pnpm check:package` | After build, verify CJS/ESM imports and NodeNext declarations in an isolated consumer without optional peers |
 | `pnpm test` | Run the test suite |
 | `pnpm test:coverage` | Run tests with coverage report |
 | `pnpm check` | Biome lint and format checks (same command as CI) |

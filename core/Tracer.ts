@@ -1,4 +1,4 @@
-import type { Trace } from "../types"
+import type { Trace } from "../types/index.js"
 
 export class Tracer {
   private readonly _startPerf: number

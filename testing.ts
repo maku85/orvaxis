@@ -1,4 +1,4 @@
-export { createMockResponse, type MockResponse } from "./core/mockResponse"
+export { createMockResponse, type MockResponse } from "./core/mockResponse.js"
 export {
   checkPolicyRequirements,
   formatPolicyRequirementReport,
@@ -8,7 +8,7 @@ export {
   type PolicyRequirementReport,
   type PolicyRequirementResult,
   type PolicyRequirementStatus,
-} from "./core/policyRequirements"
+} from "./core/policyRequirements.js"
 export {
   formatPolicyMatrixReport,
   type PolicyMatrixExpectation,
@@ -19,4 +19,4 @@ export {
   type TestResponse,
   testPolicyMatrix,
   testRequest,
-} from "./core/testHarness"
+} from "./core/testHarness.js"

@@ -25,6 +25,23 @@ function appWithPolicies(options: ConstructorParameters<typeof Orvaxis>[0] = {})
 }
 
 describe("policy decision tracing", () => {
+  it("omits the original reason if the detailed trace redactor throws", async () => {
+    const app = appWithPolicies({
+      policyTrace: {
+        mode: "detailed",
+        redact: () => {
+          throw new Error("Redaction failed")
+        },
+      },
+    })
+    const result = await testRequest(app, { path: "/api/resource" })
+    expect(result.status).toBe(403)
+    expect(result.error?.message).toBe("private user 42")
+    const decision = result.ctx?.meta.trace?.events.find((event) => event.meta?.outcome === "deny")
+    expect(decision?.meta?.reason).toBeUndefined()
+    expect(JSON.stringify(result.ctx?.meta.trace)).not.toContain("private user 42")
+  })
+
   it("records scope skips and ordered decisions by global, group, and route layer", async () => {
     const app = appWithPolicies()
     app.policy({

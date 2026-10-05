@@ -38,6 +38,24 @@ BENCH_THRESHOLD=20 pnpm bench:compare   # flag only drops > 20%
 
 ## Results
 
+### Release audit: policy trace collection
+
+Measured on 2026-10-05 with Node.js 22.23.2 on macOS arm64. Command: `pnpm exec vitest bench run benchmarks/adapter.bench.ts benchmarks/policy.bench.ts`.
+
+The full runtime comparison executes five always-allow policies with actual trace storage, context creation, route matching, and a JSON handler. It excludes network I/O.
+
+| Policy trace mode | Throughput (ops/s) | Mean (ms) |
+|---|---:|---:|
+| `off` | 137,147 | 0.0073 |
+| `summary` (default) | 104,462 | 0.0096 |
+| `detailed` | 105,453 | 0.0095 |
+
+Summary collection adds approximately 0.0023 ms per request in this synthetic workload, with about 24% lower throughput than disabled collection. The small difference between summary and detailed mode is within measurement noise; these allowed scenarios do not exercise reason redaction. The separate policy-engine denial benchmark covers a redactor call. Repeat the measurement on your target hardware before deciding to disable tracing; the default keeps authorization diagnostics available.
+
+### Historical results
+
+These tables are historical measurements from an earlier runtime. They do not measure the current radix trie or the new default policy-decision collection; rerun the benchmarks on the release candidate before using numbers for capacity planning.
+
 > Measured on Node.js 22, Linux x86_64. Your numbers will differ by hardware.
 > Times are shown in milliseconds (ms), derived from the displayed throughput as `mean (ms) = 1,000 / hz`; `hz` means operations per second. The recorded throughput and means are rounded, so rerun the command above for measurements on your machine.
 
@@ -143,7 +161,7 @@ The tracer is **~2.2x slower** than a raw array at equivalent event counts. For 
 
 ### Router
 
-Route matching is a linear scan over groups and routes. The cost is proportional to position in the list.
+The current router uses a radix trie with static → parameter → wildcard priority. The historical table below measured the former linear-scan implementation and is retained for comparison only.
 
 **Small table (5 routes)**
 
@@ -168,7 +186,7 @@ Route matching is a linear scan over groups and routes. The cost is proportional
 |---|---|---|
 | Match with `:id` param | ~174,000 | 0.0057471 |
 
-No-match exits early at the group prefix check, which is why it outperforms a hit on the last route. Registering high-traffic routes in the first group and early in the route list measurably reduces matching cost.
+Registration order does not determine matching cost in the current trie; path depth and the need for backtracking do.
 
 ---
 
@@ -185,7 +203,7 @@ End-to-end cost of `app.handle()` — the call an HTTP adapter makes for every r
 
 The fixed cost of a minimal Orvaxis request is ~7.6µs, driven by `AsyncLocalStorage` context propagation, `crypto.randomUUID()` for the request tracer, and the route lookup. Policies, middleware, and hooks add incrementally on top.
 
-To put this in perspective: a typical Express route handler (including framework parsing and routing) takes 50–150µs. Orvaxis adds 8–12µs on top, representing roughly 5–15% overhead depending on the workload — well within acceptable range for the observability and control it provides.
+These historical pipeline values do not establish the overhead of the current release. Measure your own workload, including framework parsing, serialization, policy tracing, and application I/O.
 
 ---
 

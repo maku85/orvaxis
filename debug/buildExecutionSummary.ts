@@ -1,4 +1,4 @@
-import type { DebugEntry, DebugInfo, OrvaxisContext, Trace, TraceEvent } from "../types"
+import type { DebugEntry, DebugInfo, OrvaxisContext, Trace, TraceEvent } from "../types/index.js"
 
 export type UnifiedEvent = {
   kind: "trace" | "debug"

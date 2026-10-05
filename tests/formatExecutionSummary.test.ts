@@ -4,6 +4,25 @@ import { testRequest } from "../core/testHarness"
 import { formatExecutionSummary } from "../debug/formatExecutionSummary"
 
 describe("formatExecutionSummary", () => {
+  it("identifies a failure even when the thrown value is falsy", async () => {
+    const app = new Orvaxis()
+    app.group({
+      prefix: "/api",
+      routes: [
+        {
+          method: "GET",
+          path: "/fail",
+          handler: () => {
+            throw null
+          },
+        },
+      ],
+    })
+    const result = await testRequest(app, { path: "/api/fail" })
+    if (!result.ctx) throw new Error("expected a request context")
+    expect(formatExecutionSummary(result.ctx)).toContain("Outcome: error (500)")
+  })
+
   it("formats allowed, denied, and failed requests without request or message data", async () => {
     const app = new Orvaxis()
     app.group({

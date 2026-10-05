@@ -1,5 +1,5 @@
 import { AsyncLocalStorage } from "node:async_hooks"
-import type { OrvaxisContext } from "../types"
+import type { OrvaxisContext } from "../types/index.js"
 
 const storage = new AsyncLocalStorage<OrvaxisContext>()
 const captureStorage = new AsyncLocalStorage<(ctx: OrvaxisContext) => void>()

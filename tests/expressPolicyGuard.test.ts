@@ -67,6 +67,33 @@ function makePolicyApp() {
 }
 
 describe("createExpressPolicyGuard", () => {
+  it("keeps the abort signal active until the existing handler finishes or disconnects", async () => {
+    const req = expressRequest("/api/documents/42", "GET", { "x-owner": "42" })
+    const res = expressResponse()
+    const next = vi.fn()
+    createExpressPolicyGuard(makePolicyApp())(req, res, next)
+    await vi.waitFor(() => expect(next).toHaveBeenCalledOnce())
+    const signal = (res.locals.orvaxis as { req: { signal: AbortSignal } }).req.signal
+    expect(signal.aborted).toBe(false)
+    res.emit("close")
+    expect(signal.aborted).toBe(true)
+    expect(req.listenerCount("aborted")).toBe(0)
+    expect(res.listenerCount("close")).toBe(0)
+  })
+
+  it("removes abort listeners on normal completion", async () => {
+    const req = expressRequest("/api/documents/42", "GET", { "x-owner": "42" })
+    const res = expressResponse()
+    const next = vi.fn()
+    createExpressPolicyGuard(makePolicyApp())(req, res, next)
+    await vi.waitFor(() => expect(next).toHaveBeenCalledOnce())
+    const signal = (res.locals.orvaxis as { req: { signal: AbortSignal } }).req.signal
+    res.emit("finish")
+    res.emit("close")
+    expect(signal.aborted).toBe(false)
+    expect(req.listenerCount("aborted")).toBe(0)
+  })
+
   it("continues to the existing Express handler after policy approval", async () => {
     const req = expressRequest("/api/documents/42", "GET", { "x-owner": "42" })
     const res = expressResponse()

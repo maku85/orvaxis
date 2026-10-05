@@ -1,4 +1,4 @@
-import type { PluginContext } from "../types"
+import type { PluginContext } from "../types/index.js"
 
 export type Plugin = {
   name: string

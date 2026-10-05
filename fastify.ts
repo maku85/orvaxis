@@ -1,1 +1,1 @@
-export { createFastifyServer } from "./http/fastifyAdapter"
+export { createFastifyServer } from "./http/fastifyAdapter.js"

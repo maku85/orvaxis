@@ -1,4 +1,4 @@
-import type { DebugInfo, OrvaxisContext } from "../types"
+import type { DebugInfo, OrvaxisContext } from "../types/index.js"
 
 type PerfOrigin = { startMs: number; startPerf: number }
 

@@ -1,4 +1,4 @@
-import type { Middleware, OrvaxisContext } from "../types"
+import type { Middleware, OrvaxisContext } from "../types/index.js"
 
 export class Pipeline {
   private middlewares: Middleware[] = []

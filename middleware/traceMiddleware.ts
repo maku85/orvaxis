@@ -1,4 +1,4 @@
-import type { Middleware } from "../types"
+import type { Middleware } from "../types/index.js"
 
 export function traceMiddleware(): Middleware {
   return async (ctx, next) => {

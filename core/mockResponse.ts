@@ -1,5 +1,5 @@
 import type { Readable } from "node:stream"
-import type { OrvaxisResponse } from "../types"
+import type { OrvaxisResponse } from "../types/index.js"
 
 export type MockResponse = OrvaxisResponse & {
   body: unknown

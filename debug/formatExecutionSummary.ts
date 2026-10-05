@@ -1,5 +1,5 @@
-import type { OrvaxisContext } from "../types"
-import { buildExecutionSummary } from "./buildExecutionSummary"
+import type { OrvaxisContext } from "../types/index.js"
+import { buildExecutionSummary } from "./buildExecutionSummary.js"
 
 /**
  * Format a request's recorded decisions for logs and bug reports.
@@ -10,16 +10,17 @@ export function formatExecutionSummary(ctx: OrvaxisContext): string {
   const route = summary.route
   const method = safeLabel(route?.route.method ?? ctx.req.method).toUpperCase()
   const path = safeLabel(route?.route.path ?? "<unmatched route>")
+  const failed = Boolean(ctx.error) || ctx.meta.trace?.outcome === "error"
   const status = Number.isInteger(ctx.error && "status" in ctx.error ? ctx.error.status : undefined)
     ? (ctx.error as Error & { status: number }).status
-    : ctx.error
+    : failed
       ? 500
       : ctx.res.statusCode
   const outcome = summary.stoppedByPolicy
     ? summary.stoppedByPolicy.meta?.outcome === "deny"
       ? "denied"
       : "error"
-    : ctx.error
+    : failed
       ? "error"
       : "completed"
   const lines = [`${method} ${path}`, `Outcome: ${outcome} (${status})`, "Policy decisions:"]

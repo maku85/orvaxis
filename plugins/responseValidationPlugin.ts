@@ -1,6 +1,6 @@
-import { HttpError } from "../core/HttpError"
-import type { OrvaxisContext, OrvaxisResponse, RouteResponseSchemas } from "../types"
-import type { Plugin } from "./PluginManager"
+import { HttpError } from "../core/HttpError.js"
+import type { OrvaxisContext, OrvaxisResponse, RouteResponseSchemas } from "../types/index.js"
+import type { Plugin } from "./PluginManager.js"
 
 export type ResponseValidationMode = "strict" | "warn"
 
@@ -61,15 +61,16 @@ function wrapResponse(
   const streamingResponse = () => {
     if (!currentSchema()) return
     const status = original.statusCode
+    if (mode === "strict") {
+      const issue = baseIssue("stream-not-validated")
+      throw new HttpError(
+        500,
+        `Streaming response for ${issue.method} ${issue.path} cannot be validated against a response schema`
+      )
+    }
     if (!reportedStreams.has(status)) {
       reportedStreams.add(status)
       const issue = baseIssue("stream-not-validated")
-      if (mode === "strict") {
-        throw new HttpError(
-          500,
-          `Streaming response for ${issue.method} ${issue.path} cannot be validated against a response schema`
-        )
-      }
       report(issue)
     }
   }

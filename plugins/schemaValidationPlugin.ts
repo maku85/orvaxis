@@ -1,6 +1,6 @@
-import { HttpError } from "../core/HttpError"
-import type { OrvaxisContext, RouteMatch, SchemaField } from "../types"
-import type { Plugin } from "./PluginManager"
+import { HttpError } from "../core/HttpError.js"
+import type { OrvaxisContext, RouteMatch, SchemaField } from "../types/index.js"
+import type { Plugin } from "./PluginManager.js"
 
 type ValidationField = "body" | "params" | "query" | "headers"
 
