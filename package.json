@@ -96,6 +96,9 @@
   ],
   "scripts": {
     "dev": "tsx examples/express-server.ts",
+    "docs:dev": "vitepress dev docs",
+    "docs:build": "vitepress build docs",
+    "docs:preview": "vitepress preview docs",
     "build:cjs": "tsc -p tsconfig.json",
     "build:esm": "tsc -p tsconfig.esm.json && node -e \"require('fs').writeFileSync('dist/esm/package.json', JSON.stringify({type:'module'}))\"",
     "build": "pnpm build:cjs && pnpm build:esm",
@@ -141,6 +144,7 @@
     "fastify": "^5.8.5",
     "tsx": "^4.19.0",
     "typescript": "^6.0.3",
+    "vitepress": "^1.6.4",
     "vitest": "^4.1.5",
     "zod": "^4.4.3"
   },

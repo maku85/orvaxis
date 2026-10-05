@@ -15,6 +15,8 @@
   See which rule stopped an API request, then test the permissions that protect every route.
 </p>
 
+<p align="center"><a href="https://maku85.github.io/orvaxis/">Read the documentation →</a></p>
+
 ---
 
 ## Quickstart
@@ -537,6 +539,8 @@ Policies are listed in runtime order: pre-validation global → group → route,
 ---
 
 ## Documentation
+
+Browse the [Orvaxis documentation site](https://maku85.github.io/orvaxis/) for the getting-started guide, navigable references, examples, and articles. The Markdown sources remain available below and in `docs/`.
 
 - [Quickstart](#quickstart) — protect one route and see the allowed/denied result
 - [Add Orvaxis to an existing Express route](docs/guide/integrate-existing-route.md) — add policy checks without moving the handler

@@ -44,4 +44,4 @@ Mount the guard after middleware that parses the body or establishes identity, a
 
 The guard executes only pre-validation Orvaxis policies. It does not run Orvaxis plugins, middleware, request validation, or the route handler. A mirrored route that uses `defineRoute()` or post-validation policies is rejected because those require full Orvaxis execution. To roll back, remove the guard from the Express route and its mirrored Orvaxis declaration.
 
-For a new route where Orvaxis should own routing and the handler too, use the [quickstart in the README](../../README.md#quickstart) and an adapter instead.
+For a new route where Orvaxis should own routing and the handler too, use the [getting-started guide](/guide/getting-started) and an adapter instead.

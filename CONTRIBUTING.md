@@ -26,6 +26,9 @@ pnpm install
 | `pnpm tsc --noEmit` | Type-check source without emitting files (same as CI) |
 | `pnpm typecheck:tests` | Type-check public API usage examples (same as CI) |
 | `pnpm check:tenant-demo` | Verify multi-tenant policy requirements, traces, and permission matrix (same as CI) |
+| `pnpm docs:dev` | Run the documentation site locally with hot reload |
+| `pnpm docs:build` | Build the static documentation site |
+| `pnpm docs:preview` | Preview the production documentation build |
 
 ## Project structure
 
@@ -47,6 +50,12 @@ tests/       Unit tests (mirrors source structure)
 - **No new dependencies** without discussion — keep the core footprint small.
 
 Documentation examples are expected to match exported APIs and current runtime behavior. Run the quickstart command after changing its source or instructions.
+
+The documentation site uses VitePress and lives in `docs/`. Run `pnpm docs:dev` while editing pages, then `pnpm docs:build` to catch broken internal links and build errors. Generated output and cache files under `docs/.vitepress/` are not committed.
+
+## Publishing the documentation
+
+The `Documentation` workflow builds the site on pull requests and deploys it after pushes to `main`. To enable the first deployment, open the repository's **Settings → Pages**, set **Build and deployment → Source** to **GitHub Actions**, and ensure the `github-pages` environment is available. The workflow creates a Pages deployment using the repository token; no deployment secret is required. The project site is served from `https://maku85.github.io/orvaxis/`, matching `base` in `docs/.vitepress/config.mts`.
 
 ## Testing
 

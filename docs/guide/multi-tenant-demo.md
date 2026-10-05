@@ -4,7 +4,7 @@ This runnable Express API demonstrates fixture API-key authentication, tenant is
 
 ## Run it
 
-From a repository checkout with the documented [Node.js and pnpm prerequisites](../../CONTRIBUTING.md#prerequisites), install dependencies and start the server:
+From a repository checkout with the documented [Node.js and pnpm prerequisites](https://github.com/maku85/orvaxis/blob/main/CONTRIBUTING.md#prerequisites), install dependencies and start the server:
 
 ```bash
 pnpm install
