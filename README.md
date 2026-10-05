@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="./assets/orvaxis-banner.png" width="800"/>
+  <img src="./assets/orvaxis-banner.png" width="800" alt="Orvaxis explains an API denial by showing the responsible policy and the skipped handler"/>
 </p>
 
 <h1 align="center">Orvaxis</h1>
