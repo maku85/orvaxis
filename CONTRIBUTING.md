@@ -90,6 +90,35 @@ pnpm typecheck:compat  # Express adapter compiled against @types/express 4
 
 Not covered, on purpose: the lowest declared peer versions (Express 4.20.0, Fastify 5.0.0) — the matrix uses the latest of each declared major; other Node versions; the Express guard has no Fastify counterpart.
 
+## Releasing
+
+Maintainers release from `main` with a clean tree, an authenticated npm session (`npm login`; the script never reads or stores credentials), and release notes written under `## [Unreleased]` in `CHANGELOG.md`.
+
+```bash
+bash scripts/release.sh minor --check-only   # validate everything, change nothing
+bash scripts/release.sh minor --prepare-only # local commit + tag + verified tarball, nothing public
+pnpm release:minor                           # the whole flow (also: release, release:major, release:alpha)
+bash scripts/release.sh --resume             # continue an interrupted or prepared release
+```
+
+Git and npm are not one transaction, so the flow is ordered so that the only irreversible step happens last-but-one and every earlier step can be abandoned:
+
+1. **Prepare** (local only). Validates the bump (`patch`, `minor`, `major`, or a `pre*` bump), the dist-tag (a `pre*` bump needs a non-`latest` tag and vice versa), the branch, that the branch is not behind `origin`, that npm is authenticated, and that the next version is neither tagged (locally or on `origin`) nor already on the registry. Then it runs every check, bumps the version, stamps the changelog (the new section must not be empty, since it becomes the GitHub release notes), commits `chore: release vX.Y.Z`, creates the annotated tag, builds, packs, and verifies the tarball (its `package.json` version and `dist/`).
+2. **Publish.** `npm publish` of that exact tarball. If the version is already on the registry the step is skipped, never repeated.
+3. **Finalize.** Pushes the branch and only the `vX.Y.Z` tag, refusing if `origin` already has that tag at another commit. The tag push triggers the GitHub Release workflow, so it only runs for versions that exist on npm.
+
+### If something fails
+
+| Where it failed | State | What to do |
+|---|---|---|
+| Validation or any check | Nothing changed (a failed bump or changelog stamp restores `package.json` and `CHANGELOG.md`) | Fix the reported cause and run again |
+| `--prepare-only` finished | Local commit and tag only | `--resume` to continue, or abandon with `git tag -d vX.Y.Z && git reset --hard HEAD~1` |
+| `npm publish` failed | Nothing public, nothing pushed | Check `npm view orvaxis@X.Y.Z version`. If absent, fix the cause (login, OTP, network) and `--resume`. If present, `--resume` skips publishing and pushes |
+| Push failed after publishing | Package public, git not | Fix the cause (permissions, protected branch, diverged remote) and `--resume`. Do not publish again |
+| Version already published, or tag exists remotely elsewhere | Refused before any change or publish | Choose a new version; resolve a conflicting remote tag manually |
+
+`--resume` only works on the release commit (`HEAD` is the commit tagged for `package.json`'s version) and does just what is missing. The procedure never regenerates or overwrites a published version, never deletes remote tags, and never pushes other local tags. A published npm version cannot be changed: fix problems with a new version. `tests/releaseScript.test.ts` exercises all of these paths against local git repositories with stubbed `npm publish`, so no test publishes or pushes anywhere real.
+
 ## Submitting a pull request
 
 1. Fork the repository and create a branch from `main`.

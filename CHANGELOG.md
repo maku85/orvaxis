@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Recoverable release process** — `scripts/release.sh` now validates the bump, dist-tag, branch, sync with `origin`, npm authentication and the next version (not tagged, not on the registry) before changing anything, then prepares locally, publishes the exact verified tarball, and only afterwards pushes the branch and the single release tag. Previously the commit and every local tag were pushed before `npm publish`, so a failed publish left a public tag without a package. New `--check-only`, `--prepare-only` and `--resume` modes, an empty changelog section is rejected, and the recovery steps are documented in CONTRIBUTING.md. Tests run the real script against local git repositories with a stubbed `npm publish`.
 - **OpenAPI export no longer approximates or overwrites** — `generateOpenApiDocument` now raises a contextual `TypeError` for wildcard routes (previously emitted as a bogus path such as `/files/*rest`), for HTTP methods it cannot describe (previously skipped silently), and for collisions (same operation twice, or templates differing only in parameter names). Parameter names with characters such as `-` or `.` are translated correctly. Converter output with local `$ref`s (for example `#/$defs/x`) is rejected because it cannot resolve inside the document. To keep a wildcard or internal route out of the document, pass `exclude: (route) => route.path.includes("*")`.
 
 ### Added
