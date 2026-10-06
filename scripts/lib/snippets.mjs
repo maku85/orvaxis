@@ -43,13 +43,21 @@ export function extractRegions(root, reference) {
     )
     if (end < 0) throw new Error(`${file} region '${name}' is not closed with // #endregion`)
     chunks.push(
-      lines
-        .slice(start + 1, end)
+      dedent(lines.slice(start + 1, end))
         .join("\n")
         .trimEnd()
     )
   }
   return rewriteImports(chunks.join("\n\n"))
+}
+
+/** Remove the indentation shared by all non-blank lines, so regions inside functions read naturally. */
+function dedent(lines) {
+  const indents = lines
+    .filter((line) => line.trim() !== "")
+    .map((line) => /^ */.exec(line)[0].length)
+  const shared = indents.length > 0 ? Math.min(...indents) : 0
+  return lines.map((line) => line.slice(shared))
 }
 
 const MARKER = /^<!--\s*snippet:\s*(\S+)\s*-->\s*$/

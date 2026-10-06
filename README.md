@@ -27,7 +27,7 @@ Use it to organize how requests run, enforce input and response contracts, obser
 
 | Capability | What you can do | Learn more |
 |---|---|---|
-| **Routing and lifecycle** | Declare route groups, parameters and wildcards; compose global, group and route middleware with lifecycle hooks | [Lifecycle](docs/reference/lifecycle.md), [router](docs/reference/core-concepts.md#router), [hooks and plugins example](examples/hooks-and-plugins.ts) |
+| **Routing and lifecycle** | Declare route groups, parameters and wildcards; compose global, group and route middleware with lifecycle hooks | [How a request runs](docs/guide/execution-model.md), [routing](docs/guide/routing-and-groups.md), [middleware and hooks](docs/guide/middleware-and-hooks.md), [lifecycle reference](docs/reference/lifecycle.md) |
 | **Declarative policies** | Apply named rules by scope and priority, before or after input validation; implement permissions, feature gates or other request conditions | [Policies](docs/reference/core-concepts.md#policies), [cookbook](docs/cookbook.md), [403 diagnostics](docs/guide/diagnose-403.md) |
 | **Validated, typed input** | Parse and transform body, params, query and headers; infer handler types from validator outputs with `defineRoute()` | [Typed schemas](docs/reference/core-concepts.md#typed-context), [working example](examples/typed-schema.ts) |
 | **Response contracts and OpenAPI** | Validate declared responses by status in strict or warning mode; generate OpenAPI 3.1 using your schema converter | [Contracts and OpenAPI](docs/reference/core-concepts.md#response-contracts-and-openapi) |
@@ -192,6 +192,7 @@ Browse the [Orvaxis documentation site](https://maku85.github.io/orvaxis/) for t
 - [Add Orvaxis to an existing Express route](docs/guide/integrate-existing-route.md) — add policy checks without moving the handler
 - [Multi-tenant task demo](docs/guide/multi-tenant-demo.md) — runnable tenant, ownership, roles, traces, permission matrix, and CI checks
 - [Diagnose a 403](docs/guide/diagnose-403.md) — find the terminal policy and verify skipped stages
+- [How a request runs](docs/guide/execution-model.md), [routing and groups](docs/guide/routing-and-groups.md), and [middleware and hooks](docs/guide/middleware-and-hooks.md) — the lifecycle explained with observed orders
 - [Request lifecycle reference](docs/reference/lifecycle.md) — hook, middleware, validation, and policy order
 - [Core concepts reference](docs/reference/core-concepts.md) — router, policies, hooks, plugins, tracing, and context
 - [Typed request schemas](docs/reference/core-concepts.md#typed-context) — infer handler types from parsed and transformed values

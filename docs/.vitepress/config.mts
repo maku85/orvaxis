@@ -20,10 +20,11 @@ const docsSidebar = [
   {
     text: "Execution",
     items: [
-      { text: "Request lifecycle", link: "/reference/lifecycle" },
-      { text: "Routing and groups", link: "/reference/core-concepts#router" },
-      { text: "Middleware and hooks", link: "/reference/core-concepts#middleware" },
+      { text: "How a request runs", link: "/guide/execution-model" },
+      { text: "Routing and groups", link: "/guide/routing-and-groups" },
+      { text: "Middleware and hooks", link: "/guide/middleware-and-hooks" },
       { text: "Policies", link: "/reference/core-concepts#policies" },
+      { text: "Lifecycle reference", link: "/reference/lifecycle" },
     ],
   },
   {
@@ -130,10 +131,11 @@ export default defineConfig({
       {
         text: "Execution",
         items: [
-          { text: "Request lifecycle", link: "/reference/lifecycle" },
-          { text: "Routing and groups", link: "/reference/core-concepts#router" },
-          { text: "Middleware and hooks", link: "/reference/core-concepts#middleware" },
+          { text: "How a request runs", link: "/guide/execution-model" },
+          { text: "Routing and groups", link: "/guide/routing-and-groups" },
+          { text: "Middleware and hooks", link: "/guide/middleware-and-hooks" },
           { text: "Policies", link: "/reference/core-concepts#policies" },
+          { text: "Lifecycle reference", link: "/reference/lifecycle" },
         ],
       },
       {

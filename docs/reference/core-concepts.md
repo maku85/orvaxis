@@ -174,7 +174,7 @@ Lifecycle events that allow observation of execution:
 - `afterPipeline` — fired after the handler and trace finalization (also fires when `onNotFound` / `onMethodNotAllowed` send a response)
 - `onError` — fired on any unhandled error
 
-`beforeHandler` / `afterHandler` wrap only the handler itself, independent from the pipeline. Use them for per-handler timing, logging, or auditing without interfering with middleware. They do not fire when the handler throws — use `onError` for that case.
+`beforeHandler` / `afterHandler` wrap only the handler itself, independent from the pipeline. Use them for per-handler timing, logging, or auditing without interfering with middleware. `afterHandler` does not fire when the handler throws (`beforeHandler` already has) — use `onError` for that case.
 
 Policies run in two phases. Existing policies default to `preValidation`, so authentication and other early checks keep their current behavior. A policy that depends on parsed input can use `phase: "postValidation"` and declare a non-empty `requires` list (`body`, `params`, `query`, or `headers`). It runs only after `onValidation`; Orvaxis rejects the request with a configuration error if `schemaValidationPlugin` is missing or the matched route does not define every required schema. Invalid input fails validation (422) before such a policy runs.
 

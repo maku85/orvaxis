@@ -19,8 +19,8 @@ hero:
 features:
   - title: Lifecycle and routing
     details: Declare route groups, parameters and wildcards, and compose global, group and route middleware with lifecycle hooks in one documented order.
-    link: /reference/lifecycle
-    linkText: Request lifecycle
+    link: /guide/execution-model
+    linkText: How a request runs
   - title: Policies
     details: Apply named rules by scope, priority and phase — permissions, feature gates or any request condition — and keep every decision on record.
     link: /reference/core-concepts#policies

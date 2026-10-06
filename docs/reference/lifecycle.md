@@ -1,5 +1,7 @@
 # Request lifecycle and policy order
 
+This is the normative reference. For the same flow shown with an observed example, ending by ending, see [How a request runs](/guide/execution-model), [Routing and groups](/guide/routing-and-groups) and [Middleware and hooks](/guide/middleware-and-hooks).
+
 Orvaxis separates authorization decisions, request flow, lifecycle hooks, and route handling. The runtime executes these stages in this order for a matched request:
 
 1. Validate the request and run `onRequest`.

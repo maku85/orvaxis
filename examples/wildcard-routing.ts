@@ -3,6 +3,7 @@ import { createExpressServer } from "../http/expressAdapter"
 
 const app = new Orvaxis()
 
+// #region routes
 app.group({
   prefix: "/",
   routes: [
@@ -43,6 +44,7 @@ app.group({
     },
   ],
 })
+// #endregion
 
 const server = createExpressServer(app)
 server.listen(3005).catch(console.error)
