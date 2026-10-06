@@ -47,4 +47,4 @@ app.group({
 // #endregion
 
 const server = createExpressServer(app)
-server.listen(3005).catch(console.error)
+server.listen(Number(process.env.PORT ?? 3005)).catch(console.error)

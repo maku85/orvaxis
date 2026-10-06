@@ -79,6 +79,14 @@ pnpm build && node scripts/check-package.mjs --no-peers   # tarball + peer-less 
 
 `check:package` runs `npm pack` and inspects the tarball (only `dist/` plus `package.json`, `README.md`, `LICENSE`; no sources or tests; every file named by `main`, `types` and `exports` present; size and file-count budgets). It then installs *only that tarball* into temporary consumers outside the repository: one without peers (core, testing and OpenAPI work; the integration subpaths must fail naming the missing peer), one with Express 4, and one with Express 5, Fastify 5 and OpenTelemetry. Each consumer runs a CJS script, an ESM script and a NodeNext type-check for every subpath, and all temporary directories are removed even on failure. CI, `prepublishOnly` and `scripts/release.sh` run it. Adding a subpath to `exports` makes the check fail until it is exercised in `scripts/check-package.mjs`.
 
+### Examples
+
+```bash
+pnpm test:examples   # start the examples the catalog lists and check what they answer
+```
+
+`docs/examples/index.md` is the catalog. `tests/examples.smoke.ts` starts every server example on a free port (`PORT`), makes the requests the catalog describes, and runs the finite examples checking their output; it also fails when an example under `examples/` is missing from the catalog or a catalog row states a different port than the source. When you add or change an example, update its catalog row and, for a server, its entry in that file. Examples that are shown in guides carry `// #region` markers and the guide block `<!-- snippet: ... -->`, checked by `pnpm check:snippets`.
+
 ### Compatibility matrix
 
 ```bash

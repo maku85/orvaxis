@@ -176,7 +176,7 @@ const result = await testRequest(app, { path: "/api/reports/alice", headers: { "
 // result.status === 403; result.ctx holds the trace for diagnostics
 ```
 
-The [testing guide](docs/guide/testing.md) covers the response shape, permission matrices (`testPolicyMatrix`), static policy requirements for CI (`checkPolicyRequirements`) and route introspection (`app.inspectRoutes()`).
+The [testing guide](docs/guide/testing.md) covers the response shape, permission matrices (`testPolicyMatrix`), static policy requirements for CI (`checkPolicyRequirements`) and route introspection (`app.inspectRoutes()`), and why the matrix and the static check answer different questions. Its tests are real and runnable: `pnpm exec vitest run examples/testing`. Every example, with its command, port and expected output, is in the [examples catalog](docs/examples/index.md).
 
 ---
 

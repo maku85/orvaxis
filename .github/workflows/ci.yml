@@ -64,6 +64,9 @@ jobs:
           path: protection-report/
           if-no-files-found: ignore
 
+      - name: Smoke-test the examples the catalog lists
+        run: pnpm test:examples
+
       - name: Test
         run: pnpm test:coverage
 

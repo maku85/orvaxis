@@ -85,7 +85,9 @@ app.group({
 })
 
 if (basename(process.argv[1] ?? "") === "typed-context.ts") {
-  createExpressServer(app).listen(3004).catch(console.error)
+  createExpressServer(app)
+    .listen(Number(process.env.PORT ?? 3004))
+    .catch(console.error)
 }
 
 // GET /api/me  (no key)    → 401 Missing X-API-Key header

@@ -45,7 +45,8 @@ export async function explainDenial(userId: string, documentId: string) {
 // #endregion
 
 if (basename(process.argv[1] ?? "") === "express-existing-route.ts") {
-  createExistingRouteDemo().listen(3005, () =>
-    console.log("Existing Express route demo listening on port 3005")
+  const port = Number(process.env.PORT ?? 3005)
+  createExistingRouteDemo().listen(port, () =>
+    console.log(`Existing Express route demo listening on port ${port}`)
   )
 }

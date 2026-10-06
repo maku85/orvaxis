@@ -13,20 +13,12 @@
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
 
-export const IMPORT_REWRITES = {
-  '"../index"': '"orvaxis"',
-  '"../express"': '"orvaxis/express"',
-  '"../fastify"': '"orvaxis/fastify"',
-  '"../testing"': '"orvaxis/testing"',
-  '"../openapi"': '"orvaxis/openapi"',
-  '"../otel"': '"orvaxis/otel"',
-}
-
 export function rewriteImports(source) {
-  let output = source
-  for (const [from, to] of Object.entries(IMPORT_REWRITES))
-    output = output.replaceAll(`from ${from}`, `from ${to}`)
-  return output
+  // Examples import the repository sources by relative path; documentation imports the entry points.
+  return source.replace(
+    /from "(?:\.\.\/)+(index|testing|express|fastify|openapi|otel)"/g,
+    (_match, entry) => (entry === "index" ? 'from "orvaxis"' : `from "orvaxis/${entry}"`)
+  )
 }
 
 export function extractRegions(root, reference) {

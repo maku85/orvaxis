@@ -1,5 +1,6 @@
+import express from "express"
 import { z } from "zod"
-import { createExpressServer } from "../http/expressAdapter"
+import { createExpressServer } from "../express"
 import { Orvaxis, schemaValidationPlugin } from "../index"
 
 const app = new Orvaxis()
@@ -53,8 +54,12 @@ app.on("onError", (ctx, err) => {
   }
 })
 
-const server = createExpressServer(app)
-server.listen(3003).catch(console.error)
+// Express only parses JSON bodies when told to, and it must be told before the adapter is mounted;
+// without this, every POST body is undefined and fails validation.
+const web = express()
+web.use(express.json())
+const server = createExpressServer(app, web)
+server.listen(Number(process.env.PORT ?? 3003)).catch(console.error)
 
 // POST /api/users          { name: "Alice", age: 30 }  → 201 { created: { ... } }
 // POST /api/users          { name: "", age: -1 }        → 422 { error: "Validation error", field: "body", ... }

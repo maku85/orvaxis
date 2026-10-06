@@ -38,7 +38,7 @@ app.group({
 })
 
 const server = createExpressServer(app)
-server.listen(3000).catch(console.error)
+server.listen(Number(process.env.PORT ?? 3000)).catch(console.error)
 
 // GET /api/hello prints to console:
 // [ctx.logs] [ '[GET] /api/hello', 'handler: /hello executed' ]

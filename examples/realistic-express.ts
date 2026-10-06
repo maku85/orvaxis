@@ -302,7 +302,9 @@ app.group({
 // ── Start ─────────────────────────────────────────────────────────────────────
 
 const server = createExpressServer(app, undefined, { shutdownTimeout: 10_000 })
-server.listen(3000, (port) => console.log(`[orvaxis] listening on http://localhost:${port}`))
+server.listen(Number(process.env.PORT ?? 3000), (port) =>
+  console.log(`[orvaxis] listening on http://localhost:${port}`)
+)
 
 process.once("SIGTERM", () => server.close())
 process.once("SIGINT", () => server.close())

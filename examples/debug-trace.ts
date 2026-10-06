@@ -41,7 +41,7 @@ app.group({
 })
 
 const server = createExpressServer(app)
-server.listen(3003).catch(console.error)
+server.listen(Number(process.env.PORT ?? 3003)).catch(console.error)
 
 // GET /api/users → response + summary with:
 //   traceEvents: [MIDDLEWARE:start, db:query, MIDDLEWARE:end]

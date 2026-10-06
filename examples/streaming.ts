@@ -65,5 +65,7 @@ app.group({
 if (basename(process.argv[1] ?? "") === "streaming.ts") {
   // The request timeout stops counting at the first write, so it can stay at its default for
   // streams that start promptly; use `timeout: 0` if a handler may idle before its first write.
-  createExpressServer(app).listen(3000, (port) => console.log(`Streaming server on port ${port}`))
+  createExpressServer(app).listen(Number(process.env.PORT ?? 3000), (port) =>
+    console.log(`Streaming server on port ${port}`)
+  )
 }

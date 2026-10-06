@@ -61,7 +61,7 @@ app.group({
 })
 
 const server = createExpressServer(app)
-server.listen(3002).catch(console.error)
+server.listen(Number(process.env.PORT ?? 3002)).catch(console.error)
 
 // Each request prints (text format):
 // [REQ] GET /api/fast req-abc          ← loggerPlugin onRequest

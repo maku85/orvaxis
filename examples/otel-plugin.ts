@@ -64,7 +64,7 @@ app.group({
 })
 
 const server = createExpressServer(app)
-server.listen(3004).catch(console.error)
+server.listen(Number(process.env.PORT ?? 3004)).catch(console.error)
 
 // GET /api/users/42 → span tree:
 //   GET /api/users/:id            (root)

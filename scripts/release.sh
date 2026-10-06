@@ -152,6 +152,7 @@ run_checks() {
   pnpm run check:package
   pnpm run check:snippets
   pnpm run check:quickstart
+  pnpm run test:examples
   pnpm run docs:build
 }
 

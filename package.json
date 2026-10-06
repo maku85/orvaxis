@@ -112,6 +112,7 @@
     "build:esm": "tsc -p tsconfig.esm.json && node -e \"require('fs').writeFileSync('dist/esm/package.json', JSON.stringify({type:'module'}))\"",
     "build": "pnpm build:cjs && pnpm build:esm",
     "check:package": "node scripts/check-package.mjs",
+    "test:examples": "vitest run --config vitest.smoke.config.ts",
     "test:compat": "node scripts/run-compat.mjs",
     "typecheck:compat": "tsc -p tsconfig.compat-express4.json",
     "check:snippets": "node scripts/check-snippets.mjs",
