@@ -520,3 +520,41 @@ describe("createExpressServer — errors from upstream middleware", () => {
     }
   })
 })
+
+describe("createExpressServer — shutdown after a stream ends itself", () => {
+  it("returns promptly instead of waiting for shutdownTimeout when the in-flight stream finishes", async () => {
+    const orvaxisApp = new Orvaxis()
+    orvaxisApp.group({
+      prefix: "/",
+      routes: [
+        {
+          method: "GET",
+          path: "/stream",
+          handler: async (ctx) => {
+            ctx.res.write(": ping\n\n")
+            await new Promise<void>((resolve) => {
+              ctx.req.signal?.addEventListener("abort", () => resolve(), { once: true })
+            })
+            ctx.res.write("event: bye\n\n")
+            ctx.res.end()
+          },
+        },
+      ],
+    })
+    const expressApp = express()
+    const server = createExpressServer(orvaxisApp, expressApp, {
+      timeout: 0,
+      shutdownTimeout: 4_000,
+    })
+    let port = 0
+    await server.listen(0, (assigned) => {
+      port = assigned
+    })
+    const body = fetch(`http://127.0.0.1:${port}/stream`).then((response) => response.text())
+    await new Promise((resolve) => setTimeout(resolve, 150))
+    const started = Date.now()
+    await server.close()
+    expect(Date.now() - started).toBeLessThan(2_000)
+    expect(await body).toContain("event: bye")
+  }, 8000)
+})

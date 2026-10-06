@@ -1,10 +1,15 @@
+import type { ServerResponse } from "node:http"
 import Fastify, { type FastifyReply } from "fastify"
 import type { Orvaxis } from "../core/Orvaxis.js"
 import { abandonRequest } from "../core/requestAbandoned.js"
 import type { OrvaxisRequest, OrvaxisResponse, ServerAdapter } from "../types/index.js"
 import { type AdapterOptions, buildErrorBody, withTimeout } from "./timeout.js"
 
-function wrapFastifyResponse(reply: FastifyReply, onStreamStart: () => void): OrvaxisResponse {
+function wrapFastifyResponse(
+  reply: FastifyReply,
+  onStreamStart: () => void,
+  trackStream: (raw: ServerResponse) => void
+): OrvaxisResponse {
   let statusCode = 200
   let streamStarted = false
 
@@ -13,6 +18,7 @@ function wrapFastifyResponse(reply: FastifyReply, onStreamStart: () => void): Or
       streamStarted = true
       onStreamStart()
       reply.hijack()
+      trackStream(reply.raw)
       reply.raw.writeHead(
         statusCode,
         reply.getHeaders() as unknown as import("node:http").OutgoingHttpHeaders
@@ -74,6 +80,13 @@ export function createFastifyServer(
   const requestIdHeader = options.requestIdHeader ?? "X-Request-ID"
   const requestIdHeaderLower = requestIdHeader.toLowerCase()
   const activeControllers = new Set<AbortController>()
+  // Fastify stops tracking a hijacked (streamed) response, so its own close() neither waits for it
+  // nor force-closes it. The adapter tracks streams itself to honor `shutdownTimeout`.
+  const activeStreams = new Set<ServerResponse>()
+  const trackStream = (raw: ServerResponse) => {
+    activeStreams.add(raw)
+    raw.once("close", () => activeStreams.delete(raw))
+  }
   fastify.all("/*", async (req, reply) => {
     const path = (req.url ?? "/").split("?")[0]
     const requestId =
@@ -95,7 +108,7 @@ export function createFastifyServer(
     })
 
     let cancelTimer: (() => void) | undefined
-    const wrapped = wrapFastifyResponse(reply, () => cancelTimer?.())
+    const wrapped = wrapFastifyResponse(reply, () => cancelTimer?.(), trackStream)
     wrapped.setHeader(requestIdHeader, requestId)
 
     try {
@@ -162,12 +175,19 @@ export function createFastifyServer(
       // ctx.req.signal already used for per-request timeouts — see the "Timeouts and graceful shutdown" guide.
       for (const controller of activeControllers) controller.abort()
       fastify.server.closeIdleConnections()
+      const streams = [...activeStreams]
+      const streamsClosed = Promise.all(
+        streams.map((raw) => new Promise<void>((resolve) => raw.once("close", () => resolve())))
+      )
       const deadline =
         shutdownTimeout > 0
-          ? setTimeout(() => fastify.server.closeAllConnections(), shutdownTimeout)
+          ? setTimeout(() => {
+              fastify.server.closeAllConnections()
+              for (const raw of streams) raw.destroy()
+            }, shutdownTimeout)
           : undefined
       try {
-        await fastify.close()
+        await Promise.all([fastify.close(), streamsClosed])
       } finally {
         clearTimeout(deadline)
         listening = false

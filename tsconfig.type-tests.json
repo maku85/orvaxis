@@ -9,6 +9,8 @@
     "tests/benchCompare.test.ts",
     "tests/defineRoute.types.ts",
     "examples/debug-trace.ts",
+    "examples/graceful-shutdown.ts",
+    "examples/http-lifecycle.ts",
     "examples/typed-context.ts",
     "examples/custom-plugin.ts",
     "examples/otel-local.ts",

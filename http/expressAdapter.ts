@@ -62,6 +62,7 @@ export function createExpressServer(
   const requestIdHeader = options.requestIdHeader ?? "X-Request-ID"
   const requestIdHeaderLower = requestIdHeader.toLowerCase()
   const activeControllers = new Set<AbortController>()
+  let closing = false
   server.use(async (req: Request, res: Response, _next: NextFunction) => {
     const requestId = (req.headers[requestIdHeaderLower] as string) || crypto.randomUUID()
     const controller = new AbortController()
@@ -84,6 +85,12 @@ export function createExpressServer(
     // before finishing means the client went away.
     res.once("close", () => {
       if (!res.writableFinished) abandonRequest(controller, "disconnect")
+    })
+    // During shutdown, a response that finishes must not leave an idle keep-alive connection
+    // behind: it would hold close() until the forced deadline even though the work is done.
+    const socket = res.socket // detached from `res` by the time 'finish' listeners run
+    res.once("finish", () => {
+      if (closing) socket?.end()
     })
 
     let cancelTimer: (() => void) | undefined
@@ -155,6 +162,7 @@ export function createExpressServer(
         const shutdownTimeout = options.shutdownTimeout ?? 10_000
         // Notify in-flight handlers (e.g. SSE loops) that shutdown has started, via the same
         // ctx.req.signal already used for per-request timeouts — see the "Timeouts and graceful shutdown" guide.
+        closing = true
         for (const controller of activeControllers) controller.abort()
         httpServer.closeIdleConnections()
         const deadline =
@@ -164,6 +172,7 @@ export function createExpressServer(
         httpServer.close((err) => {
           clearTimeout(deadline)
           httpServer = null
+          closing = false
           if (err) reject(err)
           else resolve()
         })

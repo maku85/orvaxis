@@ -1,23 +1,69 @@
 # HTTP adapters
 
-Express and Fastify adapters, request parsing, body limits, error responses, request IDs and custom adapters.
+An adapter connects Orvaxis to a Node.js HTTP framework: it turns the incoming request into an `OrvaxisRequest`, runs the lifecycle, and writes the response. Two are included, for Express and Fastify. This page covers choosing and installing one, creating a server, how it sits next to your framework, request parsing and limits, error responses, request IDs, and writing your own. Deadlines, cancellation and shutdown have their own page: [Timeouts and graceful shutdown](/guide/timeouts-and-shutdown); streamed responses are in [Streaming](/guide/streaming).
 
-Orvaxis is not tied to any specific HTTP framework. The core runtime is framework-agnostic — adapters are thin wrappers that normalize the incoming request and delegate to the runtime.
+## Choose and install
 
-Two adapters are included out of the box:
+| Adapter | Create with | Peer dependency | Tested against |
+|---|---|---|---|
+| Express | `createExpressServer` from `orvaxis/express` | `express ^4.20 \|\| ^5` (types: `@types/express`) | Express 4.22 and 5.2 |
+| Fastify | `createFastifyServer` from `orvaxis/fastify` | `fastify ^5` | Fastify 5.8 |
 
-| Adapter | Import | Peer dependency |
+```bash
+npm install orvaxis express           # or: npm install orvaxis fastify
+npm install -D @types/express         # TypeScript projects using Express
+```
+
+Install only the framework you use. Both peers are optional, and each adapter has its own subpath so that importing `orvaxis` never needs either; `orvaxis`, `orvaxis/testing` and `orvaxis/openapi` need neither, and importing `orvaxis/express` or `orvaxis/fastify` without its peer fails with a module-not-found error that names the package. Node.js 22.13 or later is required. The adapter tests run on every change against the versions in the last column (`pnpm test:compat`); the lowest declared versions (Express 4.20, Fastify 5.0) are not tested separately.
+
+## Create and run a server
+
+Both adapters take your `Orvaxis` app, an optional framework instance, and options, and return `{ listen, close }`:
+
+```ts
+import express from "express"
+import Fastify from "fastify"
+import { createExpressServer } from "orvaxis/express"
+import { createFastifyServer } from "orvaxis/fastify"
+
+const expressServer = createExpressServer(app)                       // creates its own Express app
+const fastifyServer = createFastifyServer(app, Fastify(), { timeout: 10_000 }) // or bring your instance
+
+await expressServer.listen(3000, (port) => console.log(`listening on ${port}`))
+// listen(0) picks a free port; onListen receives the one actually bound
+await expressServer.close()
+```
+
+Run a complete example from a checkout: `pnpm exec tsx examples/express-server.ts` (Express, port 3000) or `pnpm exec tsx examples/fastify-server.ts` (Fastify, port 3004), then `curl -i http://localhost:3000/api/hello`.
+
+| Option (`AdapterOptions`) | Default | Meaning |
 |---|---|---|
-| Express | `createExpressServer` from `orvaxis/express` | `express ^4.20 \|\| ^5` |
-| Fastify | `createFastifyServer` from `orvaxis/fastify` | `fastify ^5` |
+| `timeout` | 30 000 ms | per-request deadline; `0` disables it. See [Timeouts](/guide/timeouts-and-shutdown) |
+| `shutdownTimeout` | 10 000 ms | how long `close()` waits before cutting connections; `0` waits indefinitely |
+| `logger` | `console` | receives errors that happen after a response was sent |
+| `requestIdHeader` | `X-Request-ID` | header read for the request ID and set on the response |
 
-Install only the framework you intend to use — both peer dependencies are optional. Each adapter lives on its own subpath (`orvaxis/express`, `orvaxis/fastify`) precisely so that importing the main `orvaxis` entry point never requires either peer dependency to be installed. Importing `orvaxis/express`, `orvaxis/fastify` or `orvaxis/otel` without its peer (`express`, `fastify`, `@opentelemetry/api`) fails immediately with a module-not-found error that names the missing package; `orvaxis`, `orvaxis/testing` and `orvaxis/openapi` never need a peer.
+`listen` rejects with `Server is already listening. Call close() first.` if called twice, and `close()` resolves even when nothing is listening, so calling it twice is safe. An Express adapter can `listen` again after `close()`; a Fastify instance cannot be reopened (Fastify throws), so create a new `Fastify()` and adapter to restart.
 
-Both full-runtime adapters mount Orvaxis as a catch-all handler and delegate routing, lifecycle hooks, and declared validation to the Orvaxis runtime. Express routes within that mount are handled by Orvaxis's router. With Fastify, those endpoints use Orvaxis routing and validation instead of Fastify's native route trie and compiled schema validation. Choose the adapter for the HTTP transport and surrounding framework integrations; benchmark your application before drawing performance conclusions.
+## Full runtime or Express guard
 
-### Add Orvaxis policies to one existing Express route
+| | Full-runtime adapter | Express policy guard |
+|---|---|---|
+| Handler | declared in Orvaxis | stays in Express |
+| What runs | the whole lifecycle | pre-validation policies only |
+| Frameworks | Express, Fastify | Express only |
+| Guide | this page | [Integrate an existing route](./integrate-existing-route.md) |
 
-For a route whose handler should stay in Express, follow the [existing route integration guide](./integrate-existing-route.md). It covers middleware placement, identity mapping, the mirrored route declaration, and validation boundaries.
+The guard is `createExpressPolicyGuard` from `orvaxis/express`. There is no Fastify guard.
+
+## Mounting next to your framework
+
+A full-runtime adapter mounts Orvaxis as a catch-all, so routing, hooks and declared validation come from the Orvaxis runtime for everything it receives. How it coexists with the framework's own routes differs, and both rules were checked:
+
+- **Express.** The adapter registers one middleware on the Express app and never calls `next()`. Routes and middleware you registered **before** `createExpressServer` run first and can answer; anything registered **after** it is never reached, because Orvaxis answers every request (a path Orvaxis does not know gets its `404` envelope). Register `express.json()` and similar before the adapter.
+- **Fastify.** Orvaxis is a catch-all route (`/*`), so routes you declare on the Fastify instance win for their own paths (a `/health` route keeps working) and Orvaxis handles the rest. Fastify's own schema validation applies to Fastify routes; Orvaxis routes use their Orvaxis [schemas](./typed-validation.md).
+
+Neither framework's route trie or compiled validation is used for Orvaxis routes. Choose the adapter for the HTTP transport and the integrations you need; measure your own application before drawing performance conclusions.
 
 ## Query string parsing differs between adapters
 
@@ -34,7 +80,7 @@ GET /search?filter[status]=active
 
 Code that reads a query value directly and assumes it's a string (`ctx.req.query.filter.toUpperCase()`) compiles under the declared type but can throw at runtime on Express if a client sends bracketed keys. Two ways to avoid this:
 
-- Validate query params with `route.schema.query` (see [Plugins → `schemaValidationPlugin`](../reference/core-concepts.md#plugins)) — this reshapes and checks `ctx.req.query` at the boundary regardless of adapter.
+- Validate query params with `route.schema.query` (see [Typed input validation](./typed-validation.md)) — this reshapes and checks `ctx.req.query` at the boundary regardless of adapter.
 - Or, if you don't use query schemas and want the declared type to actually hold, switch Express to the non-nesting parser: `expressApp.set("query parser", "simple")` before passing it to `createExpressServer`. This affects the whole Express app instance, including any routes you mount outside Orvaxis, so prefer it only when you control the entire app.
 
 ## Body size limits
@@ -67,7 +113,9 @@ const adapter = createFastifyServer(app, fastify)
 
 **Custom adapters and `testRequest`** — neither enforces a body size limit. For custom adapters, implement the check at the stream level before forwarding the parsed body to `app.handle`. The `testRequest` helper is for unit tests where body size is controlled by the test author.
 
----
+## Where validation happens
+
+Two layers can reject a request and they answer differently. The framework's body parser runs first: a malformed or oversized body is rejected with the framework's status (for example `413`) before Orvaxis routes it, and the adapter still wraps that in the standard error envelope (below). Orvaxis then validates declared fields with `route.schema` and answers `422` ([Typed input validation](./typed-validation.md)). In Express, a body that no parser read is `undefined` in `ctx.req.body`; Fastify parses JSON by default.
 
 ## Error responses
 
@@ -148,5 +196,3 @@ Any adapter needs to:
 4. Call `app.handle(req, res)` (wrapped in `withTimeout` if a deadline is needed) and catch thrown errors, using `buildErrorBody(err, requestId)` to build the response body
 5. Return `{ listen(port, onListen?), close() }` to satisfy the `ServerAdapter` interface
 6. In `close()`, call `server.closeIdleConnections()` before `server.close()` to release idle keep-alive connections immediately, then set a `setTimeout(() => server.closeAllConnections(), shutdownTimeout)` deadline (default 10 s) that force-closes remaining connections if they do not drain in time; clear the timer in the close callback so it never fires when shutdown completes cleanly
-
----

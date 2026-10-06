@@ -1,9 +1,10 @@
 import { createReadStream } from "node:fs"
-import { resolve } from "node:path"
+import { basename, resolve } from "node:path"
 import { createExpressServer } from "../express"
 import { Orvaxis } from "../index"
 
-const app = new Orvaxis()
+// #region routes
+export const app = new Orvaxis()
 
 app.group({
   prefix: "/api",
@@ -59,7 +60,10 @@ app.group({
     },
   ],
 })
+// #endregion
 
-// Disable the timeout for long-lived streaming connections
-const server = createExpressServer(app, undefined, { timeout: 0 })
-server.listen(3000, (port) => console.log(`Streaming server on port ${port}`))
+if (basename(process.argv[1] ?? "") === "streaming.ts") {
+  // The request timeout stops counting at the first write, so it can stay at its default for
+  // streams that start promptly; use `timeout: 0` if a handler may idle before its first write.
+  createExpressServer(app).listen(3000, (port) => console.log(`Streaming server on port ${port}`))
+}

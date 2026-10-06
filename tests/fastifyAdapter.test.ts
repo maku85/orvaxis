@@ -506,3 +506,63 @@ describe("createFastifyServer — errors from Fastify's own request lifecycle", 
     }
   })
 })
+
+describe("createFastifyServer — shutdown deadline for streamed responses", () => {
+  const streamingApp = (finishAfterMs: number) => {
+    const app = new Orvaxis()
+    app.group({
+      prefix: "/",
+      routes: [
+        {
+          method: "GET",
+          path: "/slow",
+          handler: async (ctx) => {
+            ctx.res.write(": ping\n\n")
+            await new Promise((resolve) => setTimeout(resolve, finishAfterMs))
+            if (ctx.res.completed) return
+            ctx.res.write("late\n")
+            ctx.res.end()
+          },
+        },
+      ],
+    })
+    return app
+  }
+
+  async function startAndClose(finishAfterMs: number, shutdownTimeout: number) {
+    const fastifyInstance = Fastify()
+    const server = createFastifyServer(streamingApp(finishAfterMs), fastifyInstance, {
+      timeout: 0,
+      shutdownTimeout,
+    })
+    await server.listen(0)
+    const { port } = fastifyInstance.server.address() as AddressInfo
+    const outcome = fetch(`http://127.0.0.1:${port}/slow`).then(
+      async (response) => {
+        try {
+          return { ended: true, body: await response.text() }
+        } catch {
+          return { ended: false, body: "" }
+        }
+      },
+      () => ({ ended: false, body: "" })
+    )
+    await new Promise((resolve) => setTimeout(resolve, 100))
+    const started = Date.now()
+    await server.close()
+    return { closeMs: Date.now() - started, result: await outcome }
+  }
+
+  it("force-closes a stream that outlives shutdownTimeout, and close() waits for it", async () => {
+    const { closeMs, result } = await startAndClose(3_000, 200)
+    expect(result.ended).toBe(false)
+    expect(closeMs).toBeGreaterThanOrEqual(150)
+    expect(closeMs).toBeLessThan(2_000)
+  }, 8000)
+
+  it("lets a stream that finishes inside the deadline complete normally", async () => {
+    const { result } = await startAndClose(200, 5_000)
+    expect(result.ended).toBe(true)
+    expect(result.body).toContain("late")
+  }, 8000)
+})

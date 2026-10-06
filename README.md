@@ -159,8 +159,8 @@ Both peers are optional and each adapter has its own subpath, so `orvaxis`, `orv
 
 Adapter details are in the documentation:
 
-- [HTTP adapters](docs/guide/http-adapters.md) — query-string parsing differences, body size limits, the error response envelope, request IDs, custom adapters
-- [Timeouts and graceful shutdown](docs/guide/timeouts-and-shutdown.md) — per-request deadlines, `ctx.req.signal`, draining connections
+- [HTTP adapters](docs/guide/http-adapters.md) — installing and creating a server, mounting next to Express or Fastify, query-string parsing differences, body size limits, the error response envelope, request IDs, custom adapters
+- [Timeouts and graceful shutdown](docs/guide/timeouts-and-shutdown.md) — per-request deadlines, `ctx.req.signal` for timeout, disconnect and shutdown, SIGTERM handling, observed results on both adapters
 - [Streaming](docs/guide/streaming.md) — SSE, files and `pipe`
 
 ---
