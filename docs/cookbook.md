@@ -47,7 +47,7 @@ createExpressServer(app).listen(3000)
 - `modify` injects data into `ctx.meta`, available to all downstream handlers.
 - Policy layers run global → group → route; priority is sorted within each layer.
 - Equal priorities preserve registration order globally and declaration order in groups/routes.
-- To scope a policy to specific routes, use [`scope`](#policy-scoping).
+- To scope a policy to specific routes, use [`scope`](#_3-policy-scoping).
 
 ## 2. Authorize using validated input
 
@@ -444,7 +444,7 @@ async function getCurrentUser() {
 
 | Area | Detail |
 |------|--------|
-| **Body parsing** | No built-in body parsing. Use `createExpressServer(app, expressApp)` with `express.json()` pre-registered (see [use case 7](#7-group-level-middleware-body-parsing-correlation-ids)). |
+| **Body parsing** | No built-in body parsing. Use `createExpressServer(app, expressApp)` with `express.json()` pre-registered (see [use case 7](#_7-group-level-middleware-body-parsing-correlation-ids)). |
 | **Rate limiting** | No built-in counter/storage. Implement using any in-memory map or Redis client inside a policy. |
 | **Policy scope `path: string`** | Prefix match — `"/api"` covers `/api` and all sub-paths. Use a predicate function for exclusions: `p => p.startsWith("/admin") && !p.startsWith("/admin/public")`. |
 | **Response body interception** | Orvaxis does not intercept or transform outgoing response bodies. Handlers write the body directly via `ctx.res.json()` / `ctx.res.send()`. Response headers, however, can be set from any middleware via `ctx.res.setHeader()`. |

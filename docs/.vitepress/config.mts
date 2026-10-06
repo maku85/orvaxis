@@ -6,6 +6,77 @@ const base = "/orvaxis/"
 const site = `https://maku85.github.io${base}`
 const socialImage = `${site}social-card.jpg`
 
+
+const docsSidebar = [
+  {
+    text: "Start",
+    items: [
+      { text: "Get started", link: "/guide/getting-started" },
+      { text: "Integrate an existing route", link: "/guide/integrate-existing-route" },
+      { text: "Diagnose a 403", link: "/guide/diagnose-403" },
+      { text: "Why Orvaxis", link: "/why-orvaxis" },
+    ],
+  },
+  {
+    text: "Execution",
+    items: [
+      { text: "Request lifecycle", link: "/reference/lifecycle" },
+      { text: "Routing and groups", link: "/reference/core-concepts#router" },
+      { text: "Middleware and hooks", link: "/reference/core-concepts#middleware" },
+      { text: "Policies", link: "/reference/core-concepts#policies" },
+    ],
+  },
+  {
+    text: "Contracts",
+    items: [
+      { text: "Typed schemas", link: "/reference/core-concepts#typed-context" },
+      { text: "Response contracts and OpenAPI", link: "/reference/core-concepts#response-contracts-and-openapi" },
+    ],
+  },
+  {
+    text: "Observability",
+    items: [
+      { text: "Tracing", link: "/reference/core-concepts#tracing-system" },
+      { text: "Debug layer", link: "/reference/core-concepts#debug-layer" },
+      { text: "Request context", link: "/reference/core-concepts#request-scoped-context" },
+      { text: "Plugins and OpenTelemetry", link: "/reference/core-concepts#plugins" },
+      { text: "Trace demo", link: "/demo/policy-traces" },
+    ],
+  },
+  {
+    text: "HTTP",
+    items: [
+      { text: "HTTP adapters", link: "/guide/http-adapters" },
+      { text: "Timeouts and shutdown", link: "/guide/timeouts-and-shutdown" },
+      { text: "Streaming", link: "/guide/streaming" },
+    ],
+  },
+  {
+    text: "Test and CI",
+    items: [
+      { text: "Testing", link: "/guide/testing" },
+      { text: "Multi-tenant demo", link: "/guide/multi-tenant-demo" },
+      { text: "Authorization checks in CI", link: "/articles/authorization-requirements-in-ci" },
+    ],
+  },
+  {
+    text: "Reference and examples",
+    items: [
+      { text: "Core concepts", link: "/reference/core-concepts" },
+      { text: "Examples catalog", link: "/examples/" },
+      { text: "Cookbook", link: "/cookbook" },
+      { text: "Benchmarks", link: "/benchmarks" },
+    ],
+  },
+  {
+    text: "Articles",
+    items: [
+      { text: "Diagnosing a 403", link: "/articles/diagnosing-a-403" },
+      { text: "Tenant authorization", link: "/articles/tenant-authorization" },
+    ],
+  },
+]
+
 export default defineConfig({
   title: "Orvaxis",
   // One description for npm, the site and link previews.
@@ -55,20 +126,55 @@ export default defineConfig({
     siteTitle: "Orvaxis",
     logo: "/orvaxis-mark.svg",
     nav: [
-      { text: "Guide", link: "/guide/getting-started" },
-      { text: "Trace demo", link: "/demo/policy-traces" },
-      { text: "Examples", link: "/examples/" },
-      { text: "Reference", link: "/reference/core-concepts" },
+      { text: "Start", link: "/guide/getting-started", activeMatch: "^/guide/(getting-started|integrate|diagnose)" },
       {
-        text: "Migration",
+        text: "Execution",
         items: [
-          { text: "0.3.1 → 0.4.0", link: "/migration/0.3.1-to-0.4.0" },
-          { text: "Unreleased changes", link: "/migration/next" },
+          { text: "Request lifecycle", link: "/reference/lifecycle" },
+          { text: "Routing and groups", link: "/reference/core-concepts#router" },
+          { text: "Middleware and hooks", link: "/reference/core-concepts#middleware" },
+          { text: "Policies", link: "/reference/core-concepts#policies" },
         ],
       },
       {
-        text: "Resources",
+        text: "Contracts",
         items: [
+          { text: "Typed schemas", link: "/reference/core-concepts#typed-context" },
+          { text: "Response contracts and OpenAPI", link: "/reference/core-concepts#response-contracts-and-openapi" },
+        ],
+      },
+      {
+        text: "Observability",
+        items: [
+          { text: "Tracing", link: "/reference/core-concepts#tracing-system" },
+          { text: "Debug layer", link: "/reference/core-concepts#debug-layer" },
+          { text: "Request context", link: "/reference/core-concepts#request-scoped-context" },
+          { text: "Plugins and OpenTelemetry", link: "/reference/core-concepts#plugins" },
+          { text: "Trace demo", link: "/demo/policy-traces" },
+        ],
+      },
+      {
+        text: "HTTP",
+        items: [
+          { text: "HTTP adapters", link: "/guide/http-adapters" },
+          { text: "Timeouts and shutdown", link: "/guide/timeouts-and-shutdown" },
+          { text: "Streaming", link: "/guide/streaming" },
+        ],
+      },
+      {
+        text: "Test",
+        items: [
+          { text: "Testing", link: "/guide/testing" },
+          { text: "Multi-tenant demo", link: "/guide/multi-tenant-demo" },
+          { text: "Authorization checks in CI", link: "/articles/authorization-requirements-in-ci" },
+        ],
+      },
+      { text: "Reference", link: "/reference/core-concepts", activeMatch: "^/(reference|examples)/" },
+      {
+        text: "More",
+        items: [
+          { text: "Migration 0.3.1 → 0.4.0", link: "/migration/0.3.1-to-0.4.0" },
+          { text: "Unreleased changes", link: "/migration/next" },
           { text: "Cookbook", link: "/cookbook" },
           { text: "Benchmarks", link: "/benchmarks" },
           { text: "Changelog", link: "https://github.com/maku85/orvaxis/blob/main/CHANGELOG.md" },
@@ -77,58 +183,23 @@ export default defineConfig({
         ],
       },
     ],
+    // One sidebar for the whole documentation, grouped by what you want to do. Several entries
+    // point into the core concepts reference until each topic has its own page.
     sidebar: {
-      "/guide/": [
-        {
-          text: "Getting started",
-          items: [
-            { text: "Get started", link: "/guide/getting-started" },
-            { text: "Integrate an existing route", link: "/guide/integrate-existing-route" },
-            { text: "Diagnose a 403", link: "/guide/diagnose-403" },
-            { text: "Multi-tenant demo", link: "/guide/multi-tenant-demo" },
-          ],
-        },
-        {
-          text: "HTTP and testing",
-          items: [
-            { text: "HTTP adapters", link: "/guide/http-adapters" },
-            { text: "Timeouts and shutdown", link: "/guide/timeouts-and-shutdown" },
-            { text: "Streaming", link: "/guide/streaming" },
-            { text: "Testing", link: "/guide/testing" },
-          ],
-        },
-      ],
-      "/reference/": [
-        {
-          text: "Reference",
-          items: [
-            { text: "Core concepts", link: "/reference/core-concepts" },
-            { text: "Request lifecycle", link: "/reference/lifecycle" },
-          ],
-        },
-      ],
+      "/guide/": docsSidebar,
+      "/reference/": docsSidebar,
+      "/demo/": docsSidebar,
+      "/articles/": docsSidebar,
+      "/examples/": docsSidebar,
+      "/cookbook": docsSidebar,
+      "/why-orvaxis": docsSidebar,
+      "/benchmarks": docsSidebar,
       "/migration/": [
         {
           text: "Migration",
           items: [
             { text: "0.3.1 → 0.4.0", link: "/migration/0.3.1-to-0.4.0" },
             { text: "Unreleased changes", link: "/migration/next" },
-          ],
-        },
-      ],
-      "/demo/": [
-        {
-          text: "Interactive demo",
-          items: [{ text: "Policy traces", link: "/demo/policy-traces" }],
-        },
-      ],
-      "/articles/": [
-        {
-          text: "Articles",
-          items: [
-            { text: "Diagnosing a 403", link: "/articles/diagnosing-a-403" },
-            { text: "Tenant authorization", link: "/articles/tenant-authorization" },
-            { text: "Authorization checks in CI", link: "/articles/authorization-requirements-in-ci" },
           ],
         },
       ],

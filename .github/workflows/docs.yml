@@ -43,6 +43,9 @@ jobs:
       - name: Check asset paths under the site base
         run: pnpm check:docs-assets
 
+      - name: Check that fragment links point at existing headings
+        run: pnpm check:docs-links
+
       - name: Upload Pages artifact
         if: github.event_name != 'pull_request'
         uses: actions/upload-pages-artifact@v4

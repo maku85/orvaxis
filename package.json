@@ -116,6 +116,7 @@
     "typecheck:compat": "tsc -p tsconfig.compat-express4.json",
     "check:snippets": "node scripts/check-snippets.mjs",
     "check:quickstart": "node scripts/check-quickstart.mjs",
+    "check:docs-links": "node scripts/check-docs-links.mjs",
     "check:docs-assets": "node scripts/check-docs-assets.mjs",
     "lint": "biome lint .",
     "format": "biome format . --write",
