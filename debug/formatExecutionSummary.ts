@@ -1,3 +1,4 @@
+import { fullRoutePath } from "../core/Router.js"
 import type { OrvaxisContext } from "../types/index.js"
 import { buildExecutionSummary } from "./buildExecutionSummary.js"
 
@@ -8,14 +9,20 @@ import { buildExecutionSummary } from "./buildExecutionSummary.js"
 export function formatExecutionSummary(ctx: OrvaxisContext): string {
   const summary = buildExecutionSummary(ctx)
   const route = summary.route
-  const method = safeLabel(route?.route.method ?? ctx.req.method).toUpperCase()
-  const path = safeLabel(route?.route.path ?? "<unmatched route>")
-  const failed = Boolean(ctx.error) || ctx.meta.trace?.outcome === "error"
-  const status = Number.isInteger(ctx.error && "status" in ctx.error ? ctx.error.status : undefined)
-    ? (ctx.error as Error & { status: number }).status
-    : failed
-      ? 500
-      : ctx.res.statusCode
+  const requestMethod = safeLabel(ctx.req.method).toUpperCase()
+  const routeMethod = route ? safeLabel(route.route.method).toUpperCase() : undefined
+  const method =
+    routeMethod && routeMethod !== requestMethod
+      ? `${requestMethod} (matched ${routeMethod})`
+      : requestMethod
+  const path = route
+    ? safeLabel(fullRoutePath(route.group.prefix, route.route.path))
+    : "<unmatched route>"
+  const failed = ctx.error !== undefined || ctx.meta.trace?.outcome === "error"
+  const sent = ctx.res.sent === true
+  const status = sent
+    ? ctx.res.statusCode
+    : (errorStatus(ctx.error) ?? (failed ? 500 : ctx.res.statusCode))
   const outcome = summary.stoppedByPolicy
     ? summary.stoppedByPolicy.meta?.outcome === "deny"
       ? "denied"
@@ -23,7 +30,8 @@ export function formatExecutionSummary(ctx: OrvaxisContext): string {
     : failed
       ? "error"
       : "completed"
-  const lines = [`${method} ${path}`, `Outcome: ${outcome} (${status})`, "Policy decisions:"]
+  const statusText = failed && sent ? `${status}, response already sent` : String(status)
+  const lines = [`${method} ${path}`, `Outcome: ${outcome} (${statusText})`, "Policy decisions:"]
 
   if (summary.policyDecisions.length === 0) {
     lines.push("  none recorded")
@@ -49,6 +57,14 @@ export function formatExecutionSummary(ctx: OrvaxisContext): string {
     lines.push(`Not reached: ${summary.notReachedStages.join(" → ")}`)
   }
   return lines.join("\n")
+}
+
+function errorStatus(error: unknown): number | undefined {
+  if (typeof error !== "object" || error === null || !("status" in error)) return undefined
+  const status = error.status
+  return typeof status === "number" && Number.isInteger(status) && status >= 100 && status <= 599
+    ? status
+    : undefined
 }
 
 function safeLabel(value: unknown): string {

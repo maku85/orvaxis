@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **`formatExecutionSummary` robustness** — thrown strings, numbers and other non-object values no longer break the formatter, and only HTTP statuses in the 100–599 range are read from errors. When a response was already sent, its status is preserved and the outcome notes that an error followed it. The summary now shows the full route template including the group prefix and the request method, with the matched route method for HEAD → GET fallback.
+
 ## [0.4.0] - 2026-10-05
 
 ### Added

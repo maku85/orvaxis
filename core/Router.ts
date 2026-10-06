@@ -153,7 +153,7 @@ class Trie {
 type PolicyLayer = PolicyInspection["layer"]
 type PolicySource = { policy: Policy; index: number; layer: PolicyLayer }
 
-function fullRoutePath(prefix: string, routePath: string): string {
+export function fullRoutePath(prefix: string, routePath: string): string {
   if (prefix === "/") return routePath || "/"
   return routePath ? prefix + routePath : prefix
 }
