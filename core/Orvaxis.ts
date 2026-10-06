@@ -33,8 +33,15 @@ export class Orvaxis {
     return this
   }
 
-  group(group: Group) {
-    this.runtime.router.group(group)
+  /**
+   * Register a route group. Handlers, middleware and policies may be typed with an
+   * `OrvaxisContext<TState, TMeta>`; the types are inferred from them or given explicitly.
+   */
+  group<
+    TState extends Record<string, unknown> = Record<string, unknown>,
+    TMeta extends Record<string, unknown> = Record<never, never>,
+  >(group: Group<TState, TMeta>) {
+    this.runtime.router.group(group as unknown as Group)
     return this
   }
 

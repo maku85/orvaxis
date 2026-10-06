@@ -31,10 +31,10 @@ Use it to organize how requests run, enforce input and response contracts, obser
 | **Declarative policies** | Apply named rules by scope and priority, before or after input validation; implement permissions, feature gates or other request conditions | [Policies](docs/reference/core-concepts.md#policies), [cookbook](docs/cookbook.md), [403 diagnostics](docs/guide/diagnose-403.md) |
 | **Validated, typed input** | Parse and transform body, params, query and headers; infer handler types from validator outputs with `defineRoute()` | [Typed input validation](docs/guide/typed-validation.md), [working example](examples/typed-schema.ts) |
 | **Response contracts and OpenAPI** | Validate declared responses by status in strict or warning mode; generate OpenAPI 3.1 using your schema converter | [Response contracts](docs/guide/response-contracts.md), [OpenAPI export](docs/guide/openapi.md) |
-| **Observability** | Inspect request traces and debug timelines, emit custom events, use structured logging and export spans through OpenTelemetry | [Tracing](docs/reference/core-concepts.md#tracing-system), [debugging](docs/reference/core-concepts.md#debug-layer), [OpenTelemetry example](examples/otel-plugin.ts) |
+| **Observability** | Inspect request traces and debug timelines, emit custom events, use structured logging and export spans through OpenTelemetry | [Observability](docs/guide/observability.md), [OpenTelemetry](docs/guide/opentelemetry.md), [OpenTelemetry example](examples/otel-plugin.ts) |
 | **Testing and inspection** | Execute requests without a server, test permission matrices, inspect route declarations and check required policies in CI | [Testing](docs/guide/testing.md), [route inspection](docs/guide/testing.md#route-introspection) |
 | **HTTP and streaming** | Use Express or Fastify transport, stream SSE/files, propagate request IDs and handle cancellation, timeouts and graceful shutdown | [Adapters](docs/guide/http-adapters.md), [streaming](docs/guide/streaming.md), [shutdown](docs/guide/timeouts-and-shutdown.md#graceful-shutdown) |
-| **Extensibility and context** | Register opt-in plugins, use CORS and logging plugins, and access isolated request context across async calls | [Plugins](docs/reference/core-concepts.md#plugins), [async context](docs/reference/core-concepts.md#request-scoped-context) |
+| **Extensibility and context** | Register opt-in plugins, use CORS and logging plugins, and access isolated request context across async calls | [Plugins](docs/guide/plugins.md), [request context](docs/guide/request-context.md) |
 
 Choose the integration that fits your application:
 
@@ -199,8 +199,10 @@ Browse the [Orvaxis documentation site](https://maku85.github.io/orvaxis/) for t
 - [Response contracts](docs/guide/response-contracts.md) — validate outgoing values by status, strict and warn modes, streaming
 - [OpenAPI export](docs/guide/openapi.md) — generate an OpenAPI 3.1 document from route declarations
 - [Contracts API reference](docs/reference/contracts.md)
-- [Tracing and debugging](docs/reference/core-concepts.md#tracing-system) — lifecycle traces, custom events, and combined debug timelines
-- [Plugins and OpenTelemetry](docs/reference/core-concepts.md#plugins) — logging, validation, CORS, and optional span export
+- [Observability](docs/guide/observability.md) — traces, custom events, debug timelines, structured logs and request IDs, and what each one records
+- [Request context](docs/guide/request-context.md) — `ctx.state`, `ctx.meta`, `ctx.logs`, `getContext()` and isolation
+- [Plugins](docs/guide/plugins.md) — the plugin contract and the built-in plugins
+- [OpenTelemetry](docs/guide/opentelemetry.md) — span structure, attributes and export
 - [HTTP adapters](docs/guide/http-adapters.md), [streaming](docs/guide/streaming.md), and [timeouts and graceful shutdown](docs/guide/timeouts-and-shutdown.md) — request and connection lifecycle in the HTTP adapters
 - [Testing](docs/guide/testing.md) — `testRequest`, permission matrices, static policy requirements and route introspection
 - [Diagnosing an API 403](docs/articles/diagnosing-a-403.md) — trace a denial to its terminal policy

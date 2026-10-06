@@ -31,8 +31,8 @@ features:
     linkText: Typed validation and contracts
   - title: Observability
     details: Follow each request through traces, debug timelines, structured logs and OpenTelemetry spans, and see why a request was blocked.
-    link: /reference/core-concepts#tracing-system
-    linkText: Tracing and debugging
+    link: /guide/observability
+    linkText: Observability guide
   - title: Testing and CI
     details: Run the full lifecycle without a server, test permission matrices, and check required policies and protection changes before deploying.
     link: /guide/testing

@@ -1,5 +1,7 @@
 import { z } from "zod"
 import { defineRoute } from "../core/defineRoute"
+import { Orvaxis } from "../core/Orvaxis"
+import type { OrvaxisContext } from "../types"
 
 const schemas = {
   body: z.object({ amount: z.coerce.number() }),
@@ -61,4 +63,25 @@ defineRoute<z.infer<typeof schemas.body>>({
     const amount: number = ctx.req.body.amount
     void amount
   },
+})
+
+// app.group() infers the state and meta types from handlers annotated with a typed context.
+type GroupState = { user: { id: string } }
+type GroupMeta = { apiKey: string }
+const typedGroupApp = new Orvaxis()
+typedGroupApp.group({
+  prefix: "/typed",
+  routes: [
+    {
+      method: "GET",
+      path: "/me",
+      handler: (ctx: OrvaxisContext<GroupState, GroupMeta>) => {
+        const id: string = ctx.state.user.id
+        const key: string = ctx.meta.apiKey
+        // @ts-expect-error `user.id` is a string, not a number
+        const wrong: number = ctx.state.user.id
+        ctx.res.json({ id, key, wrong })
+      },
+    },
+  ],
 })

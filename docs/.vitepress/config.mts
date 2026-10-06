@@ -39,10 +39,10 @@ const docsSidebar = [
   {
     text: "Observability",
     items: [
-      { text: "Tracing", link: "/reference/core-concepts#tracing-system" },
-      { text: "Debug layer", link: "/reference/core-concepts#debug-layer" },
-      { text: "Request context", link: "/reference/core-concepts#request-scoped-context" },
-      { text: "Plugins and OpenTelemetry", link: "/reference/core-concepts#plugins" },
+      { text: "Observability", link: "/guide/observability" },
+      { text: "Request context", link: "/guide/request-context" },
+      { text: "Plugins", link: "/guide/plugins" },
+      { text: "OpenTelemetry", link: "/guide/opentelemetry" },
       { text: "Trace demo", link: "/demo/policy-traces" },
     ],
   },
@@ -152,10 +152,10 @@ export default defineConfig({
       {
         text: "Observability",
         items: [
-          { text: "Tracing", link: "/reference/core-concepts#tracing-system" },
-          { text: "Debug layer", link: "/reference/core-concepts#debug-layer" },
-          { text: "Request context", link: "/reference/core-concepts#request-scoped-context" },
-          { text: "Plugins and OpenTelemetry", link: "/reference/core-concepts#plugins" },
+          { text: "Observability", link: "/guide/observability" },
+          { text: "Request context", link: "/guide/request-context" },
+          { text: "Plugins", link: "/guide/plugins" },
+          { text: "OpenTelemetry", link: "/guide/opentelemetry" },
           { text: "Trace demo", link: "/demo/policy-traces" },
         ],
       },

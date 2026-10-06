@@ -285,6 +285,8 @@ app.on("onError", (ctx) => {
 
 ### Plugins
 
+Guides: [Plugins](/guide/plugins), [Observability](/guide/observability), [OpenTelemetry](/guide/opentelemetry) and [Request context](/guide/request-context) explain these topics with examples; this section keeps the option reference.
+
 Plugins extend runtime capabilities by registering hooks, middleware, or policies.
 
 Orvaxis ships with two built-in plugins:
