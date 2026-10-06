@@ -110,6 +110,8 @@
     "check": "biome check .",
     "typecheck:tests": "tsc --noEmit -p tsconfig.type-tests.json",
     "check:tenant-demo": "tsx examples/tenant-tasks-check.ts",
+    "check:protection": "tsx examples/protection-report.ts --baseline examples/fixtures/tenant-tasks-protection.json --fail-on policy-removed,policy-weakened",
+    "update:protection-baseline": "tsx examples/protection-report.ts --baseline examples/fixtures/tenant-tasks-protection.json --update",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",

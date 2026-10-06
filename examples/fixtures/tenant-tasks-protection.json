@@ -1,0 +1,59 @@
+{
+  "schemaVersion": 1,
+  "routes": [
+    {
+      "method": "GET",
+      "path": "/api/tenants/:tenantId/admin/overview",
+      "policies": [
+        {
+          "name": "authenticate",
+          "layer": "global",
+          "phase": "preValidation",
+          "applicability": "always",
+          "reason": "no-scope"
+        },
+        {
+          "name": "tenant-access",
+          "layer": "group",
+          "phase": "preValidation",
+          "applicability": "always",
+          "reason": "no-scope"
+        },
+        {
+          "name": "require-admin",
+          "layer": "route",
+          "phase": "preValidation",
+          "applicability": "always",
+          "reason": "no-scope"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/tenants/:tenantId/tasks/:taskId",
+      "policies": [
+        {
+          "name": "authenticate",
+          "layer": "global",
+          "phase": "preValidation",
+          "applicability": "always",
+          "reason": "no-scope"
+        },
+        {
+          "name": "tenant-access",
+          "layer": "group",
+          "phase": "preValidation",
+          "applicability": "always",
+          "reason": "no-scope"
+        },
+        {
+          "name": "task-owner-or-admin",
+          "layer": "route",
+          "phase": "preValidation",
+          "applicability": "always",
+          "reason": "no-scope"
+        }
+      ]
+    }
+  ]
+}

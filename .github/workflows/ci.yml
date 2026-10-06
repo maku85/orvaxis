@@ -43,6 +43,17 @@ jobs:
       - name: Check multi-tenant demo policies and permission matrix
         run: pnpm check:tenant-demo
 
+      - name: Compare route protections with the committed baseline
+        run: pnpm check:protection
+
+      - name: Upload route protection report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: route-protection-report
+          path: protection-report/
+          if-no-files-found: ignore
+
       - name: Test
         run: pnpm test:coverage
 
