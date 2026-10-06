@@ -9,48 +9,60 @@ Microbenchmarks for each execution layer. Numbers give you a baseline to reason 
 ```bash
 pnpm bench:run      # one-shot, prints results and exits
 pnpm bench          # watch mode, re-runs on file save
-pnpm bench:save     # run and save current results as baseline
-pnpm bench:compare  # run and compare against saved baseline
+pnpm bench:save     # run and save current results as this machine's baseline
+pnpm bench:compare  # run and compare against the saved baseline
 ```
 
-Benchmarks live in `benchmarks/` and use [vitest bench](https://vitest.dev/guide/features.html#benchmarking) (built on [tinybench](https://github.com/tinylibs/tinybench)). No extra dependencies needed.
+Benchmarks live in `benchmarks/` and use [vitest bench](https://vitest.dev/guide/features.html#benchmarking) (built on [tinybench](https://github.com/tinylibs/tinybench)). No extra dependencies needed. Microbenchmarks (`policy`, `trace`, `router`, …) exercise one layer without I/O; `http.bench.ts` sends real requests over a loopback socket and is meant to be compared only with its own rows.
 
-### Detecting regressions
+### Comparing runs
 
-`bench:save` writes `benchmarks/baseline.json` with the current results. `bench:compare` re-runs the suite, prints a diff table, and exits with code 1 if any benchmark drops more than **15%** (the default threshold for natural microbenchmark noise).
+`bench:save` reads vitest's structured JSON output and writes `benchmarks/baseline.json` with the results and the environment they came from: commit (and whether the tree was dirty), Node version, platform, architecture, CPU, runner (`local` or `ci`), vitest version, the command, and units (`hz` in operations per second, `mean` and `p99` in milliseconds, `rme` in percent). The file is ignored by Git because a baseline is only meaningful on the machine and Node version that produced it.
+
+`bench:compare` re-runs the suite and prints a before/after table. Its exit status never turns a problem into a pass:
+
+| Exit | Meaning |
+|---|---|
+| 0 | Every baseline case was measured and none dropped by the threshold |
+| 1 | At least one case dropped by the threshold or more |
+| 2 | The comparison cannot be trusted: no or invalid baseline (including the old format), empty output, a non-positive or non-numeric measurement, a benchmark file without results, baseline cases missing from this run, or runs that differ in Node major version, platform, architecture or runner |
+
+New cases are listed but do not fail. `--allow-removed` accepts missing cases and `--allow-mismatch` accepts a non-homogeneous comparison; neither hides regressions. The threshold is **15%** by default, set with `--threshold <percent>` or `BENCH_THRESHOLD` (above 0 and below 100).
 
 ```bash
-# typical workflow before merging a PR
-pnpm bench:save          # save baseline on main
-# ... make changes ...
-pnpm bench:compare       # compare — exits 1 if a regression is found
+pnpm bench:save                                  # on main, before your change
+pnpm bench:compare                               # after it
+pnpm bench:compare --threshold 20
 ```
 
-To use a stricter or looser threshold:
-
-```bash
-BENCH_THRESHOLD=20 pnpm bench:compare   # flag only drops > 20%
-```
-
-> **On noise**: microbenchmarks in the nanosecond range have natural run-to-run variance of ±10–20% due to JIT warm-up, GC pauses, and CPU scheduling. A 15% threshold filters out noise while catching real regressions, which typically show as ≥30% drops. Always confirm a flagged regression by running `bench:compare` twice — if it disappears, it was noise.
+> **On noise**: microbenchmarks in the nanosecond to microsecond range vary between runs because of JIT warm-up, garbage collection and CPU scheduling. Two consecutive runs on the same machine, with no code change, reported two cases (async hook listeners) beyond the 15% threshold. Treat a flagged case as a lead: run the comparison again and look at its `rme`. The repository's CI does not run `bench:compare` as a gate, because no threshold has been validated against shared-runner noise.
 
 ---
 
 ## Results
 
-### Release audit: policy trace collection
+### Policy trace collection
 
-Measured on 2026-10-05 with Node.js 22.23.2 on macOS arm64. Command: `pnpm exec vitest bench run benchmarks/adapter.bench.ts benchmarks/policy.bench.ts`.
+Environment of these measurements: Apple M3 Pro, macOS arm64, Node.js v24.16.0 (launched through pnpm), vitest 4.1.5, commit 96f7667 plus uncommitted changes, 2026-10-06, local runner. Throughput is operations per second and `rme` is the relative margin of error reported by tinybench; when it is large, differences of that size are not meaningful. Command: `pnpm bench:save` (the full suite). Numbers describe this machine and workload only; they are not a promise about your cost.
 
-The full runtime comparison executes five always-allow policies with actual trace storage, context creation, route matching, and a JSON handler. It excludes network I/O.
+**Policy engine microbenchmark** (`trace.bench.ts`, no routing or HTTP; each iteration also creates a context, identically in every row). Throughput in ops/s, `rme` in parentheses:
 
-| Policy trace mode | Throughput (ops/s) | Mean (ms) |
-|---|---:|---:|
-| `off` | 137,147 | 0.0073 |
-| `summary` (default) | 104,462 | 0.0096 |
-| `detailed` | 105,453 | 0.0095 |
+| Outcome | Policies | `off` | `summary` | `detailed` |
+|---|---:|---:|---:|---:|
+| allow | 1 | 975,574 (±8.7%) | 485,722 (±29.4%) | 466,969 (±28.6%) |
+| allow | 5 | 710,051 (±6.6%) | 264,685 (±16.7%) | 281,031 (±19.4%) |
+| allow | 20 | 337,771 (±5.5%) | 116,185 (±11.4%) | 121,739 (±7.8%) |
+| deny | 1 | 245,207 (±8.4%) | 187,416 (±12.4%) | 185,349 (±16.6%) |
+| deny | 5 | 235,237 (±6.3%) | 149,950 (±11.2%) | 153,104 (±11.0%) |
+| deny | 20 | 173,183 (±4.1%) | 87,430 (±2.7%) | 83,728 (±9.5%) |
 
-Summary collection adds approximately 0.0023 ms per request in this synthetic workload, with about 24% lower throughput than disabled collection. The small difference between summary and detailed mode is within measurement noise; these allowed scenarios do not exercise reason redaction. The separate policy-engine denial benchmark covers a redactor call. Repeat the measurement on your target hardware before deciding to disable tracing; the default keeps authorization diagnostics available.
+In this isolated workload, collecting decisions costs between roughly 1 µs (one policy) and 5.7 µs (20 allowed policies) per evaluation, which is a large relative share of the engine itself. `summary` and `detailed` are indistinguishable within their margins; these allow cases never call the redactor, and the denial rows include one redactor call. A denial is slower than an allow because it constructs and throws an `HttpError`.
+
+**Truncation.** With 20 allowed policies in `summary` mode: `maxEvents` 1 → 149,313, 5 → 144,450, 100 → 119,290 ops/s (rme ±10–13%). With 20 policies ending in a denial: `maxEvents` 1 → 95,289 and 100 → 74,740 ops/s; the terminal decision is recorded in both. A smaller limit stores fewer events, so it is cheaper, but it also keeps less of the trace.
+
+**Full runtime and HTTP.** Five always-allow policies through `app.handle()` (context, routing, JSON handler, no network): `off` 167,899 (±8.4%), `summary` 125,295 (±8.5%), `detailed` 122,877 (±10.5%) ops/s. Over a real loopback socket through Express, with five policies, 8,143 (`off`, allow), 9,158 (`summary`, allow), 9,495 (`off`, deny) and 9,357 (`summary`, deny) ops/s, rme ±3.7–4.7%: the differences between these four rows are within the noise, because socket and event-loop time dominate. A single run of the HTTP file under Node 22 measured about 600 ops/s, roughly an order of magnitude lower than under Node 24 here, so do not compare HTTP numbers across Node versions or machines.
+
+**Policy ordering.** Policies are sorted by priority on every evaluation. `sortPolicies` alone: 1 policy 15.4M, 5 policies 5.7M, 20 policies 2.4M, 100 policies 613k ops/s, which is about 0.18 µs, 0.41 µs and 1.6 µs for 5, 20 and 100 policies. Against the 1.4 µs and 3.0 µs engine evaluation of 5 and 20 allowed policies with tracing off, that is a visible share of the engine alone and a small share of a full request. A cache is not implemented: policy arrays are plain mutable arrays (`register()` appends and route or group `policies` can be changed after declaration), and caching would first need a defined contract for mutation and invalidation. Revisit it if profiling a real application points at this sort.
 
 ### Historical results
 

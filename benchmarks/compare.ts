@@ -1,137 +1,128 @@
 #!/usr/bin/env node
 /**
  * Usage:
- *   tsx benchmarks/compare.ts --save          # run benchmarks and save as new baseline
- *   tsx benchmarks/compare.ts --compare       # run benchmarks and compare against baseline
- *   tsx benchmarks/compare.ts                 # run benchmarks only (no save, no compare)
+ *   tsx benchmarks/compare.ts --save               run the suite and store it as the baseline
+ *   tsx benchmarks/compare.ts --compare            run the suite and compare with the baseline
+ *   tsx benchmarks/compare.ts                      run the suite only
  *
- * Baseline file: benchmarks/baseline.json
- * Regression threshold: -10% in hz (configurable via BENCH_THRESHOLD env var)
+ * Options:
+ *   --threshold <percent>   throughput drop reported as a regression (default 15; or BENCH_THRESHOLD)
+ *   --allow-mismatch        compare even when Node major, platform, architecture or runner differ
+ *   --allow-removed         accept baseline cases that this run no longer produces
+ *
+ * Exit status: 0 clean, 1 regression, 2 the comparison cannot be trusted (empty or invalid
+ * results, missing baseline cases, non-homogeneous runs) — never a silent pass.
+ *
+ * Results come from vitest's structured `--outputJson`, not from parsing terminal output.
  */
+import { execFileSync, execSync } from "node:child_process"
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { cpus, tmpdir } from "node:os"
+import { join } from "node:path"
+import {
+  BenchError,
+  type BenchSnapshot,
+  compareSnapshots,
+  decide,
+  formatComparison,
+  parseBenchJson,
+  parseThreshold,
+  SNAPSHOT_VERSION,
+  validateSnapshot,
+} from "./lib"
 
-import { execSync } from "node:child_process"
-import { existsSync, readFileSync, writeFileSync } from "node:fs"
-import { dirname, join } from "node:path"
-import { fileURLToPath } from "node:url"
+const here = __dirname
+const root = join(here, "..")
+const BASELINE_PATH = join(here, "baseline.json")
+const args = process.argv.slice(2)
+const flag = (name: string) => args.includes(name)
+const option = (name: string) => {
+  const index = args.indexOf(name)
+  return index >= 0 ? args[index + 1] : undefined
+}
 
-const __dirname = dirname(fileURLToPath(import.meta.url))
-const BASELINE_PATH = join(__dirname, "baseline.json")
-const THRESHOLD = Number(process.env.BENCH_THRESHOLD ?? 15)
+function git(command: string): string {
+  try {
+    return execSync(`git ${command}`, { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim()
+  } catch {
+    return "unknown"
+  }
+}
 
-type BenchEntry = { hz: number; mean: number; p99: number; rme: string }
-type BenchSnapshot = { date: string; node: string; results: Record<string, BenchEntry> }
-
-// ─── parse vitest bench output ────────────────────────────────────────────────
-
-function parseOutput(raw: string): Record<string, BenchEntry> {
-  const results: Record<string, BenchEntry> = {}
-  let currentSuite = ""
-
-  for (const line of raw.split("\n")) {
-    // suite header: " ✓ benchmarks/policy.bench.ts > PolicyEngine — N always-allow policies 2967ms"
-    const suiteMatch = line.match(/✓\s+\S+\s+>\s+(.+?)\s+\d+ms/)
-    if (suiteMatch) {
-      currentSuite = suiteMatch[1].trim()
-      continue
-    }
-
-    // result row: "   · minimal request    12,841,381.72  0.0001  0.1775  0.0001  0.0001  0.0001  0.0001  0.0002  ±0.13%  ..."
-    const rowMatch = line.match(/·\s+(.+?)\s{2,}([\d,]+\.\d+)\s+([\d.]+)\s+([\d.]+)\s+([\d.]+).+?(±[\d.]+%)/)
-    if (rowMatch && currentSuite) {
-      const [, name, hzRaw, , , mean, , rme] = rowMatch
-      const p99Match = line.match(/(?:[\d.]+\s+){6}([\d.]+)/)
-      results[`${currentSuite} > ${name.trim()}`] = {
-        hz: Number(hzRaw.replace(/,/g, "")),
-        mean: Number(mean),
-        p99: p99Match ? Number(p99Match[1]) : 0,
-        rme,
+function runSuite(): BenchSnapshot {
+  const files = readdirSync(here).filter((name) => name.endsWith(".bench.ts")).sort()
+  const directory = mkdtempSync(join(tmpdir(), "orvaxis-bench-"))
+  const output = join(directory, "bench.json")
+  const command = `vitest bench run ${files.map((f) => `benchmarks/${f}`).join(" ")}`
+  try {
+    execFileSync(
+      "npx",
+      ["vitest", "bench", "run", ...files.map((f) => `benchmarks/${f}`), "--config", "vitest.bench.config.ts", "--outputJson", output],
+      { cwd: root, stdio: "inherit" }
+    )
+    const results = parseBenchJson(JSON.parse(readFileSync(output, "utf8")))
+    // Every benchmark file must have produced at least one result.
+    for (const file of files) {
+      if (!Object.keys(results).some((name) => name.startsWith(`benchmarks/${file} `))) {
+        throw new BenchError(`No results were recorded for benchmarks/${file}`)
       }
     }
-  }
-
-  return results
-}
-
-// ─── run benchmarks ───────────────────────────────────────────────────────────
-
-console.log("Running benchmarks…\n")
-const raw = execSync("npx vitest bench run benchmarks/", {
-  cwd: join(__dirname, ".."),
-  encoding: "utf8",
-  stdio: ["ignore", "pipe", "inherit"],
-})
-
-process.stdout.write(raw)
-
-const results = parseOutput(raw)
-const snapshot: BenchSnapshot = {
-  date: new Date().toISOString(),
-  node: process.version,
-  results,
-}
-
-// ─── save ─────────────────────────────────────────────────────────────────────
-
-if (process.argv.includes("--save")) {
-  writeFileSync(BASELINE_PATH, JSON.stringify(snapshot, null, 2))
-  console.log(`\nBaseline saved → ${BASELINE_PATH}`)
-  process.exit(0)
-}
-
-// ─── compare ──────────────────────────────────────────────────────────────────
-
-if (process.argv.includes("--compare")) {
-  if (!existsSync(BASELINE_PATH)) {
-    console.error(`No baseline found at ${BASELINE_PATH}. Run with --save first.`)
-    process.exit(1)
-  }
-
-  const baseline: BenchSnapshot = JSON.parse(readFileSync(BASELINE_PATH, "utf8"))
-
-  console.log(`\nComparing against baseline from ${baseline.date} (Node ${baseline.node})\n`)
-
-  const regressions: string[] = []
-  const rows: { name: string; before: string; after: string; delta: string; status: string }[] = []
-
-  for (const [name, current] of Object.entries(results)) {
-    const prev = baseline.results[name]
-    if (!prev) {
-      rows.push({ name, before: "—", after: fmtHz(current.hz), delta: "new", status: "🆕" })
-      continue
+    const vitest = JSON.parse(readFileSync(join(root, "node_modules/vitest/package.json"), "utf8")).version
+    return {
+      schemaVersion: SNAPSHOT_VERSION,
+      meta: {
+        date: new Date().toISOString(),
+        commit: git("rev-parse --short HEAD"),
+        dirty: git("status --porcelain") !== "",
+        node: process.version,
+        platform: process.platform,
+        arch: process.arch,
+        cpu: cpus()[0]?.model ?? "unknown",
+        runner: process.env.CI ? "ci" : "local",
+        vitest,
+        command,
+        units: { hz: "ops/s", mean: "ms", p99: "ms", rme: "%" },
+      },
+      results,
     }
-
-    const pct = ((current.hz - prev.hz) / prev.hz) * 100
-    const delta = `${pct >= 0 ? "+" : ""}${pct.toFixed(1)}%`
-    const status = pct <= -THRESHOLD ? "❌" : pct >= THRESHOLD ? "✅" : "  "
-
-    rows.push({ name, before: fmtHz(prev.hz), after: fmtHz(current.hz), delta, status })
-
-    if (pct <= -THRESHOLD) regressions.push(`  ${name}: ${delta}`)
-  }
-
-  // print table
-  const nameW = Math.max(...rows.map((r) => r.name.length), 4)
-  const header = `${"Benchmark".padEnd(nameW)}  ${"Before".padStart(14)}  ${"After".padStart(14)}  ${"Δ".padStart(8)}`
-  console.log(header)
-  console.log("─".repeat(header.length))
-  for (const r of rows) {
-    console.log(
-      `${r.status} ${r.name.padEnd(nameW)}  ${r.before.padStart(14)}  ${r.after.padStart(14)}  ${r.delta.padStart(8)}`,
-    )
-  }
-
-  if (regressions.length > 0) {
-    console.log(`\n❌ Regressions detected (threshold: −${THRESHOLD}%):\n${regressions.join("\n")}`)
-    process.exit(1)
-  } else {
-    console.log(`\n✅ No regressions detected (threshold: −${THRESHOLD}%)`)
+  } finally {
+    rmSync(directory, { recursive: true, force: true })
   }
 }
 
-function fmtHz(hz: number): string {
-  return hz >= 1_000_000
-    ? `${(hz / 1_000_000).toFixed(2)}M/s`
-    : hz >= 1_000
-      ? `${(hz / 1_000).toFixed(1)}k/s`
-      : `${hz.toFixed(0)}/s`
+try {
+  const threshold = parseThreshold(option("--threshold") ?? process.env.BENCH_THRESHOLD)
+  if (flag("--compare") && !existsSync(BASELINE_PATH)) {
+    throw new BenchError(`No baseline at ${BASELINE_PATH}. Run with --save first.`)
+  }
+  // Validate the baseline before spending minutes on a run that cannot be compared.
+  const baseline = flag("--compare")
+    ? validateSnapshot(JSON.parse(readFileSync(BASELINE_PATH, "utf8")), "baseline")
+    : undefined
+
+  const current = runSuite()
+  console.log(`\n${Object.keys(current.results).length} benchmark results (${current.meta.node}, ${current.meta.platform}/${current.meta.arch}, ${current.meta.runner}, commit ${current.meta.commit}${current.meta.dirty ? "+dirty" : ""})`)
+
+  if (flag("--save")) {
+    writeFileSync(BASELINE_PATH, `${JSON.stringify(current, null, 2)}\n`)
+    console.log(`Baseline saved → ${BASELINE_PATH}`)
+  }
+  if (baseline) {
+    console.log(`\nComparing with the baseline from ${baseline.meta.date} (${baseline.meta.node}, ${baseline.meta.platform}/${baseline.meta.arch}, ${baseline.meta.runner}, commit ${baseline.meta.commit})\n`)
+    const comparison = compareSnapshots(baseline, current, threshold)
+    console.log(formatComparison(comparison, threshold))
+    const verdict = decide(comparison, { mismatch: flag("--allow-mismatch"), removed: flag("--allow-removed") })
+    for (const message of verdict.messages) console.log(`\n${verdict.code === 0 ? "ℹ" : "⚠"} ${message}`)
+    console.log(
+      verdict.code === 0
+        ? `\n✅ No regressions at a ${threshold}% threshold`
+        : verdict.code === 1
+          ? "\n❌ Regressions detected"
+          : "\n⛔ The comparison cannot be trusted (see above); no verdict on regressions"
+    )
+    process.exit(verdict.code)
+  }
+} catch (error) {
+  console.error(error instanceof BenchError ? `Benchmark error: ${error.message}` : error)
+  process.exit(2)
 }

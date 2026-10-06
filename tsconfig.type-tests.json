@@ -5,6 +5,8 @@
     "rootDir": "."
   },
   "include": [
+    "benchmarks/**/*.ts",
+    "tests/benchCompare.test.ts",
     "tests/defineRoute.types.ts",
     "examples/debug-trace.ts",
     "examples/express-existing-route.ts",
