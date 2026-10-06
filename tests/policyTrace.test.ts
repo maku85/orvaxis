@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest"
 import { Orvaxis } from "../core/Orvaxis"
 import { testRequest } from "../core/testHarness"
 import { buildExecutionSummary } from "../debug/buildExecutionSummary"
+import { formatExecutionSummary } from "../debug/formatExecutionSummary"
 import { otelPlugin } from "../plugins/otelPlugin"
 
 function appWithPolicies(options: ConstructorParameters<typeof Orvaxis>[0] = {}) {
@@ -195,6 +196,72 @@ describe("policy decision tracing", () => {
     expect(
       capped.ctx?.meta.trace?.events.some((event) => event.type === "POLICY_TRACE_LIMIT")
     ).toBe(true)
+  })
+
+  it("keeps the terminal decision when the trace limit is exceeded", async () => {
+    const build = (last: () => { allow: boolean } | never) => {
+      const app = new Orvaxis({ policyTrace: { mode: "summary", maxEvents: 1 } })
+      app.policy({ name: "first", priority: 3, evaluate: () => ({ allow: true }) })
+      app.policy({
+        name: "scoped-out",
+        priority: 2,
+        scope: { method: "POST" },
+        evaluate: () => ({ allow: true }),
+      })
+      app.policy({ name: "last", priority: 1, evaluate: last })
+      app.group({ prefix: "/api", routes: [{ method: "GET", path: "/x", handler: () => {} }] })
+      return app
+    }
+
+    const denied = await testRequest(
+      build(() => ({ allow: false })),
+      { path: "/api/x" }
+    )
+    if (!denied.ctx) throw new Error("expected a request context")
+    const deniedSummary = buildExecutionSummary(denied.ctx)
+    expect(deniedSummary.stoppedByPolicy?.meta).toMatchObject({
+      policy: "last",
+      layer: "global",
+      phase: "preValidation",
+      outcome: "deny",
+      terminal: true,
+    })
+    expect(deniedSummary.policyDecisions).toHaveLength(2)
+    expect(deniedSummary.policyTrace).toEqual({
+      truncated: true,
+      droppedDecisions: 1,
+      maxEvents: 1,
+    })
+    expect(formatExecutionSummary(denied.ctx)).toContain("Trace truncated: 1 decision(s)")
+    expect(formatExecutionSummary(denied.ctx)).toContain("Stopped by: last")
+
+    const failed = await testRequest(
+      build(() => {
+        throw new Error("private")
+      }),
+      { path: "/api/x" }
+    )
+    if (!failed.ctx) throw new Error("expected a request context")
+    const failedSummary = buildExecutionSummary(failed.ctx)
+    expect(failedSummary.stoppedByPolicy?.meta).toMatchObject({ policy: "last", outcome: "error" })
+    expect(failedSummary.policyTrace.truncated).toBe(true)
+  })
+
+  it("does not report truncation or collect decisions when nothing is dropped or tracing is off", async () => {
+    const app = new Orvaxis({ policyTrace: { mode: "summary", maxEvents: 2 } })
+    app.policy({ name: "a", evaluate: () => ({ allow: true }) })
+    app.policy({ name: "b", evaluate: () => ({ allow: false }) })
+    app.group({ prefix: "/api", routes: [{ method: "GET", path: "/x", handler: () => {} }] })
+    const result = await testRequest(app, { path: "/api/x" })
+    if (!result.ctx) throw new Error("expected a request context")
+    expect(buildExecutionSummary(result.ctx).policyTrace.truncated).toBe(false)
+
+    const off = new Orvaxis({ policyTrace: { mode: "off" } })
+    off.policy({ name: "b", evaluate: () => ({ allow: false }) })
+    off.group({ prefix: "/api", routes: [{ method: "GET", path: "/x", handler: () => {} }] })
+    const offResult = await testRequest(off, { path: "/api/x" })
+    if (!offResult.ctx) throw new Error("expected a request context")
+    expect(buildExecutionSummary(offResult.ctx).policyDecisions).toHaveLength(0)
   })
 
   it("forwards policy decision events to the request OpenTelemetry span", async () => {

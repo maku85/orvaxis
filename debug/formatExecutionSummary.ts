@@ -50,6 +50,11 @@ export function formatExecutionSummary(ctx: OrvaxisContext): string {
     }
   }
 
+  if (summary.policyTrace.truncated) {
+    lines.push(
+      `Trace truncated: ${summary.policyTrace.droppedDecisions} decision(s) not recorded (maxEvents ${summary.policyTrace.maxEvents}); the terminal decision is always kept`
+    )
+  }
   if (summary.stoppedByPolicy) {
     lines.push(`Stopped by: ${safeLabel(summary.stoppedByPolicy.meta?.policy)}`)
   }

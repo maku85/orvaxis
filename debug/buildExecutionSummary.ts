@@ -1,3 +1,4 @@
+import { getPolicyTraceInfo, type PolicyTraceInfo } from "../core/PolicyEngine.js"
 import type { DebugEntry, DebugInfo, OrvaxisContext, Trace, TraceEvent } from "../types/index.js"
 
 export type UnifiedEvent = {
@@ -15,6 +16,8 @@ export type ExecutionSummary = {
   policyDecisions: TraceEvent[]
   stoppedByPolicy: TraceEvent | undefined
   notReachedStages: string[]
+  /** Whether decisions were dropped by `maxEvents`; the terminal decision is always kept. */
+  policyTrace: PolicyTraceInfo
   debugSteps: Record<string, DebugEntry[]>
   combinedTimeline: UnifiedEvent[]
 }
@@ -82,6 +85,7 @@ export function buildExecutionSummary(ctx: OrvaxisContext): ExecutionSummary {
     policyDecisions,
     stoppedByPolicy,
     notReachedStages,
+    policyTrace: getPolicyTraceInfo(ctx),
     debugSteps,
     combinedTimeline,
   }

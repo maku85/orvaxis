@@ -61,8 +61,26 @@ export type PolicyDecision = {
   scope?: { path?: string; method?: string }
 }
 
-type TraceState = { count: number; truncated: boolean }
+type TraceState = { count: number; truncated: boolean; dropped: number; limit: number }
 const traceStates = new WeakMap<OrvaxisContext, TraceState>()
+
+export type PolicyTraceInfo = {
+  /** True when at least one non-terminal decision was not recorded because of `maxEvents`. */
+  truncated: boolean
+  /** Number of decisions not recorded. Skipped-by-scope policies that were recorded are not counted. */
+  droppedDecisions: number
+  /** Effective limit applied to non-terminal decisions, when collection was active. */
+  maxEvents: number | undefined
+}
+
+export function getPolicyTraceInfo(ctx: OrvaxisContext): PolicyTraceInfo {
+  const state = traceStates.get(ctx)
+  return {
+    truncated: state?.truncated ?? false,
+    droppedDecisions: state?.dropped ?? 0,
+    maxEvents: state?.limit,
+  }
+}
 
 export function recordPolicyDecision(
   ctx: OrvaxisContext,
@@ -70,13 +88,17 @@ export function recordPolicyDecision(
   decision: PolicyDecision
 ): void {
   if (!options || options.mode === "off") return
-  const state = traceStates.get(ctx) ?? { count: 0, truncated: false }
+  const state = traceStates.get(ctx) ?? { count: 0, truncated: false, dropped: 0, limit: 0 }
   traceStates.set(ctx, state)
   const requestedLimit = options.maxEvents ?? 100
   const limit = Number.isFinite(requestedLimit)
     ? Math.min(1000, Math.max(1, Math.floor(requestedLimit)))
     : 100
-  if (state.count >= limit) {
+  state.limit = limit
+  // The decision that stopped the request is always kept, even beyond the limit. A request
+  // stops at its first terminal decision, so this adds at most one event.
+  if (state.count >= limit && decision.terminal !== true) {
+    state.dropped++
     if (!state.truncated) {
       state.truncated = true
       ctx.meta.tracer?.event("POLICY_TRACE_LIMIT", { maxEvents: limit })

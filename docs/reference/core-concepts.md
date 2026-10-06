@@ -180,7 +180,7 @@ Policies run in two phases. Existing policies default to `preValidation`, so aut
 
 Policy decisions are added to `ctx.meta.trace.events` as `POLICY_DECISION` events. Each event reports the policy name, layer (`global`, `group`, or `route`), phase, order within that layer, priority, elapsed time, and outcome (`allow`, `deny`, `skipped`, or `error`). Denials and evaluation errors are terminal; later request stages do not run. The same events appear in `buildExecutionSummary().policyDecisions` and are forwarded to OpenTelemetry spans.
 
-Collection defaults to a bounded summary of at most 100 decisions per request. `maxEvents` accepts 1–1000. Policy decision events do not copy request bodies, headers, cookies, identity values, free-form denial reasons, or exception messages. Names should be stable configuration labels, never values derived from a request. Configure collection on `Orvaxis`:
+Collection defaults to a bounded summary of at most 100 decisions per request. `maxEvents` accepts 1–1000 and bounds the non-terminal decisions recorded; the terminal decision (a denial or evaluation error) is always recorded in addition, so a truncated trace still explains why the request stopped. When decisions are dropped, a `POLICY_TRACE_LIMIT` event is added and `buildExecutionSummary().policyTrace` reports `truncated` and `droppedDecisions` (policies skipped by scope are recorded as `skipped` and are not counted as dropped). Policy decision events do not copy request bodies, headers, cookies, identity values, free-form denial reasons, or exception messages. Names should be stable configuration labels, never values derived from a request. Configure collection on `Orvaxis`:
 
 ```ts
 const app = new Orvaxis({
