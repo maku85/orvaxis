@@ -1,46 +1,30 @@
-# Migrating from 0.3.1
+# Unreleased changes after 0.4.0
 
-This page covers the changes in the current repository after 0.3.1. Check the [changelog](https://github.com/maku85/orvaxis/blob/main/CHANGELOG.md) for the release containing them.
+> **Not in the published package.** Everything on this page exists on the `main` branch only and ships with the next release. The published version is 0.4.0. Upgrading from 0.3.1 instead? See [Migrating from 0.3.1 to 0.4.0](/migration/0.3.1-to-0.4.0) (this URL used to hold that guide).
 
-## Middleware must explicitly continue
+Behavior that can affect existing code is listed first. The [changelog](https://github.com/maku85/orvaxis/blob/main/CHANGELOG.md) has the complete list under *Unreleased*.
 
-Returning from middleware without calling `next()` now stops the entire remaining request flow, including later middleware layers, validation, and the handler. Send a response or throw when stopping; otherwise the HTTP connection can remain open until its timeout.
+## OpenAPI export is stricter
 
-```ts
-app.use(async (ctx, next) => {
-  if (!ctx.req.headers["x-user-id"]) {
-    ctx.res.status(401).json({ error: "Authentication required" })
-    return
-  }
-  await next()
-})
-```
+`generateOpenApiDocument` now raises a `TypeError` naming the route where it previously approximated or overwrote:
 
-Sending a response stops later application phases even if middleware subsequently calls `next()`. On successful short circuits, `afterPipeline` still runs. `afterHandler` runs only after a handler completes successfully. Error paths finalize the trace before `onError` and skip `afterPipeline`. See the [lifecycle reference](/reference/lifecycle).
+- **Wildcard routes** (`/files/*path`) used to appear as a path that is not a valid OpenAPI template. Exclude them explicitly: `exclude: (route) => route.path.includes("*")`.
+- **Collisions** — the same operation twice, or templates differing only in parameter names (`GET /items/:id` with `POST /items/:itemId`) — are errors instead of overwriting.
+- **Converter output** with local references such as `#/$defs/x` is rejected; inline it or declare it in the new `componentSchemas` option and reference `#/components/schemas/<name>`.
 
-## Group and route scopes now apply
+New, additive: a route-level `openapi` object (`operationId`, `summary`, `tags`, optional `body`, media types) and the options above. See the [reference](/reference/core-concepts#response-contracts-and-openapi).
 
-Group and route policies now honor `scope.path` and `scope.method`, as global policies already did. A policy whose scope does not match is skipped. Audit existing scoped policies, especially authorization checks that previously ran regardless of their declared scope. Remove the scope if the check must always run.
+## Disconnected clients stop work
 
-Within each validation phase, execution order is global, group, then route; higher priority runs first within a layer, with declaration order breaking ties. Priority never moves a route policy ahead of global policies. Regular expressions with `g` or `y` no longer depend on previous requests.
+The built-in adapters abort `ctx.req.signal` when the client disconnects, and the runtime stops before the next stage (middleware, handler) for such a request. The Express policy guard no longer calls `next()` after a disconnect, so the existing handler is not invoked late. Shutdown still lets requests in progress finish.
 
-## Typed routes require runtime validation
+## Terminal policy decision survives `maxEvents`
 
-Routes created with `defineRoute()` now fail explicitly if `schemaValidationPlugin` is missing. Register the plugin before serving requests:
+The decision that denied the request or failed evaluation is always recorded, even past the limit, so a truncated trace still explains the stop (`maxEvents` bounds the other decisions). The 0.4.0 limitation described in the 0.4.0 guide no longer applies on `main`.
 
-```ts
-import { Orvaxis, schemaValidationPlugin } from "orvaxis"
+## Additions
 
-const app = new Orvaxis()
-app.register(schemaValidationPlugin)
-```
-
-The handler receives parsed output types for body, params, query, and headers, including coercions and transforms. Existing `defineRoute<TBody, TState>()` calls remain supported. Post-validation policies must declare the schema fields they require. The incremental Express guard supports pre-validation policies and ordinary route declarations; typed routes and post-validation policies require the full runtime.
-
-## Policy diagnostics are collected by default
-
-The default policy trace records at most 100 decisions without request values or free-form denial reasons. Disable it with `new Orvaxis({ policyTrace: { mode: "off" } })`, or configure the limit. Detailed mode requires an explicit reason redactor. A truncated trace cannot identify decisions beyond its limit; increase the limit, up to 1,000, when diagnosing routes with many policies.
-
-`testRequest()` retains the failed context and original error. Generic errors before a response now report status 500; errors after a response preserve the status already sent. HTTP adapters still construct the error response envelope.
-
-Response validation and OpenAPI generation are opt-in. Existing applications do not need to register them. Use the [response contract reference](/reference/core-concepts#response-contracts-and-openapi) for their boundaries.
+- `policyId` and `declarationIndex` on policy decisions, matching `inspectRoutes()` IDs.
+- `buildRequestReport()` for a serializable, privacy-bounded request report.
+- `buildProtectionReport()` and `diffProtectionReports()` in `orvaxis/testing` for protection changes in CI.
+- `formatExecutionSummary()` shows the request method, the full route template, and the status actually sent.

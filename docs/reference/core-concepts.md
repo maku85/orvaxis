@@ -178,7 +178,11 @@ Lifecycle events that allow observation of execution:
 
 Policies run in two phases. Existing policies default to `preValidation`, so authentication and other early checks keep their current behavior. A policy that depends on parsed input can use `phase: "postValidation"` and declare a non-empty `requires` list (`body`, `params`, `query`, or `headers`). It runs only after `onValidation`; Orvaxis rejects the request with a configuration error if `schemaValidationPlugin` is missing or the matched route does not define every required schema. Invalid input fails validation (422) before such a policy runs.
 
+> **Unreleased.** `policyId`, `declarationIndex`, the always-recorded terminal decision, and the `policyTrace` truncation fields described in this section are on `main` only. The published 0.4.0 package reports the other fields and drops decisions past `maxEvents`, including the terminal one.
+
 Policy decisions are added to `ctx.meta.trace.events` as `POLICY_DECISION` events. Each event reports the policy name, a declaration `policyId`, layer (`global`, `group`, or `route`), phase, `declarationIndex`, `order`, priority, elapsed time, and outcome (`allow`, `deny`, `skipped`, or `error`). `policyId` has the form `layer:index`, where `index` is the zero-based position of the policy in that layer's declaration array (global policies in registration order, then the group's and the route's `policies` arrays), independent of phase, priority and scope. It is the same value as `PolicyInspection.id` from `app.inspectRoutes()`, so a decision can be matched to the static report even when names are duplicated. It is unique within one route's chain, not across routes (`group:0` names different policies in different groups), and a policy object reused in several declarations has one ID per declaration. `declarationIndex` is that index alone; `order` is the one-based evaluation position within the layer and phase after priority sorting. Denials and evaluation errors are terminal; later request stages do not run. The same events appear in `buildExecutionSummary().policyDecisions` and are forwarded to OpenTelemetry spans.
+
+> **Unreleased.** The request report below is on `main` only; it is not in the published 0.4.0 package.
 
 #### Request report
 
@@ -741,6 +745,8 @@ const document = generateOpenApiDocument(app, {
   schemaConverter: (validator) => z.toJSONSchema(validator as z.ZodType),
 })
 ```
+
+> **Unreleased.** The strict path checks, the `exclude` and `componentSchemas` options, converter reference validation and `route.openapi` metadata below are on `main` only. In 0.4.0 the generator rewrites `:name` with a regular expression, always emits a required `application/json` body, and does not check for wildcards or collisions. See [Unreleased changes](/migration/next).
 
 The generator emits OpenAPI 3.1 paths, request bodies, query/header/path parameters, declared responses, and a default Orvaxis error envelope. It reads route metadata only; it never executes handlers or policies. Anything it cannot describe faithfully raises a `TypeError` naming the route instead of being dropped or approximated.
 

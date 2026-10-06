@@ -1,6 +1,7 @@
+import { readFileSync } from "node:fs"
 import { createServer as createHttpServer } from "node:http"
 import { describe, expect, it } from "vitest"
-import { createExistingRouteDemo } from "../examples/express-existing-route"
+import { createExistingRouteDemo, explainDenial } from "../examples/express-existing-route"
 
 describe("existing Express route demo", () => {
   it("runs the original handler only when its owner policy allows the request", async () => {
@@ -23,5 +24,15 @@ describe("existing Express route demo", () => {
         server.close((error) => (error ? reject(error) : resolve()))
       )
     }
+  })
+
+  it("explains the first denied request exactly as the guide shows it", async () => {
+    const guide = readFileSync("docs/guide/integrate-existing-route.md", "utf8")
+    const shown = /```text\n(GET \/api\/documents\/:id[\s\S]*?)\n```/.exec(guide)?.[1]
+    expect(shown).toBeDefined()
+    expect(await explainDenial("bob", "alice")).toBe(shown)
+    const allowed = await explainDenial("alice", "alice")
+    expect(allowed).toContain("Outcome: completed (200)")
+    expect(allowed).not.toContain("Stopped by")
   })
 })

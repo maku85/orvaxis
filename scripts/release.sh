@@ -150,6 +150,8 @@ run_checks() {
   pnpm test
   pnpm run build
   pnpm run check:package
+  pnpm run check:snippets
+  pnpm run check:quickstart
   pnpm run docs:build
 }
 

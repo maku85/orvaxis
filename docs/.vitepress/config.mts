@@ -25,7 +25,13 @@ export default defineConfig({
       { text: "Trace demo", link: "/demo/policy-traces" },
       { text: "Examples", link: "/examples/" },
       { text: "Reference", link: "/reference/core-concepts" },
-      { text: "Migration", link: "/migration/next" },
+      {
+        text: "Migration",
+        items: [
+          { text: "0.3.1 → 0.4.0", link: "/migration/0.3.1-to-0.4.0" },
+          { text: "Unreleased changes", link: "/migration/next" },
+        ],
+      },
       {
         text: "Resources",
         items: [
@@ -48,6 +54,15 @@ export default defineConfig({
             { text: "Multi-tenant demo", link: "/guide/multi-tenant-demo" },
           ],
         },
+        {
+          text: "HTTP and testing",
+          items: [
+            { text: "HTTP adapters", link: "/guide/http-adapters" },
+            { text: "Timeouts and shutdown", link: "/guide/timeouts-and-shutdown" },
+            { text: "Streaming", link: "/guide/streaming" },
+            { text: "Testing", link: "/guide/testing" },
+          ],
+        },
       ],
       "/reference/": [
         {
@@ -55,6 +70,15 @@ export default defineConfig({
           items: [
             { text: "Core concepts", link: "/reference/core-concepts" },
             { text: "Request lifecycle", link: "/reference/lifecycle" },
+          ],
+        },
+      ],
+      "/migration/": [
+        {
+          text: "Migration",
+          items: [
+            { text: "0.3.1 → 0.4.0", link: "/migration/0.3.1-to-0.4.0" },
+            { text: "Unreleased changes", link: "/migration/next" },
           ],
         },
       ],

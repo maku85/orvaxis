@@ -126,7 +126,7 @@ describe("release script — successful release", () => {
     expect(result.status, result.err).toBe(0)
 
     const events = repo.events()
-    expect(events.filter((event) => event.startsWith("pnpm")).slice(0, 8)).toEqual([
+    expect(events.filter((event) => event.startsWith("pnpm")).slice(0, 10)).toEqual([
       "pnpm run check",
       "pnpm exec tsc --noEmit",
       "pnpm run typecheck:tests",
@@ -134,6 +134,8 @@ describe("release script — successful release", () => {
       "pnpm test",
       "pnpm run build",
       "pnpm run check:package",
+      "pnpm run check:snippets",
+      "pnpm run check:quickstart",
       "pnpm run docs:build",
     ])
     const publish = events.findIndex((event) => event.startsWith("npm publish"))

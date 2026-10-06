@@ -34,6 +34,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Check documentation snippets against their examples
+        run: pnpm check:snippets
+
       - name: Build VitePress site and validate internal links
         run: pnpm docs:build
 

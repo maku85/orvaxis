@@ -32,8 +32,8 @@ Use it to organize how requests run, enforce input and response contracts, obser
 | **Validated, typed input** | Parse and transform body, params, query and headers; infer handler types from validator outputs with `defineRoute()` | [Typed schemas](docs/reference/core-concepts.md#typed-context), [working example](examples/typed-schema.ts) |
 | **Response contracts and OpenAPI** | Validate declared responses by status in strict or warning mode; generate OpenAPI 3.1 using your schema converter | [Contracts and OpenAPI](docs/reference/core-concepts.md#response-contracts-and-openapi) |
 | **Observability** | Inspect request traces and debug timelines, emit custom events, use structured logging and export spans through OpenTelemetry | [Tracing](docs/reference/core-concepts.md#tracing-system), [debugging](docs/reference/core-concepts.md#debug-layer), [OpenTelemetry example](examples/otel-plugin.ts) |
-| **Testing and inspection** | Execute requests without a server, test permission matrices, inspect route declarations and check required policies in CI | [Testing](#testing), [route inspection](#route-introspection) |
-| **HTTP and streaming** | Use Express or Fastify transport, stream SSE/files, propagate request IDs and handle cancellation, timeouts and graceful shutdown | [Adapters](#http-adapters), [streaming](#streaming), [shutdown](#graceful-shutdown) |
+| **Testing and inspection** | Execute requests without a server, test permission matrices, inspect route declarations and check required policies in CI | [Testing](docs/guide/testing.md), [route inspection](docs/guide/testing.md#route-introspection) |
+| **HTTP and streaming** | Use Express or Fastify transport, stream SSE/files, propagate request IDs and handle cancellation, timeouts and graceful shutdown | [Adapters](docs/guide/http-adapters.md), [streaming](docs/guide/streaming.md), [shutdown](docs/guide/timeouts-and-shutdown.md#graceful-shutdown) |
 | **Extensibility and context** | Register opt-in plugins, use CORS and logging plugins, and access isolated request context across async calls | [Plugins](docs/reference/core-concepts.md#plugins), [async context](docs/reference/core-concepts.md#request-scoped-context) |
 
 Choose the integration that fits your application:
@@ -43,19 +43,23 @@ Choose the integration that fits your application:
 
 ## Quickstart
 
-Start with a small full-runtime API: declare a route and its policies, then serve it through Express. This example demonstrates an allowed request and a denied request whose handler never runs. Validation, plugins and streaming can be added as needed.
+Start with a small full-runtime API: declare a route and its policies, then serve it through Express. This example demonstrates an allowed request and a denied request whose handler never runs. Validation, plugins and streaming can be added as needed. It needs Node.js 22.13 or later.
 
-## Installation
+Create a project and install Orvaxis, Express (the HTTP transport; Fastify works too) and a TypeScript runner and the type declarations Express does not bundle:
 
 ```bash
+mkdir orvaxis-quickstart && cd orvaxis-quickstart
+npm init -y
 npm install orvaxis express
+npm install -D tsx typescript @types/node @types/express
 ```
 
-Register authentication globally and ownership on the route that needs it:
+Save this as `server.ts`. Authentication is registered globally, ownership on the route that needs it:
 
+<!-- snippet: examples/quickstart.ts#imports,app,serve -->
 ```ts
-import { Orvaxis, type Policy } from "orvaxis"
 import { createExpressServer } from "orvaxis/express"
+import { Orvaxis, type Policy } from "orvaxis"
 
 const authenticate: Policy = {
   name: "authenticate-user",
@@ -80,23 +84,28 @@ const app = new Orvaxis()
 app.policy(authenticate)
 app.group({
   prefix: "/api",
-  routes: [{
-    method: "GET",
-    path: "/reports/:ownerId",
-    policies: [ownerOnly],
-    handler: (ctx) => ctx.res.json({ ownerId: ctx.params.ownerId, report: "quarterly" }),
-  }],
+  routes: [
+    {
+      method: "GET",
+      path: "/reports/:ownerId",
+      policies: [ownerOnly],
+      handler: (ctx) => ctx.res.json({ ownerId: ctx.params.ownerId, report: "quarterly" }),
+    },
+  ],
 })
 
 createExpressServer(app).listen(3000)
 ```
 
-Run the same [working example](examples/quickstart.ts) from a checkout with `pnpm exec tsx examples/quickstart.ts`, then try the allowed and denied requests:
+Start it with `npx tsx server.ts`, then try the allowed and denied requests:
 
 ```bash
 curl -i -H 'x-user-id: bob' http://localhost:3000/api/reports/alice  # 403: policy denied
 curl -i -H 'x-user-id: alice' http://localhost:3000/api/reports/alice # 200: handler ran
+curl -i http://localhost:3000/api/reports/alice                      # 401: no identity
 ```
+
+The same code is the [working example](examples/quickstart.ts) in the repository (`pnpm exec tsx examples/quickstart.ts` from a checkout); a script runs this exact snippet in a clean project against the packed package, so the commands above stay accurate.
 
 The `x-user-id` header is a demo identity input, not authentication. In an application, use the identity established by trusted authentication middleware or token verification.
 
@@ -139,450 +148,47 @@ The [core concepts reference](docs/reference/core-concepts.md) covers the router
 
 ## HTTP Adapters
 
-Orvaxis is not tied to any specific HTTP framework. The core runtime is framework-agnostic — adapters are thin wrappers that normalize the incoming request and delegate to the runtime.
-
-Two adapters are included out of the box:
+Orvaxis is not tied to any HTTP framework: adapters are thin wrappers that normalize the incoming request and delegate to the runtime. Two are included.
 
 | Adapter | Import | Peer dependency |
 |---|---|---|
-| Express | `createExpressServer` from `orvaxis/express` | `express ^4.20 \|\| ^5` |
+| Express | `createExpressServer` from `orvaxis/express` | `express ^4.20 \|\| ^5` (types: `@types/express`) |
 | Fastify | `createFastifyServer` from `orvaxis/fastify` | `fastify ^5` |
 
-Install only the framework you intend to use — both peer dependencies are optional. Each adapter lives on its own subpath (`orvaxis/express`, `orvaxis/fastify`) precisely so that importing the main `orvaxis` entry point never requires either peer dependency to be installed. Importing `orvaxis/express`, `orvaxis/fastify` or `orvaxis/otel` without its peer (`express`, `fastify`, `@opentelemetry/api`) fails immediately with a module-not-found error that names the missing package; `orvaxis`, `orvaxis/testing` and `orvaxis/openapi` never need a peer.
+Both peers are optional and each adapter has its own subpath, so `orvaxis`, `orvaxis/testing` and `orvaxis/openapi` never need either. Importing `orvaxis/express`, `orvaxis/fastify` or `orvaxis/otel` without its peer fails immediately with a module-not-found error that names the package. Both full-runtime adapters mount Orvaxis as a catch-all, so routing, hooks and declared validation come from the Orvaxis runtime; benchmark your application before drawing performance conclusions. To protect one existing Express route without moving its handler, use the [existing route guide](docs/guide/integrate-existing-route.md).
 
-Both full-runtime adapters mount Orvaxis as a catch-all handler and delegate routing, lifecycle hooks, and declared validation to the Orvaxis runtime. Express routes within that mount are handled by Orvaxis's router. With Fastify, those endpoints use Orvaxis routing and validation instead of Fastify's native route trie and compiled schema validation. Choose the adapter for the HTTP transport and surrounding framework integrations; benchmark your application before drawing performance conclusions.
+Adapter details are in the documentation:
 
-#### Add Orvaxis policies to one existing Express route
-
-For a route whose handler should stay in Express, follow the [existing route integration guide](docs/guide/integrate-existing-route.md). It covers middleware placement, identity mapping, the mirrored route declaration, and validation boundaries.
-
-### Query string parsing differs between adapters
-
-`ctx.req.query` is typed as `Record<string, string | string[]>` on both adapters, but Express's default query parser (`qs`, in "extended" mode) does not actually guarantee that shape: bracket notation is parsed into **nested objects**.
-
-```
-GET /search?filter[status]=active
-```
-
-| Adapter | `ctx.req.query.filter` |
-|---|---|
-| Express (default) | `{ status: "active" }` — an object, not a string |
-| Fastify (default) | `"active"` under the literal key `"filter[status]"` — brackets are not special |
-
-Code that reads a query value directly and assumes it's a string (`ctx.req.query.filter.toUpperCase()`) compiles under the declared type but can throw at runtime on Express if a client sends bracketed keys. Two ways to avoid this:
-
-- Validate query params with `route.schema.query` (see [Plugins → `schemaValidationPlugin`](docs/reference/core-concepts.md#plugins)) — this reshapes and checks `ctx.req.query` at the boundary regardless of adapter.
-- Or, if you don't use query schemas and want the declared type to actually hold, switch Express to the non-nesting parser: `expressApp.set("query parser", "simple")` before passing it to `createExpressServer`. This affects the whole Express app instance, including any routes you mount outside Orvaxis, so prefer it only when you control the entire app.
-
-### Timeout
-
-Both adapters accept an optional `AdapterOptions` third argument:
-
-```ts
-import { createExpressServer } from "orvaxis/express"
-
-// default: 30 000 ms
-const server = createExpressServer(app)
-
-// custom deadline
-const server = createExpressServer(app, undefined, { timeout: 10_000 })
-
-// disabled (long-running handlers, streaming, etc.)
-const server = createExpressServer(app, undefined, { timeout: 0 })
-```
-
-When the deadline expires the adapter sends a 408 response and sets `ctx.req.signal` to aborted, so any downstream work that accepts an `AbortSignal` is cancelled immediately:
-
-```ts
-handler: async (ctx) => {
-  // fetch is aborted if the request times out
-  const res = await fetch("https://api.example.com/data", { signal: ctx.req.signal })
-  ctx.res.json(await res.json())
-}
-```
-
-The same signal is aborted when the client disconnects before the response finishes. The runtime stops before its next stage (middleware, handler) for such a request instead of running work nobody will receive; the Express policy guard likewise does not call `next()`. Graceful shutdown aborts the signal too but lets requests already in progress run to completion.
-
-`ctx.req.signal` is always defined when using the built-in adapters. Pass it to `node:http` requests, database drivers (pg, mongodb, prisma), or any API that accepts an `AbortSignal` to stop work the client will never see. The same option is available on `createFastifyServer`.
-
-`withTimeout` and `AdapterOptions` are exported from the main entry point so custom adapters can reuse them:
-
-```ts
-import { withTimeout, type AdapterOptions } from "orvaxis"
-```
-
-### Graceful shutdown
-
-When `close()` is called (e.g. on `SIGTERM`), the adapter stops accepting new connections and waits for active requests to finish. A `shutdownTimeout` cap (default `10 000 ms`) forces `closeAllConnections()` if active connections do not drain in time, so the process always exits cleanly under Kubernetes, systemd, and other orchestrators.
-
-**In-flight requests are notified via the same `ctx.req.signal` used for timeouts.** Before waiting for connections to drain, `close()` aborts the `AbortSignal` of every request still in flight. A long-lived handler — an SSE loop, a chunked NDJSON stream — can listen for this exactly like it already does for timeouts, and end itself cleanly (send a final message, call `ctx.res.end()`) instead of being cut off by `shutdownTimeout`:
-
-```ts
-handler: async (ctx) => {
-  ctx.res.write(": ping\n\n")
-  await new Promise<void>((resolve) => {
-    ctx.req.signal?.addEventListener("abort", resolve, { once: true })
-  })
-  // fires both on a request timeout and on server shutdown — same signal, same handling
-  ctx.res.write("event: bye\ndata: server shutting down\n\n")
-  ctx.res.end()
-}
-```
-
-If a handler doesn't listen for the signal, nothing changes: `shutdownTimeout` still forces the connection closed as before. This is a notification, not a kill switch.
-
-```ts
-// default: 10 000 ms forced-close deadline
-const server = createExpressServer(app)
-
-// custom deadline
-const server = createExpressServer(app, undefined, { shutdownTimeout: 5_000 })
-
-// disable forced close (wait indefinitely — not recommended in production)
-const server = createExpressServer(app, undefined, { shutdownTimeout: 0 })
-```
-
-Typical SIGTERM handler:
-
-```ts
-const server = createExpressServer(app, undefined, { shutdownTimeout: 10_000 })
-await server.listen(3000)
-
-process.once("SIGTERM", () => server.close())
-process.once("SIGINT",  () => server.close())
-```
-
-### Body size limits
-
-Orvaxis does not enforce its own body size limit. The ceiling is set entirely by the body-parsing layer of the underlying framework, **before** the request reaches the Orvaxis runtime.
-
-**Express** — body parsing is opt-in. Pass a `limit` to `express.json()` (default `"100kb"`):
-
-```ts
-import express from "express"
-import { createExpressServer } from "orvaxis/express"
-
-const server = express()
-server.use(express.json({ limit: "256kb" }))
-server.use(express.urlencoded({ limit: "256kb", extended: true }))
-
-const adapter = createExpressServer(app, server)
-```
-
-**Fastify** — the `bodyLimit` constructor option applies globally (default: `1048576` = 1 MB):
-
-```ts
-import Fastify from "fastify"
-import { createFastifyServer } from "orvaxis/fastify"
-
-const fastify = Fastify({ bodyLimit: 256 * 1024 })   // 256 KB
-
-const adapter = createFastifyServer(app, fastify)
-```
-
-**Custom adapters and `testRequest`** — neither enforces a body size limit. For custom adapters, implement the check at the stream level before forwarding the parsed body to `app.handle`. The `testRequest` helper is for unit tests where body size is controlled by the test author.
-
----
-
-### Error responses
-
-Every error response from the built-in adapters follows a standard `ErrorResponse` envelope:
-
-```ts
-import type { ErrorResponse } from "orvaxis"
-// { error: string; code?: string; requestId?: string; details?: unknown }
-```
-
-Fields populated on every response:
-
-| Field | Source | Always present |
-|---|---|---|
-| `error` | `sanitizeErrorMessage(err)` | yes |
-| `code` | `err.code` when set on `HttpError` | no |
-| `requestId` | request's `X-Request-ID` value | yes |
-| `details` | `err.details` when set on `HttpError` | no |
-
-Message sanitization depends on `NODE_ENV`:
-
-| Environment | Generic `Error` | `HttpError` |
-|---|---|---|
-| `production` | `"Internal Server Error"` | original message |
-| anything else | original message | original message |
-
-`HttpError` messages are always forwarded because they are intentional user-facing responses. All other error messages are hidden in production to avoid leaking internal details such as stack traces, file paths, or database error text.
-
-**This includes errors that never reach the Orvaxis runtime.** A malformed JSON body rejected by `express.json()`, or a request over Fastify's `bodyLimit`, happens in the underlying framework's own parsing layer, before Orvaxis's routing and policies ever run. Both adapters register a dedicated error handler for this case (a 4-arg middleware on Express, `fastify.setErrorHandler` on Fastify) so these responses go through the same `ErrorResponse` envelope and carry the same `requestId` — instead of Express's default HTML error page or Fastify's native `{ statusCode, code, error, message }` shape.
-
-The built-in router applies this rule to its own 404: outside production the message includes the unmatched path (`"Not Found: /api/users/42"`) to make debugging faster; in production it falls back to the generic `"Not Found"` to avoid reflecting user-controlled input in the response body.
-
-`buildErrorBody` and `sanitizeErrorMessage` are exported for custom adapters:
-
-```ts
-import { buildErrorBody } from "orvaxis"
-
-// in a custom adapter's catch block — produces the full ErrorResponse envelope:
-res.status(err.status ?? 500).json(buildErrorBody(err, requestId))
-```
-
-### Request ID
-
-Both adapters automatically assign a request ID on every request and return it in the `X-Request-ID` response header. The ID is also available as `ctx.req.id` throughout the entire execution lifecycle.
-
-Priority order for the ID value:
-
-1. `X-Request-ID` header from the incoming request — honours upstream propagation (API gateway, service mesh, distributed tracing)
-2. Fastify's native request ID (Fastify adapter only)
-3. `crypto.randomUUID()` — generated if none of the above is present
-
-```ts
-app.on("afterPipeline", (ctx) => {
-  console.log(ctx.req.id) // always defined — e.g. "550e8400-e29b-41d4-a716-446655440000"
-})
-```
-
-The header name is configurable via `requestIdHeader` on `AdapterOptions`, for stacks that use a different convention (`X-Correlation-ID`, `X-Trace-ID`, …). It applies to both reading the incoming header and setting the outgoing one — the default remains `X-Request-ID`:
-
-```ts
-const server = createExpressServer(app, undefined, { requestIdHeader: "X-Correlation-ID" })
-// same option name on createFastifyServer
-```
-
-`loggerPlugin` automatically includes the ID in every structured log:
-
-```
-{ type: "request", method: "GET", path: "/api/users", requestId: "550e8400-e29b-41d4-a716-446655440000" }
-{ type: "response", method: "GET", path: "/api/users", status: 200, durationMs: 8, requestId: "550e8400-e29b-41d4-a716-446655440000" }
-```
-
-### Streaming
-
-`ctx.res` exposes three methods for streaming responses:
-
-| Method | Behaviour |
-|--------|-----------|
-| `ctx.res.write(chunk)` | Sends a chunk to the client without closing the connection |
-| `ctx.res.end(chunk?)` | Sends an optional final chunk and closes the connection |
-| `ctx.res.pipe(stream)` | Pipes a `node:stream.Readable` directly to the response |
-
-```ts
-app.group({
-  prefix: "/api",
-  routes: [
-    {
-      method: "GET",
-      path: "/events",
-      handler: async (ctx) => {
-        ctx.res.setHeader("Content-Type", "text/event-stream")
-        ctx.res.setHeader("Cache-Control", "no-cache")
-
-        ctx.res.write("data: connected\n\n")
-
-        // send a few events then close
-        for (let i = 1; i <= 3; i++) {
-          ctx.res.write(`data: event ${i}\n\n`)
-        }
-
-        ctx.res.end()
-      },
-    },
-    {
-      method: "GET",
-      path: "/file/:name",
-      handler: async (ctx) => {
-        const { createReadStream } = await import("node:fs")
-        const stream = createReadStream(`/data/${ctx.meta.route!.params.name}`)
-        ctx.res.pipe(stream)
-      },
-    },
-  ],
-})
-```
-
-When using the built-in adapters, disable the default 30 s timeout for long-lived streaming connections:
-
-```ts
-const server = createExpressServer(app, undefined, { timeout: 0 })
-```
-
-For testing, `testRequest` captures all chunks in `result.chunks` and exposes `result.ended`, so streaming handlers do not require a live server.
-
-### Writing a custom adapter
-
-Any adapter needs to:
-1. Ensure `req.path` is a plain path string (no query string)
-2. Create an `AbortController`, attach its `signal` to the request, and pass the controller as the third argument to `withTimeout` so that in-flight work is cancelled when the deadline expires
-3. Enforce a body size limit at the stream level before forwarding the parsed body to `app.handle` — Orvaxis does not apply any limit of its own
-4. Call `app.handle(req, res)` (wrapped in `withTimeout` if a deadline is needed) and catch thrown errors, using `buildErrorBody(err, requestId)` to build the response body
-5. Return `{ listen(port, onListen?), close() }` to satisfy the `ServerAdapter` interface
-6. In `close()`, call `server.closeIdleConnections()` before `server.close()` to release idle keep-alive connections immediately, then set a `setTimeout(() => server.closeAllConnections(), shutdownTimeout)` deadline (default 10 s) that force-closes remaining connections if they do not drain in time; clear the timer in the close callback so it never fires when shutdown completes cleanly
+- [HTTP adapters](docs/guide/http-adapters.md) — query-string parsing differences, body size limits, the error response envelope, request IDs, custom adapters
+- [Timeouts and graceful shutdown](docs/guide/timeouts-and-shutdown.md) — per-request deadlines, `ctx.req.signal`, draining connections
+- [Streaming](docs/guide/streaming.md) — SSE, files and `pipe`
 
 ---
 
 ## Testing
 
-`testRequest` runs the full execution cycle — policies, pipeline, middleware, handler — against an `Orvaxis` instance, with no HTTP server required.
+`testRequest` runs the full lifecycle (policies, middleware, validation, handler) against an `Orvaxis` instance without starting a server, so tests exercise the runtime the adapters use:
 
 ```ts
-import { Orvaxis } from "orvaxis"
 import { testRequest } from "orvaxis/testing"
 
-const app = new Orvaxis()
-
-app.group({
-  prefix: "/api",
-  routes: [
-    {
-      method: "GET",
-      path: "/users/:id",
-      handler: async (ctx) => {
-        ctx.res.json({ id: ctx.meta.route?.params.id })
-      },
-    },
-  ],
-})
-
-// successful request
-const res = await testRequest(app, { path: "/api/users/42" })
-// res.status  → 200
-// res.body    → { id: "42" }
-// res.ctx     → full OrvaxisContext
-// res.error   → undefined
-
-// with query params
-const search = await testRequest(app, { path: "/api/users/42", query: { expand: "profile" } })
-// search.ctx.req.query → { expand: "profile" }
-
-// route not found
-const notFound = await testRequest(app, { path: "/api/missing" })
-// notFound.status  → 404
-// notFound.error   → Error("Not Found: /api/missing")  (path included outside production)
-
-// streaming handler
-const streamed = await testRequest(app, { path: "/api/stream" })
-// streamed.chunks  → ["chunk1", "chunk2"]   (written via ctx.res.write)
-// streamed.ended   → true                   (ctx.res.end was called)
+const result = await testRequest(app, { path: "/api/reports/alice", headers: { "x-user-id": "bob" } })
+// result.status === 403; result.ctx holds the trace for diagnostics
 ```
 
-`TestRequestInit` accepts `path`, `method` (defaults to `"GET"`), `headers`, `query`, `id`, and any additional field (e.g. `body`) which is forwarded directly onto `req`. `query` is typed as `Record<string, string | string[]>` and maps directly to `ctx.req.query` inside the handler: `testRequest` never throws — errors thrown during execution are captured in `result.error`, the request context remains available in `result.ctx`, and the error's `.status` property (if present) is reflected in `result.status`. Failed traces are finalized before `onError`, and `trace.events` contains bounded policy decisions according to the configured `policyTrace` mode. The error remains the original thrown error; `testRequest` does not build the HTTP `ErrorResponse` envelope produced by adapters. For streaming handlers, `result.chunks` holds all values passed to `ctx.res.write` and `ctx.res.end`, and `result.ended` is `true` when `ctx.res.end` was called.
-
-All testing utilities are available from the `orvaxis/testing` sub-path and are excluded from the production bundle:
-
-```ts
-import { testRequest, createMockResponse, type TestRequestInit, type TestResponse, type MockResponse } from "orvaxis/testing"
-```
-
-#### Permission matrices
-
-Use `testPolicyMatrix` to run role, identity, tenant, and ownership cases against real policy execution. Each scenario executes once through `testRequest`; the helper compares the HTTP status, terminal policy name, and whether the handler ran using the finalized request trace. It returns mismatches instead of throwing, so the complete report remains available on failure:
-
-```ts
-import { expect, it } from "vitest"
-import { formatPolicyMatrixReport, testPolicyMatrix } from "orvaxis/testing"
-
-it("enforces document permissions", async () => {
-  const report = await testPolicyMatrix(app, [
-    {
-      name: "anonymous request",
-      request: { path: "/api/documents/42" },
-      expected: { status: 401, policy: "authenticate", handlerExecuted: false },
-    },
-    {
-      name: "document owner",
-      request: { path: "/api/documents/42", headers: { "x-user": "alice" } },
-      expected: { status: 200, policy: null, handlerExecuted: true },
-    },
-  ])
-
-  expect(report.passed, formatPolicyMatrixReport(report)).toBe(true)
-})
-```
-
-For a complete anonymous/owner/other-user/other-tenant/admin example, run `pnpm exec tsx examples/policy-matrix.ts`. The report contains scenario names, status, policy, and handler reachability; it omits request headers and values. `ctx.meta.trace.handlerExecuted` records whether the runtime invoked the route handler, including when that handler throws.
-
-#### Static policy requirements for CI
-
-`checkPolicyRequirements` checks an inspected route inventory without executing policy predicates, evaluators, or handlers. Selectors use exact route templates or path globs: `*` matches one segment, and `**` matches zero or more trailing segments. Method filters and exceptions keep public endpoints explicit; every exception requires a reason. A selector matching no routes fails so a typo cannot pass vacuously.
-
-```ts
-import { expect, it } from "vitest"
-import { checkPolicyRequirements, formatPolicyRequirementReport } from "orvaxis/testing"
-
-it("keeps authentication on private endpoints", () => {
-  const report = checkPolicyRequirements(app.inspectRoutes(), [
-    {
-      name: "private API authentication",
-      paths: ["/api/private/**"],
-      methods: ["GET", "POST"],
-      requirePolicies: ["authenticate"],
-      exceptions: [
-        { path: "/api/private/health", methods: ["GET"], reason: "Public health probe" },
-      ],
-    },
-  ])
-
-  expect(report.passed, formatPolicyRequirementReport(report)).toBe(true)
-})
-```
-
-Each selected route is reported as `PASS`, `FAIL`, `UNVERIFIABLE`, or `EXCLUDED`. A required policy whose scope is conditional—such as a regex or predicate—is `UNVERIFIABLE` by default and does not fail the report; pass `{ failOnUnverifiable: true }` to make that strict in CI. Missing policies and selectors that match no routes always fail. The static check only verifies declared policy configuration; it cannot prove what an arbitrary `evaluate()` function does. Keep runtime permission cases in a separate `testPolicyMatrix` assertion. Run `pnpm exec tsx examples/policy-ci-check.ts` for both checks together.
-
-### Route introspection
-
-`app.routes()` returns the flat list of all registered routes as `RouteInfo[]`, useful for OpenAPI generation and admin tooling:
-
-```ts
-import { Orvaxis } from "orvaxis"
-import type { RouteInfo } from "orvaxis"
-
-const app = new Orvaxis()
-
-app.group({
-  prefix: "/api",
-  routes: [
-    { method: "GET",  path: "/users",     handler: async () => {} },
-    { method: "POST", path: "/users",     handler: async () => {} },
-    { method: "GET",  path: "/users/:id", handler: async () => {} },
-  ],
-})
-
-const routes: RouteInfo[] = app.routes()
-// [
-//   { method: "GET",  path: "/api/users",     prefix: "/api" },
-//   { method: "POST", path: "/api/users",     prefix: "/api" },
-//   { method: "GET",  path: "/api/users/:id", prefix: "/api" },
-// ]
-```
-
-For policy configuration, `app.inspectRoutes()` returns one static description per route with its inherited global, group, and route policies:
-
-```ts
-const inspected = app.inspectRoutes()
-const users = inspected.find((route) => route.path === "/api/users/:id")
-
-users?.policies.map(({ id, name, layer, phase, priority, order, applicability }) => ({
-  id,
-  name,
-  layer,
-  phase,
-  priority,
-  order,
-  applicability,
-}))
-```
-
-Policies are listed in runtime order: pre-validation global → group → route, then post-validation global → group → route. `id` distinguishes declarations even when names repeat; `nameAmbiguous` flags duplicate names across the endpoint's effective policy set. `applicability.status` is `always`, `never`, or `conditional`: string scopes are compared conservatively with the route template and method, while regexes, predicates, paths crossing route parameters or wildcards, and implicit GET-to-HEAD fallback stay conditional. The inspector never calls policy evaluators, handlers, or scope predicates. This is configuration metadata, not a prediction of the policy result or a security guarantee based on policy names. The existing `app.routes()` API and its `RouteInfo[]` result are unchanged.
+The [testing guide](docs/guide/testing.md) covers the response shape, permission matrices (`testPolicyMatrix`), static policy requirements for CI (`checkPolicyRequirements`) and route introspection (`app.inspectRoutes()`).
 
 ---
 
 ## Documentation
 
-See [Migrating from 0.3.1 to 0.4.0](docs/migration/next.md) for the released behavior changes.
+This README and the documentation site describe the `main` branch. The published package is 0.4.0; changes made since then are listed under *Unreleased* in the [changelog](CHANGELOG.md) and in [Unreleased changes](docs/migration/next.md), and marked as unreleased where they are documented. Upgrading from 0.3.1? See [Migrating from 0.3.1 to 0.4.0](docs/migration/0.3.1-to-0.4.0.md).
 
 Browse the [Orvaxis documentation site](https://maku85.github.io/orvaxis/) for the getting-started guide, navigable references, examples, and articles. The Markdown sources remain available below and in `docs/`.
 
 [Explore the recorded allow, deny, and handler-error traces](docs/demo/policy-traces.md) in the static documentation demo.
 
-- [Quickstart](#quickstart) — protect one route and see the allowed/denied result
+- [Get started](docs/guide/getting-started.md) — the quickstart as a guide: protect one route and see the allowed/denied result
 - [Add Orvaxis to an existing Express route](docs/guide/integrate-existing-route.md) — add policy checks without moving the handler
 - [Multi-tenant task demo](docs/guide/multi-tenant-demo.md) — runnable tenant, ownership, roles, traces, permission matrix, and CI checks
 - [Diagnose a 403](docs/guide/diagnose-403.md) — find the terminal policy and verify skipped stages
@@ -592,7 +198,8 @@ Browse the [Orvaxis documentation site](https://maku85.github.io/orvaxis/) for t
 - [Response contracts and OpenAPI](docs/reference/core-concepts.md#response-contracts-and-openapi) — validate outgoing values and generate API metadata
 - [Tracing and debugging](docs/reference/core-concepts.md#tracing-system) — lifecycle traces, custom events, and combined debug timelines
 - [Plugins and OpenTelemetry](docs/reference/core-concepts.md#plugins) — logging, validation, CORS, and optional span export
-- [Streaming](#streaming), [timeouts](#timeout), and [graceful shutdown](#graceful-shutdown) — request and connection lifecycle in the HTTP adapters
+- [HTTP adapters](docs/guide/http-adapters.md), [streaming](docs/guide/streaming.md), and [timeouts and graceful shutdown](docs/guide/timeouts-and-shutdown.md) — request and connection lifecycle in the HTTP adapters
+- [Testing](docs/guide/testing.md) — `testRequest`, permission matrices, static policy requirements and route introspection
 - [Diagnosing an API 403](docs/articles/diagnosing-a-403.md) — trace a denial to its terminal policy
 - [Tenant authorization](docs/articles/tenant-authorization.md) — separate tenant access, ownership, and roles
 - [Authorization requirements in CI](docs/articles/authorization-requirements-in-ci.md) — combine static route checks with permission tests

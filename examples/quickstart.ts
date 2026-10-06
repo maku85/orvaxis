@@ -1,14 +1,17 @@
+// #region imports
 import { createExpressServer } from "../express"
 import { Orvaxis, type Policy } from "../index"
 
+// #endregion
+
+// #region app
 const authenticate: Policy = {
   name: "authenticate-user",
   evaluate(ctx) {
     const userId = ctx.req.headers["x-user-id"]
-    if (typeof userId !== "string") {
-      return { allow: false, status: 401, reason: "X-User-ID header required" }
-    }
-    return { allow: true, modify: { userId } }
+    return typeof userId === "string"
+      ? { allow: true, modify: { userId } }
+      : { allow: false, status: 401, reason: "X-User-ID header required" }
   },
 }
 
@@ -34,8 +37,8 @@ app.group({
     },
   ],
 })
+// #endregion
 
-const port = Number(process.env.PORT ?? 3000)
-createExpressServer(app)
-  .listen(port)
-  .then(() => console.log(`Quickstart listening at http://localhost:${port}`))
+// #region serve
+createExpressServer(app).listen(3000)
+// #endregion

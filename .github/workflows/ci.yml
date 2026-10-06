@@ -41,6 +41,9 @@ jobs:
       - name: Type-check API examples
         run: pnpm typecheck:tests
 
+      - name: Documentation snippets match their examples
+        run: pnpm check:snippets
+
       - name: Type-check the Express adapter against Express 4 types
         run: pnpm typecheck:compat
 
@@ -69,3 +72,6 @@ jobs:
 
       - name: Verify the packed tarball in isolated consumers
         run: pnpm check:package
+
+      - name: Run the README quickstart in a clean project
+        run: pnpm check:quickstart

@@ -26,6 +26,8 @@ if (!report.passed) process.exitCode = 1
 
 Exact route templates and path globs select routes. A selector matching no routes fails, so a renamed route cannot silently escape the check. Every declared exception needs a reason. Conditional scopes are reported as unverifiable because static inspection does not call regular expressions or predicates; opt into `failOnUnverifiable` when those need to block CI.
 
+> **Unreleased.** `buildProtectionReport` and `diffProtectionReports` are on `main` only and are not in the published 0.4.0 package. `checkPolicyRequirements` below is available in 0.4.0.
+
 ## Review protection changes against a baseline
 
 Requirements fail on what you declared as mandatory. A protection report adds a different signal for reviewers: what changed. `buildProtectionReport(app.inspectRoutes())` returns deterministic JSON (method, full route template, and for each policy its name, layer, phase, scope and whether it `always`, `conditional`ly or `never` applies). It runs no handler, evaluator or scope predicate, and it omits declaration order, priority and indexes, so reordering policies does not change it. Regular expressions, predicates and path-dependent scopes appear as `conditional`; a listed policy is a declaration, not proof of correct authorization.

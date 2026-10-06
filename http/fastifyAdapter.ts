@@ -159,7 +159,7 @@ export function createFastifyServer(
       if (!listening) return
       const shutdownTimeout = options.shutdownTimeout ?? 10_000
       // Notify in-flight handlers (e.g. SSE loops) that shutdown has started, via the same
-      // ctx.req.signal already used for per-request timeouts — see README "Graceful shutdown".
+      // ctx.req.signal already used for per-request timeouts — see the "Timeouts and graceful shutdown" guide.
       for (const controller of activeControllers) controller.abort()
       fastify.server.closeIdleConnections()
       const deadline =
