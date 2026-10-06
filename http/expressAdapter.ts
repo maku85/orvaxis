@@ -6,6 +6,7 @@ import express, {
   type Response,
 } from "express"
 import type { Orvaxis } from "../core/Orvaxis.js"
+import { abandonRequest, isRequestAbandoned } from "../core/requestAbandoned.js"
 import type { OrvaxisRequest, OrvaxisResponse, ServerAdapter } from "../types/index.js"
 import { type AdapterOptions, buildErrorBody, withTimeout } from "./timeout.js"
 
@@ -77,6 +78,12 @@ export function createExpressServer(
       },
       id: { value: requestId, writable: true, configurable: true, enumerable: true },
       signal: { value: controller.signal, writable: true, configurable: true, enumerable: true },
+    })
+
+    // `close` fires once per response; the listener removes itself. A response that closed
+    // before finishing means the client went away.
+    res.once("close", () => {
+      if (!res.writableFinished) abandonRequest(controller, "disconnect")
     })
 
     let cancelTimer: (() => void) | undefined
@@ -194,7 +201,7 @@ export function createExpressPolicyGuard(
       signal: { value: controller.signal, writable: true, configurable: true, enumerable: true },
     })
 
-    const abort = () => controller.abort()
+    const abort = () => abandonRequest(controller, "disconnect")
     const cleanup = () => {
       req.off("aborted", abort)
       res.off("close", abort)
@@ -221,7 +228,7 @@ export function createExpressPolicyGuard(
     void pending
       .then((ctx) => {
         res.locals.orvaxis = ctx
-        if (!wrapped.sent) next()
+        if (!wrapped.sent && !isRequestAbandoned(controller.signal)) next()
       })
       .catch((err: unknown) => {
         if (res.headersSent || wrapped.sent) {

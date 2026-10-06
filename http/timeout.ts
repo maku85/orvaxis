@@ -1,4 +1,5 @@
 import { HttpError } from "../core/HttpError.js"
+import { abandonRequest } from "../core/requestAbandoned.js"
 import type { Logger } from "../types/index.js"
 
 export type AdapterOptions = {
@@ -46,7 +47,7 @@ export function withTimeout<T>(
     new Promise<never>((_, reject) => {
       // Promise executor runs synchronously — timer is set before onCancel fires
       timer = setTimeout(() => {
-        controller?.abort()
+        if (controller) abandonRequest(controller, "timeout")
         reject(new HttpError(408, "Request Timeout"))
       }, ms)
     }),

@@ -13,7 +13,8 @@ jobs:
 
     strategy:
       matrix:
-        node-version: ["22.13.0"]
+        # Declared minimum and the latest LTS line at the time of writing.
+        node-version: ["22.13.0", "24"]
 
     steps:
       - uses: actions/checkout@v4
@@ -40,6 +41,12 @@ jobs:
       - name: Type-check API examples
         run: pnpm typecheck:tests
 
+      - name: Type-check the Express adapter against Express 4 types
+        run: pnpm typecheck:compat
+
+      - name: HTTP adapter matrix (Express 4, Express 5, Fastify 5)
+        run: pnpm test:compat
+
       - name: Check multi-tenant demo policies and permission matrix
         run: pnpm check:tenant-demo
 
@@ -50,7 +57,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: route-protection-report
+          name: route-protection-report-node-${{ matrix.node-version }}
           path: protection-report/
           if-no-files-found: ignore
 

@@ -201,6 +201,8 @@ handler: async (ctx) => {
 }
 ```
 
+The same signal is aborted when the client disconnects before the response finishes. The runtime stops before its next stage (middleware, handler) for such a request instead of running work nobody will receive; the Express policy guard likewise does not call `next()`. Graceful shutdown aborts the signal too but lets requests already in progress run to completion.
+
 `ctx.req.signal` is always defined when using the built-in adapters. Pass it to `node:http` requests, database drivers (pg, mongodb, prisma), or any API that accepts an `AbortSignal` to stop work the client will never see. The same option is available on `createFastifyServer`.
 
 `withTimeout` and `AdapterOptions` are exported from the main entry point so custom adapters can reuse them:

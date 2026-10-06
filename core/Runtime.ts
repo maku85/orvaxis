@@ -23,6 +23,7 @@ import {
   type PolicyLayer,
 } from "./PolicyEngine.js"
 import { Router } from "./Router.js"
+import { isRequestAbandoned } from "./requestAbandoned.js"
 import { Tracer } from "./Tracer.js"
 import { validateRequest } from "./validation.js"
 
@@ -132,7 +133,7 @@ export class Runtime {
 
         await this.hooks.trigger("onRequest", ctx)
         this.debugger.log(ctx, "HOOK:onRequest")
-        if (ctx.res.sent) return await this.finishRequest(ctx, tracer)
+        if (this.isSettled(ctx)) return await this.finishRequest(ctx, tracer)
 
         const match = this.router.match(req)
         if (!match) {
@@ -189,7 +190,7 @@ export class Runtime {
         this.debugger.log(ctx, "POLICY_END")
 
         await this.hooks.trigger("beforePipeline", ctx)
-        if (ctx.res.sent) return await this.finishRequest(ctx, tracer)
+        if (this.isSettled(ctx)) return await this.finishRequest(ctx, tracer)
         const pipelineContinues = await this.pipeline.execute(ctx)
         this.debugger.log(ctx, "PIPELINE_DONE")
         if (!pipelineContinues) return await this.finishRequest(ctx, tracer)
@@ -204,7 +205,7 @@ export class Runtime {
 
         await this.hooks.trigger("onValidation", ctx)
         this.debugger.log(ctx, "HOOK:onValidation")
-        if (ctx.res.sent) return await this.finishRequest(ctx, tracer)
+        if (this.isSettled(ctx)) return await this.finishRequest(ctx, tracer)
 
         await this.policies.evaluate(ctx, "postValidation", {
           layer: "global",
@@ -216,7 +217,7 @@ export class Runtime {
 
         await this.hooks.trigger("beforeHandler", ctx)
         this.debugger.log(ctx, "HOOK:beforeHandler")
-        if (ctx.res.sent) return await this.finishRequest(ctx, tracer)
+        if (this.isSettled(ctx)) return await this.finishRequest(ctx, tracer)
         tracer.markHandlerExecuted()
         await match.route.handler(ctx)
         this.debugger.log(ctx, "HANDLER_EXECUTED")
@@ -313,6 +314,11 @@ export class Runtime {
         throw err
       }
     })
+  }
+
+  /** A response is already out, or the adapter gave up on the request (timeout, disconnect). */
+  private isSettled(ctx: OrvaxisContext): boolean {
+    return ctx.res.sent || isRequestAbandoned(ctx.req.signal)
   }
 
   private async finishRequest(ctx: OrvaxisContext, tracer: Tracer): Promise<OrvaxisContext> {

@@ -68,7 +68,18 @@ pnpm test:coverage    # check coverage (target: >90%)
 pnpm exec tsx examples/quickstart.ts  # run the documented Express quickstart
 ```
 
-Coverage is tracked via v8. Regressions in coverage require justification.
+Coverage is tracked via v8 over `core`, `debug`, `http`, `middleware`, `openapi` and `plugins`. The global floor is 90% lines and 80% branches; `http/**` (adapters) and `openapi/**` have their own floors in `vitest.config.ts` because their failures cross a process boundary. Regressions in coverage require justification.
+
+### Compatibility matrix
+
+```bash
+pnpm test:compat       # adapter tests per target: Express 4, Express 5, Fastify 5
+pnpm typecheck:compat  # Express adapter compiled against @types/express 4
+```
+
+`test:compat` aliases the `express` import to the `express4` / `express5` dev dependencies and runs `tests/httpAdapters.test.ts` (real sockets) plus the adapter suites; Fastify runs against the installed `fastify` 5. Express runtime and types are separate: the default type-check uses `@types/express` 5 and `typecheck:compat` uses `@types/express` 4. CI runs both on Node 22.13.0 (declared minimum) and Node 24 (latest LTS when this was written).
+
+Not covered, on purpose: the lowest declared peer versions (Express 4.20.0, Fastify 5.0.0) — the matrix uses the latest of each declared major; other Node versions; the Express guard has no Fastify counterpart.
 
 ## Submitting a pull request
 

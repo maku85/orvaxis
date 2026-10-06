@@ -1,5 +1,6 @@
 import Fastify, { type FastifyReply } from "fastify"
 import type { Orvaxis } from "../core/Orvaxis.js"
+import { abandonRequest } from "../core/requestAbandoned.js"
 import type { OrvaxisRequest, OrvaxisResponse, ServerAdapter } from "../types/index.js"
 import { type AdapterOptions, buildErrorBody, withTimeout } from "./timeout.js"
 
@@ -87,6 +88,12 @@ export function createFastifyServer(
       id: { value: requestId, writable: true, configurable: true, enumerable: true },
       signal: { value: controller.signal, writable: true, configurable: true, enumerable: true },
     })
+    // `close` fires once per response; the listener removes itself. A response that closed
+    // before finishing means the client went away.
+    reply.raw.once("close", () => {
+      if (!reply.raw.writableFinished) abandonRequest(controller, "disconnect")
+    })
+
     let cancelTimer: (() => void) | undefined
     const wrapped = wrapFastifyResponse(reply, () => cancelTimer?.())
     wrapped.setHeader(requestIdHeader, requestId)
