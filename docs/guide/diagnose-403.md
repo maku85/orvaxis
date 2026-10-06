@@ -35,6 +35,6 @@ Run the complete working demo from the repository checkout:
 pnpm exec tsx examples/policy-diagnostics.ts
 ```
 
-It prints allowed, denied, and handler-error summaries. To verify permission behavior as well as inspect it, run `pnpm exec tsx examples/policy-matrix.ts`; each scenario asserts the expected status, terminal policy, and whether the handler ran.
+It prints six scenarios: allowed, denied, policy evaluation error, validation failure, handler error, and a truncated trace. Pass a scenario id (`pnpm exec tsx examples/policy-diagnostics.ts policy-error`) for one of them plus its JSON request report; the [interactive demo](/demo/policy-traces) lists every id and command. To verify permission behavior as well as inspect it, run `pnpm exec tsx examples/policy-matrix.ts`; each scenario asserts the expected status, terminal policy, and whether the handler ran.
 
 If the wrong policy is terminal, check the declarations in execution order: global, group, then route; within a layer, higher priority runs first. Confirm that a scoped policy matches the request method and path, and that a post-validation policy declares `requires` fields with matching route schemas and `schemaValidationPlugin` installed. `app.inspectRoutes()` helps check which policies are attached to a route without executing policy code. See [policy and lifecycle reference](../reference/lifecycle.md) for ordering details.

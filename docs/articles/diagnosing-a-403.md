@@ -11,7 +11,7 @@ pnpm install
 pnpm exec tsx examples/policy-diagnostics.ts
 ```
 
-The denied case produces a sanitized summary. The [interactive trace demo](/demo/policy-traces) shows that runtime-generated output and the matching allowed and handler-error cases.
+The denied case produces a sanitized summary. The [interactive trace demo](/demo/policy-traces) shows that runtime-generated output next to the cases that look similar from outside: a policy error, a validation failure, a handler error and a truncated trace.
 
 `formatExecutionSummary()` formats decisions already captured by the runtime. It does not call policy code a second time, and its default output omits request values and free-form denial reasons. A maintainer can see that `document-owner` denied this request before any middleware or handler ran.
 

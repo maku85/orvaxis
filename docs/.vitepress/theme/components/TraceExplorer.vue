@@ -1,57 +1,111 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue"
+import { computed, onMounted, ref, watch } from "vue"
+import type { PolicyDiagnosticSnapshot } from "../../../../examples/policy-diagnostics-types"
 
-type PolicyDecision = {
-  policy: string
-  layer: string
-  phase: string
-  outcome: string
-  terminal: boolean
-}
+type Scenario = PolicyDiagnosticSnapshot
 
-type PolicyScenario = {
-  id: string
-  label: string
-  description: string
-  method: string
-  route: string
-  status: number
-  outcome: "completed" | "denied" | "error"
-  terminalPolicy: string | null
-  handlerExecuted: boolean
-  decisions: PolicyDecision[]
-  notReachedStages: string[]
-  formattedSummary: string
-}
+const REPO = "https://github.com/maku85/orvaxis/blob/main/"
+const identityOrder = ["anonymous", "alice", "bob", "maya", "admin"]
+const resourceOrder = ["task-1", "task-2", "task-3", "overview"]
 
-const scenarios = ref<PolicyScenario[]>([])
-const selectedId = ref("denied")
+const scenarios = ref<Scenario[]>([])
 const loadingError = ref(false)
-const selectedScenario = computed(
-  () => scenarios.value.find((scenario) => scenario.id === selectedId.value) ?? scenarios.value[0]
+const group = ref<"basics" | "tenant">("basics")
+const basicId = ref("denied")
+const identity = ref("bob")
+const resource = ref("task-1")
+const copied = ref("")
+
+const basics = computed(() => scenarios.value.filter((scenario) => scenario.group === "basics"))
+const tenant = computed(() => scenarios.value.filter((scenario) => scenario.group === "tenant"))
+const tenantById = computed(() => new Map(tenant.value.map((scenario) => [scenario.id, scenario])))
+
+const identities = computed(() =>
+  identityOrder
+    .map((id) => ({ id, label: tenantById.value.get(`tenant:${id}:task-1`)?.identity?.label ?? "No API key" }))
+    .filter((entry) => tenantById.value.has(`tenant:${entry.id}:task-1`))
 )
+const resources = computed(() =>
+  resourceOrder
+    .map((id) => ({ id, label: tenantById.value.get(`tenant:anonymous:${id}`)?.label.split(" → ")[1] ?? id }))
+    .filter((entry) => tenantById.value.has(`tenant:anonymous:${entry.id}`))
+)
+
+const selected = computed<Scenario | undefined>(() =>
+  group.value === "basics"
+    ? (basics.value.find((scenario) => scenario.id === basicId.value) ?? basics.value[0])
+    : (tenantById.value.get(`tenant:${identity.value}:${resource.value}`) ?? tenant.value[0])
+)
+
+const outcomeLabel = (scenario: Scenario) =>
+  scenario.id === "validation-failed"
+    ? "Validation failed"
+    : scenario.report.terminalDecision.state === "recorded" && scenario.report.terminalDecision.kind === "error"
+      ? "Policy error"
+      : scenario.outcome === "denied"
+        ? "Denied"
+        : scenario.outcome === "completed"
+          ? "Allowed"
+          : "Error"
+const outcomeGlyph = (scenario: Scenario) =>
+  scenario.outcome === "completed" ? "✓" : scenario.outcome === "denied" ? "✕" : "!"
+const decisionGlyph = (outcome: string) =>
+  ({ allow: "✓", deny: "✕", error: "!", skipped: "–" })[outcome] ?? "?"
+
+const terminalText = (scenario: Scenario) => {
+  const terminal = scenario.report.terminalDecision
+  if (terminal.state === "recorded") {
+    const where = `${terminal.layer} · ${terminal.phase}${terminal.policyId ? ` · ${terminal.policyId}` : ""}`
+    return `${terminal.policy} (${terminal.kind === "deny" ? "denied" : "evaluation error"}; ${where})`
+  }
+  return terminal.state === "none" ? "None — no policy stopped the request" : "Unknown"
+}
+
+const traceText = (scenario: Scenario) => {
+  const trace = scenario.report.trace
+  const state = trace.truncated
+    ? `truncated: ${trace.droppedDecisions} decision${trace.droppedDecisions === 1 ? "" : "s"} not recorded (limit ${trace.maxEvents})`
+    : "complete"
+  return `${trace.recordedDecisions} recorded, ${state}`
+}
+
+async function copy(text: string, key: string) {
+  try {
+    await navigator.clipboard.writeText(text)
+    copied.value = key
+  } catch {
+    copied.value = ""
+  }
+}
+watch([group, basicId, identity, resource], () => {
+  copied.value = ""
+})
 
 onMounted(async () => {
   try {
     const response = await fetch(`${import.meta.env.BASE_URL}demo/policy-scenarios.json`)
     if (!response.ok) throw new Error("Scenario data is unavailable")
-    scenarios.value = (await response.json()) as PolicyScenario[]
+    scenarios.value = (await response.json()) as Scenario[]
   } catch {
     loadingError.value = true
   }
 })
+
+const cellText = (id: string) => {
+  const scenario = tenantById.value.get(id)
+  return scenario ? `${outcomeGlyph(scenario)} ${scenario.status}` : ""
+}
 </script>
 
 <template>
   <section class="trace-explorer" aria-labelledby="trace-explorer-title">
-    <div class="trace-controls">
-      <label for="trace-scenario">Choose a recorded request</label>
-      <select id="trace-scenario" v-model="selectedId" :disabled="scenarios.length === 0">
-        <option v-for="scenario in scenarios" :key="scenario.id" :value="scenario.id">
-          {{ scenario.label }} · {{ scenario.method }} {{ scenario.route }}
-        </option>
-      </select>
-    </div>
+    <h2 id="trace-explorer-title" class="visually-hidden">Recorded request explorer</h2>
+
+    <fieldset class="trace-groups">
+      <legend>Scenario set</legend>
+      <label><input v-model="group" type="radio" value="basics" /> Single-purpose scenarios</label>
+      <label><input v-model="group" type="radio" value="tenant" /> Multi-tenant fixtures</label>
+    </fieldset>
 
     <p v-if="loadingError" class="trace-error" role="alert">
       The recorded trace file could not be loaded. Build the site with <code>pnpm docs:build</code>
@@ -61,41 +115,111 @@ onMounted(async () => {
       Loading recorded traces…
     </p>
 
-    <template v-if="selectedScenario">
-      <div class="trace-result">
+    <div v-if="group === 'basics' && basics.length > 0" class="trace-controls">
+      <label for="trace-scenario">Recorded request</label>
+      <select id="trace-scenario" v-model="basicId">
+        <option v-for="scenario in basics" :key="scenario.id" :value="scenario.id">
+          {{ scenario.label }}
+        </option>
+      </select>
+    </div>
+
+    <template v-if="group === 'tenant' && tenant.length > 0">
+      <p class="trace-note">
+        Demonstration tenants, roles and tasks from <code>examples/tenant-tasks.ts</code>. The
+        selectors choose between results generated from those fixtures when the site was built;
+        no backend is simulated and nothing is evaluated in your browser.
+      </p>
+      <div class="trace-controls trace-controls-pair">
         <div>
-          <p class="trace-eyebrow">{{ selectedScenario.method }} {{ selectedScenario.route }}</p>
-          <h2 id="trace-explorer-title">{{ selectedScenario.label }}</h2>
-          <p>{{ selectedScenario.description }}</p>
+          <label for="trace-identity">Who is asking</label>
+          <select id="trace-identity" v-model="identity">
+            <option v-for="entry in identities" :key="entry.id" :value="entry.id">{{ entry.label }}</option>
+          </select>
         </div>
-        <div
-          class="trace-status"
-          :class="`is-${selectedScenario.outcome}`"
-          :aria-label="`${selectedScenario.outcome}, HTTP ${selectedScenario.status}`"
-        >
-          <strong>{{ selectedScenario.status }}</strong>
-          <span>{{ selectedScenario.outcome }}</span>
+        <div>
+          <label for="trace-resource">What they ask for</label>
+          <select id="trace-resource" v-model="resource">
+            <option v-for="entry in resources" :key="entry.id" :value="entry.id">{{ entry.label }}</option>
+          </select>
         </div>
       </div>
 
+      <table class="trace-matrix">
+        <caption>
+          All combinations: symbol and HTTP status (✓ allowed, ✕ denied, ! error). Select a cell to
+          show its trace.
+        </caption>
+        <thead>
+          <tr>
+            <th scope="col">Identity</th>
+            <th v-for="entry in resources" :key="entry.id" scope="col">{{ entry.label }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="row in identities" :key="row.id">
+            <th scope="row">{{ row.label }}</th>
+            <td v-for="column in resources" :key="column.id">
+              <button
+                type="button"
+                :aria-pressed="identity === row.id && resource === column.id"
+                :aria-label="`${row.label}, ${column.label}: ${cellText(`tenant:${row.id}:${column.id}`)}`"
+                @click="(identity = row.id), (resource = column.id)"
+              >
+                {{ cellText(`tenant:${row.id}:${column.id}`) }}
+              </button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </template>
+
+    <div v-if="selected" class="trace-live" aria-live="polite">
+      <div class="trace-result">
+        <div>
+          <p class="trace-eyebrow">{{ selected.method }} {{ selected.route }}</p>
+          <h3>{{ selected.label }}</h3>
+          <p>{{ selected.description }}</p>
+        </div>
+        <div class="trace-status" :class="`is-${selected.outcome}`">
+          <strong><span aria-hidden="true">{{ outcomeGlyph(selected) }}</span> {{ selected.status }}</strong>
+          <span>{{ outcomeLabel(selected) }}</span>
+        </div>
+      </div>
+
+      <p class="trace-explanation">{{ selected.explanation }}</p>
+
       <dl class="trace-facts">
         <div>
-          <dt>Terminal policy</dt>
-          <dd>{{ selectedScenario.terminalPolicy ?? "None — policies allowed the request" }}</dd>
+          <dt>Route</dt>
+          <dd>{{ selected.report.route?.method }} {{ selected.report.route?.template }}</dd>
+        </div>
+        <div>
+          <dt>Terminal decision</dt>
+          <dd>{{ terminalText(selected) }}</dd>
         </div>
         <div>
           <dt>Route handler</dt>
-          <dd>{{ selectedScenario.handlerExecuted ? "Executed" : "Skipped" }}</dd>
+          <dd>{{ selected.report.handler === "executed" ? "Executed" : selected.report.handler === "not-executed" ? "Not executed" : "Unknown" }}</dd>
+        </div>
+        <div>
+          <dt>Policy trace</dt>
+          <dd>{{ traceText(selected) }}</dd>
+        </div>
+        <div v-if="selected.identity">
+          <dt>Fixture identity</dt>
+          <dd>{{ selected.identity.userId }} · {{ selected.identity.role }} · tenant {{ selected.identity.tenantId }}</dd>
         </div>
       </dl>
 
       <div class="trace-decisions">
-        <h3>Policy decisions</h3>
-        <ol v-if="selectedScenario.decisions.length > 0">
-          <li v-for="(decision, index) in selectedScenario.decisions" :key="`${decision.policy}-${index}`">
-            <span class="decision-location">{{ decision.layer }} · {{ decision.phase }}</span>
+        <h4>Policy decisions</h4>
+        <ol v-if="selected.decisions.length > 0">
+          <li v-for="(decision, index) in selected.decisions" :key="`${decision.policy}-${index}`">
+            <span class="decision-location">{{ decision.layer }} · {{ decision.phase }}<template v-if="decision.policyId"> · {{ decision.policyId }}</template></span>
             <strong>{{ decision.policy }}</strong>
             <span class="decision-outcome" :class="`is-${decision.outcome}`">
+              <span aria-hidden="true">{{ decisionGlyph(decision.outcome) }}</span>
               {{ decision.outcome }}<template v-if="decision.terminal"> · terminal</template>
             </span>
           </li>
@@ -103,16 +227,43 @@ onMounted(async () => {
         <p v-else>No policy decision was recorded for this request.</p>
       </div>
 
-      <details v-if="selectedScenario.notReachedStages.length > 0" class="trace-skipped">
+      <details v-if="selected.notReachedStages.length > 0" class="trace-skipped">
         <summary>Stages not reached</summary>
-        <p>{{ selectedScenario.notReachedStages.join(" → ") }}</p>
+        <p>{{ selected.notReachedStages.join(" → ") }}</p>
       </details>
 
       <details class="trace-output">
         <summary>Sanitized diagnostic output</summary>
-        <pre>{{ selectedScenario.formattedSummary }}</pre>
+        <pre>{{ selected.formattedSummary }}</pre>
       </details>
-    </template>
+
+      <div class="trace-reproduce">
+        <h4>Reproduce it locally</h4>
+        <p>From a repository checkout (<code>pnpm install</code> first):</p>
+        <div class="trace-command">
+          <pre><code>{{ selected.command }}</code></pre>
+          <button type="button" @click="copy(selected.command, 'command')">
+            {{ copied === "command" ? "Copied" : "Copy" }}<span class="visually-hidden"> command</span>
+          </button>
+        </div>
+        <template v-if="selected.curl">
+          <p>
+            Or against the running demo server (<code>pnpm exec tsx examples/tenant-tasks-server.ts</code>,
+            demonstration key only):
+          </p>
+          <div class="trace-command">
+            <pre><code>{{ selected.curl }}</code></pre>
+            <button type="button" @click="copy(selected.curl, 'curl')">
+              {{ copied === "curl" ? "Copied" : "Copy" }}<span class="visually-hidden"> curl command</span>
+            </button>
+          </div>
+        </template>
+        <p class="trace-links">
+          Source: <a :href="`${REPO}${selected.source}`">{{ selected.source }}</a> · Test:
+          <a :href="`${REPO}${selected.test}`">{{ selected.test }}</a>
+        </p>
+      </div>
+    </div>
 
     <p class="trace-disclaimer">
       Pre-recorded data generated from the real Orvaxis runtime during the site build. Selecting a
@@ -130,17 +281,61 @@ onMounted(async () => {
   background: var(--vp-c-bg-soft);
 }
 
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.trace-groups {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.5rem;
+  margin: 0 0 1rem;
+  border: 0;
+  padding: 0;
+}
+
+.trace-groups legend,
+.trace-controls label,
+.trace-facts dt {
+  color: var(--vp-c-text-2);
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.trace-groups label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-height: 2.75rem;
+  color: var(--vp-c-text-1);
+  font-size: 0.95rem;
+  font-weight: 500;
+}
+
+.trace-groups legend {
+  margin-bottom: 0.25rem;
+}
+
 .trace-controls {
   display: grid;
   gap: 0.45rem;
   max-width: 32rem;
 }
 
-.trace-controls label,
-.trace-facts dt {
-  color: var(--vp-c-text-2);
-  font-size: 0.875rem;
-  font-weight: 600;
+.trace-controls-pair {
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  max-width: none;
+  gap: 0.75rem;
+}
+
+.trace-controls-pair > div {
+  display: grid;
+  gap: 0.45rem;
 }
 
 .trace-controls select {
@@ -154,6 +349,53 @@ onMounted(async () => {
   font: inherit;
 }
 
+.trace-note {
+  margin: 0 0 0.75rem;
+  color: var(--vp-c-text-2);
+  font-size: 0.9rem;
+}
+
+.trace-matrix {
+  display: block;
+  overflow-x: auto;
+  margin: 1rem 0;
+  font-size: 0.85rem;
+}
+
+.trace-matrix caption {
+  caption-side: top;
+  padding-bottom: 0.5rem;
+  color: var(--vp-c-text-2);
+  text-align: left;
+}
+
+.trace-matrix th,
+.trace-matrix td {
+  padding: 0.25rem 0.4rem;
+  white-space: nowrap;
+}
+
+.trace-matrix button {
+  min-width: 4rem;
+  min-height: 2.75rem;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 6px;
+  color: var(--vp-c-text-1);
+  background: var(--vp-c-bg);
+  font: inherit;
+  cursor: pointer;
+}
+
+.trace-matrix button[aria-pressed="true"] {
+  border: 2px solid var(--vp-c-brand-1);
+  font-weight: 700;
+}
+
+.trace-explorer :is(select, input, button, summary, a):focus-visible {
+  outline: 2px solid var(--vp-c-brand-1);
+  outline-offset: 2px;
+}
+
 .trace-result {
   display: flex;
   align-items: flex-start;
@@ -162,7 +404,7 @@ onMounted(async () => {
   margin-top: 1.5rem;
 }
 
-.trace-result h2 {
+.trace-result h3 {
   margin: 0.25rem 0;
   border: 0;
   padding: 0;
@@ -171,6 +413,12 @@ onMounted(async () => {
 
 .trace-result p {
   margin: 0.4rem 0;
+}
+
+.trace-explanation {
+  margin: 0.75rem 0 0;
+  border-left: 3px solid var(--vp-c-brand-1);
+  padding-left: 0.75rem;
 }
 
 .trace-eyebrow,
@@ -183,13 +431,13 @@ onMounted(async () => {
 .trace-status {
   display: grid;
   flex: 0 0 auto;
-  min-width: 5rem;
+  min-width: 6rem;
   justify-items: center;
-  border: 1px solid var(--vp-c-divider);
+  border: 2px solid currentColor;
   border-radius: 10px;
   padding: 0.5rem 0.75rem;
   background: var(--vp-c-bg);
-  text-transform: capitalize;
+  text-align: center;
 }
 
 .trace-status strong {
@@ -197,7 +445,8 @@ onMounted(async () => {
 }
 
 .trace-status span {
-  font-size: 0.75rem;
+  font-size: 0.8rem;
+  font-weight: 600;
 }
 
 .is-completed,
@@ -235,8 +484,9 @@ onMounted(async () => {
   font-weight: 600;
 }
 
-.trace-decisions h3 {
-  margin-bottom: 0.5rem;
+.trace-decisions h4,
+.trace-reproduce h4 {
+  margin: 0 0 0.5rem;
   font-size: 1rem;
 }
 
@@ -267,7 +517,8 @@ onMounted(async () => {
 }
 
 .trace-skipped,
-.trace-output {
+.trace-output,
+.trace-reproduce {
   margin-top: 0.75rem;
   border-top: 1px solid var(--vp-c-divider);
   padding-top: 0.75rem;
@@ -275,6 +526,7 @@ onMounted(async () => {
 
 .trace-skipped summary,
 .trace-output summary {
+  min-height: 2.75rem;
   cursor: pointer;
   font-weight: 600;
 }
@@ -291,6 +543,41 @@ onMounted(async () => {
   margin-bottom: 0;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+}
+
+.trace-command {
+  display: flex;
+  align-items: stretch;
+  gap: 0.5rem;
+  margin: 0.4rem 0 0.75rem;
+}
+
+.trace-command pre {
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+  margin: 0;
+  border-radius: 8px;
+  padding: 0.6rem 0.75rem;
+  background: var(--vp-c-bg);
+  font-size: 0.8rem;
+}
+
+.trace-command button {
+  min-width: 4.5rem;
+  min-height: 2.75rem;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 8px;
+  color: var(--vp-c-text-1);
+  background: var(--vp-c-bg);
+  font: inherit;
+  cursor: pointer;
+}
+
+.trace-links {
+  margin: 0.25rem 0 0;
+  overflow-wrap: anywhere;
+  font-size: 0.85rem;
 }
 
 .trace-disclaimer,
@@ -311,7 +598,12 @@ onMounted(async () => {
   }
 
   .trace-result {
-    align-items: center;
+    flex-direction: column-reverse;
+    align-items: stretch;
+  }
+
+  .trace-status {
+    justify-self: start;
   }
 
   .trace-decisions li {
@@ -320,6 +612,10 @@ onMounted(async () => {
 
   .decision-location {
     grid-column: 1 / -1;
+  }
+
+  .trace-command {
+    flex-direction: column;
   }
 }
 </style>
