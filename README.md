@@ -148,7 +148,7 @@ Two adapters are included out of the box:
 | Express | `createExpressServer` from `orvaxis/express` | `express ^4.20 \|\| ^5` |
 | Fastify | `createFastifyServer` from `orvaxis/fastify` | `fastify ^5` |
 
-Install only the framework you intend to use — both peer dependencies are optional. Each adapter lives on its own subpath (`orvaxis/express`, `orvaxis/fastify`) precisely so that importing the main `orvaxis` entry point never requires either peer dependency to be installed.
+Install only the framework you intend to use — both peer dependencies are optional. Each adapter lives on its own subpath (`orvaxis/express`, `orvaxis/fastify`) precisely so that importing the main `orvaxis` entry point never requires either peer dependency to be installed. Importing `orvaxis/express`, `orvaxis/fastify` or `orvaxis/otel` without its peer (`express`, `fastify`, `@opentelemetry/api`) fails immediately with a module-not-found error that names the missing package; `orvaxis`, `orvaxis/testing` and `orvaxis/openapi` never need a peer.
 
 Both full-runtime adapters mount Orvaxis as a catch-all handler and delegate routing, lifecycle hooks, and declared validation to the Orvaxis runtime. Express routes within that mount are handled by Orvaxis's router. With Fastify, those endpoints use Orvaxis routing and validation instead of Fastify's native route trie and compiled schema validation. Choose the adapter for the HTTP transport and surrounding framework integrations; benchmark your application before drawing performance conclusions.
 

@@ -67,5 +67,5 @@ jobs:
       - name: Build package
         run: pnpm build
 
-      - name: Verify package imports and declarations without optional peers
+      - name: Verify the packed tarball in isolated consumers
         run: pnpm check:package

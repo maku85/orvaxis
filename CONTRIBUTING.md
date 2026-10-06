@@ -70,6 +70,15 @@ pnpm exec tsx examples/quickstart.ts  # run the documented Express quickstart
 
 Coverage is tracked via v8 over `core`, `debug`, `http`, `middleware`, `openapi` and `plugins`. The global floor is 90% lines and 80% branches; `http/**` (adapters) and `openapi/**` have their own floors in `vitest.config.ts` because their failures cross a process boundary. Regressions in coverage require justification.
 
+### Package check
+
+```bash
+pnpm build && pnpm check:package            # full check; installs peers from the npm registry
+pnpm build && node scripts/check-package.mjs --no-peers   # tarball + peer-less consumer only
+```
+
+`check:package` runs `npm pack` and inspects the tarball (only `dist/` plus `package.json`, `README.md`, `LICENSE`; no sources or tests; every file named by `main`, `types` and `exports` present; size and file-count budgets). It then installs *only that tarball* into temporary consumers outside the repository: one without peers (core, testing and OpenAPI work; the integration subpaths must fail naming the missing peer), one with Express 4, and one with Express 5, Fastify 5 and OpenTelemetry. Each consumer runs a CJS script, an ESM script and a NodeNext type-check for every subpath, and all temporary directories are removed even on failure. CI, `prepublishOnly` and `scripts/release.sh` run it. Adding a subpath to `exports` makes the check fail until it is exercised in `scripts/check-package.mjs`.
+
 ### Compatibility matrix
 
 ```bash
