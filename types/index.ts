@@ -97,7 +97,11 @@ export type RouteInfo = {
 }
 
 export type PolicyInspection = {
-  /** Stable within the inspected route and distinct even when names are duplicated. */
+  /**
+   * Declaration identity: layer plus zero-based position in that layer's declaration array.
+   * Unique within the inspected route, independent of names, and equal to the `policyId` recorded
+   * in the runtime trace. It is not unique across routes.
+   */
   id: string
   name: string
   nameAmbiguous: boolean

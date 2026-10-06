@@ -264,6 +264,65 @@ describe("policy decision tracing", () => {
     expect(buildExecutionSummary(offResult.ctx).policyDecisions).toHaveLength(0)
   })
 
+  it("links decisions to the inspector's declaration IDs with duplicate and reused policies", async () => {
+    const shared = { name: "shared", evaluate: () => ({ allow: true }) }
+    const app = new Orvaxis()
+    app.policy(shared)
+    app.policy({ name: "shared", priority: 5, evaluate: () => ({ allow: true }) })
+    app.group({
+      prefix: "/a",
+      policies: [shared, { name: "shared", priority: 5, evaluate: () => ({ allow: true }) }],
+      routes: [
+        {
+          method: "GET",
+          path: "/x",
+          policies: [
+            { name: "shared", evaluate: () => ({ allow: true }) },
+            { name: "shared", priority: 1, evaluate: () => ({ allow: false }) },
+          ],
+          handler: () => {},
+        },
+      ],
+    })
+    app.group({
+      prefix: "/b",
+      policies: [shared],
+      routes: [{ method: "GET", path: "/x", handler: () => {} }],
+    })
+
+    const denied = await testRequest(app, { path: "/a/x" })
+    if (!denied.ctx) throw new Error("expected a request context")
+    const decisions = buildExecutionSummary(denied.ctx).policyDecisions.map((event) => event.meta)
+    expect(
+      decisions.map((meta) => [meta?.layer, meta?.policyId, meta?.declarationIndex, meta?.order])
+    ).toEqual([
+      ["global", "global:1", 1, 1],
+      ["global", "global:0", 0, 2],
+      ["group", "group:1", 1, 1],
+      ["group", "group:0", 0, 2],
+      ["route", "route:1", 1, 1],
+    ])
+    expect(decisions.every((meta) => meta?.policy === "shared")).toBe(true)
+    const terminal = buildExecutionSummary(denied.ctx).stoppedByPolicy?.meta
+    expect(terminal).toMatchObject({ policyId: "route:1", outcome: "deny" })
+    expect(formatExecutionSummary(denied.ctx)).toContain("Stopped by: shared (route:1)")
+
+    const inspected = app.inspectRoutes().find((route) => route.path === "/a/x")
+    const inspectedIds = inspected?.policies.map(
+      (policy) => `${policy.layer}.${policy.id}.${policy.order}`
+    )
+    // The request stopped at route:1, so the inspector lists one more (unreached) policy.
+    expect(inspectedIds?.slice(0, decisions.length)).toEqual(
+      decisions.map((meta) => `${meta?.layer}.${meta?.policyId}.${meta?.order}`)
+    )
+
+    const other = await testRequest(app, { path: "/b/x" })
+    if (!other.ctx) throw new Error("expected a request context")
+    expect(
+      buildExecutionSummary(other.ctx).policyDecisions.map((event) => event.meta?.policyId)
+    ).toEqual(["global:1", "global:0", "group:0"])
+  })
+
   it("forwards policy decision events to the request OpenTelemetry span", async () => {
     const addEvent = vi.fn()
     const span = {

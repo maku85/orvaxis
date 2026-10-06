@@ -23,7 +23,7 @@ GET /api/documents/:id
 Outcome: denied (403)
 Policy decisions:
   [route.preValidation #1] document-owner: deny, terminal
-Stopped by: document-owner
+Stopped by: document-owner (route:0)
 Not reached: beforePipeline → globalPipeline → groupMiddleware → routeMiddleware → validation → global.postValidation → group.postValidation → route.postValidation → beforeHandler → handler
 ```
 

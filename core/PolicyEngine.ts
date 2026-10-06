@@ -9,11 +9,25 @@ import type {
 import { HttpError } from "./HttpError.js"
 import { mergeSafe } from "./utils.js"
 
+/**
+ * Deterministic identity of a policy declaration: the layer plus its zero-based position in that
+ * layer's declaration array, regardless of phase, priority or scope. The route inspector and the
+ * runtime trace use the same value, so it is unique within one route's policy chain but not across
+ * routes: `group:0` names different policies in different groups. A policy object reused in several
+ * layers or groups has one ID per declaration, and a name never contributes to the ID.
+ */
+export function policyDeclarationId(layer: PolicyLayer, declarationIndex: number): string {
+  return `${layer}:${declarationIndex}`
+}
+
 export function sortPolicies(policies: Policy[]): Policy[] {
+  return sortPoliciesWithIndex(policies).map(({ policy }) => policy)
+}
+
+function sortPoliciesWithIndex(policies: Policy[]): { policy: Policy; index: number }[] {
   return policies
     .map((policy, index) => ({ policy, index }))
     .sort((a, b) => (b.policy.priority ?? 0) - (a.policy.priority ?? 0) || a.index - b.index)
-    .map(({ policy }) => policy)
 }
 
 export function matchesPolicyScope(scope: PolicyScope | undefined, ctx: OrvaxisContext): boolean {
@@ -47,6 +61,10 @@ export type PolicyOutcome = "allow" | "deny" | "skipped" | "error"
 
 export type PolicyDecision = {
   policy: string
+  /** Declaration identity shared with the route inspector (`PolicyInspection.id`). */
+  policyId: string
+  /** Zero-based position in the layer's declaration array; `order` is the evaluation position. */
+  declarationIndex: number
   layer: PolicyLayer
   phase: PolicyPhase
   order: number
@@ -161,13 +179,15 @@ export async function evaluatePolicies(
 ): Promise<void> {
   let order = 0
   const tracing = options.trace?.mode !== "off" && options.trace !== undefined
-  for (const policy of sortPolicies(policies)) {
+  for (const { policy, index: declarationIndex } of sortPoliciesWithIndex(policies)) {
     if ((policy.phase ?? "preValidation") !== phase) continue
     const currentOrder = tracing ? ++order : 0
     const started = tracing ? performance.now() : 0
     const base = tracing
       ? {
           policy: policy.name,
+          policyId: policyDeclarationId(options.layer, declarationIndex),
+          declarationIndex,
           layer: options.layer,
           phase,
           order: currentOrder,

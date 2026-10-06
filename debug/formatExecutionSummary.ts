@@ -56,7 +56,9 @@ export function formatExecutionSummary(ctx: OrvaxisContext): string {
     )
   }
   if (summary.stoppedByPolicy) {
-    lines.push(`Stopped by: ${safeLabel(summary.stoppedByPolicy.meta?.policy)}`)
+    const stoppedBy = summary.stoppedByPolicy.meta
+    const id = stoppedBy?.policyId === undefined ? "" : ` (${safeLabel(stoppedBy.policyId)})`
+    lines.push(`Stopped by: ${safeLabel(stoppedBy?.policy)}${id}`)
   }
   if (summary.notReachedStages.length > 0) {
     lines.push(`Not reached: ${summary.notReachedStages.join(" → ")}`)

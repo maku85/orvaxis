@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Policy declaration IDs in traces** — `POLICY_DECISION` events now carry `policyId` and `declarationIndex`, and `formatExecutionSummary` prints the terminal policy's ID. `policyId` (`layer:index`) is the same value as `PolicyInspection.id` from `inspectRoutes()`, so a decision maps to the static report even with duplicate names or reused policy objects. Existing fields, including `policy` (the name) and `order`, are unchanged; the inspector IDs keep their previous values.
+
 ### Fixed
 
 - **Documentation favicon path** — the site favicon link now includes the `/orvaxis/` base, and `pnpm check:docs-assets` (run in the documentation workflow) fails when a built page references an asset outside the base or one missing from the build output.

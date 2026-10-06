@@ -10,6 +10,7 @@ import type {
   RouteMatch,
 } from "../types/index.js"
 import { HttpError } from "./HttpError.js"
+import { policyDeclarationId } from "./PolicyEngine.js"
 import { validateGroup } from "./validation.js"
 
 function decodeSafe(segment: string): string {
@@ -264,7 +265,7 @@ function inspectPolicies(
         .sort((a, b) => (b.policy.priority ?? 0) - (a.policy.priority ?? 0) || a.index - b.index)
       ordered.forEach(({ policy, index }, order) => {
         output.push({
-          id: `${layer}:${index}`,
+          id: policyDeclarationId(layer, index),
           name: policy.name,
           nameAmbiguous: (counts.get(policy.name) ?? 0) > 1,
           layer,
