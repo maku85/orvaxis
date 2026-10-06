@@ -30,8 +30,10 @@ const docsSidebar = [
   {
     text: "Contracts",
     items: [
-      { text: "Typed schemas", link: "/reference/core-concepts#typed-context" },
-      { text: "Response contracts and OpenAPI", link: "/reference/core-concepts#response-contracts-and-openapi" },
+      { text: "Typed input validation", link: "/guide/typed-validation" },
+      { text: "Response contracts", link: "/guide/response-contracts" },
+      { text: "OpenAPI export", link: "/guide/openapi" },
+      { text: "Contracts API reference", link: "/reference/contracts" },
     ],
   },
   {
@@ -141,8 +143,10 @@ export default defineConfig({
       {
         text: "Contracts",
         items: [
-          { text: "Typed schemas", link: "/reference/core-concepts#typed-context" },
-          { text: "Response contracts and OpenAPI", link: "/reference/core-concepts#response-contracts-and-openapi" },
+          { text: "Typed input validation", link: "/guide/typed-validation" },
+          { text: "Response contracts", link: "/guide/response-contracts" },
+          { text: "OpenAPI export", link: "/guide/openapi" },
+          { text: "Contracts API reference", link: "/reference/contracts" },
         ],
       },
       {

@@ -6,6 +6,7 @@ import { generateOpenApiDocument } from "../openapi"
 // Zod is this example's validator; any validator works with a matching schemaConverter.
 const noop = () => undefined
 
+// #region app
 export function buildExampleApp() {
   const app = new Orvaxis()
   app.group({
@@ -52,7 +53,9 @@ export function buildExampleApp() {
   })
   return app
 }
+// #endregion
 
+// #region document
 export function buildExampleDocument() {
   return generateOpenApiDocument(buildExampleApp(), {
     title: "Items API",
@@ -61,6 +64,7 @@ export function buildExampleDocument() {
     exclude: (route) => route.path.includes("/*"),
   })
 }
+// #endregion
 
 if (process.argv[1]?.endsWith("openapi-export.ts")) {
   console.log(JSON.stringify(buildExampleDocument(), null, 2))

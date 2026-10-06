@@ -29,8 +29,8 @@ Use it to organize how requests run, enforce input and response contracts, obser
 |---|---|---|
 | **Routing and lifecycle** | Declare route groups, parameters and wildcards; compose global, group and route middleware with lifecycle hooks | [How a request runs](docs/guide/execution-model.md), [routing](docs/guide/routing-and-groups.md), [middleware and hooks](docs/guide/middleware-and-hooks.md), [lifecycle reference](docs/reference/lifecycle.md) |
 | **Declarative policies** | Apply named rules by scope and priority, before or after input validation; implement permissions, feature gates or other request conditions | [Policies](docs/reference/core-concepts.md#policies), [cookbook](docs/cookbook.md), [403 diagnostics](docs/guide/diagnose-403.md) |
-| **Validated, typed input** | Parse and transform body, params, query and headers; infer handler types from validator outputs with `defineRoute()` | [Typed schemas](docs/reference/core-concepts.md#typed-context), [working example](examples/typed-schema.ts) |
-| **Response contracts and OpenAPI** | Validate declared responses by status in strict or warning mode; generate OpenAPI 3.1 using your schema converter | [Contracts and OpenAPI](docs/reference/core-concepts.md#response-contracts-and-openapi) |
+| **Validated, typed input** | Parse and transform body, params, query and headers; infer handler types from validator outputs with `defineRoute()` | [Typed input validation](docs/guide/typed-validation.md), [working example](examples/typed-schema.ts) |
+| **Response contracts and OpenAPI** | Validate declared responses by status in strict or warning mode; generate OpenAPI 3.1 using your schema converter | [Response contracts](docs/guide/response-contracts.md), [OpenAPI export](docs/guide/openapi.md) |
 | **Observability** | Inspect request traces and debug timelines, emit custom events, use structured logging and export spans through OpenTelemetry | [Tracing](docs/reference/core-concepts.md#tracing-system), [debugging](docs/reference/core-concepts.md#debug-layer), [OpenTelemetry example](examples/otel-plugin.ts) |
 | **Testing and inspection** | Execute requests without a server, test permission matrices, inspect route declarations and check required policies in CI | [Testing](docs/guide/testing.md), [route inspection](docs/guide/testing.md#route-introspection) |
 | **HTTP and streaming** | Use Express or Fastify transport, stream SSE/files, propagate request IDs and handle cancellation, timeouts and graceful shutdown | [Adapters](docs/guide/http-adapters.md), [streaming](docs/guide/streaming.md), [shutdown](docs/guide/timeouts-and-shutdown.md#graceful-shutdown) |
@@ -195,8 +195,10 @@ Browse the [Orvaxis documentation site](https://maku85.github.io/orvaxis/) for t
 - [How a request runs](docs/guide/execution-model.md), [routing and groups](docs/guide/routing-and-groups.md), and [middleware and hooks](docs/guide/middleware-and-hooks.md) — the lifecycle explained with observed orders
 - [Request lifecycle reference](docs/reference/lifecycle.md) — hook, middleware, validation, and policy order
 - [Core concepts reference](docs/reference/core-concepts.md) — router, policies, hooks, plugins, tracing, and context
-- [Typed request schemas](docs/reference/core-concepts.md#typed-context) — infer handler types from parsed and transformed values
-- [Response contracts and OpenAPI](docs/reference/core-concepts.md#response-contracts-and-openapi) — validate outgoing values and generate API metadata
+- [Typed input validation](docs/guide/typed-validation.md) — parse request fields, infer handler types, post-validation policies, and the 422 error
+- [Response contracts](docs/guide/response-contracts.md) — validate outgoing values by status, strict and warn modes, streaming
+- [OpenAPI export](docs/guide/openapi.md) — generate an OpenAPI 3.1 document from route declarations
+- [Contracts API reference](docs/reference/contracts.md)
 - [Tracing and debugging](docs/reference/core-concepts.md#tracing-system) — lifecycle traces, custom events, and combined debug timelines
 - [Plugins and OpenTelemetry](docs/reference/core-concepts.md#plugins) — logging, validation, CORS, and optional span export
 - [HTTP adapters](docs/guide/http-adapters.md), [streaming](docs/guide/streaming.md), and [timeouts and graceful shutdown](docs/guide/timeouts-and-shutdown.md) — request and connection lifecycle in the HTTP adapters

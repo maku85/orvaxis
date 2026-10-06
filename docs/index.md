@@ -27,8 +27,8 @@ features:
     linkText: Policies
   - title: Typed contracts and OpenAPI
     details: Parse body, params, query and headers, infer handler types from the parsed values, validate responses by status and generate OpenAPI 3.1.
-    link: /reference/core-concepts#typed-context
-    linkText: Typed schemas and contracts
+    link: /guide/typed-validation
+    linkText: Typed validation and contracts
   - title: Observability
     details: Follow each request through traces, debug timelines, structured logs and OpenTelemetry spans, and see why a request was blocked.
     link: /reference/core-concepts#tracing-system

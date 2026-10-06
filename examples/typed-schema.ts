@@ -2,15 +2,18 @@ import { z } from "zod"
 import { defineRoute, Orvaxis, schemaValidationPlugin } from "../index"
 import { testRequest } from "../testing"
 
-const app = new Orvaxis()
-app.register(schemaValidationPlugin)
-
+// #region schemas
 const itemSchema = {
   body: z.object({ quantity: z.coerce.number() }),
   params: z.object({ id: z.coerce.number() }),
   query: z.object({ page: z.coerce.number().default(1) }),
   headers: z.object({ "x-user": z.string().transform((value) => value.length) }),
 }
+// #endregion
+
+// #region route
+const app = new Orvaxis()
+app.register(schemaValidationPlugin) // required for every defineRoute() route
 
 app.group({
   prefix: "/api",
@@ -36,6 +39,7 @@ app.group({
     }),
   ],
 })
+// #endregion
 
 async function main() {
   const result = await testRequest(app, {

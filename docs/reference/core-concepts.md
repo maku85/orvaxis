@@ -710,6 +710,8 @@ Run `pnpm exec tsx examples/typed-schema.ts` to see the transformed values produ
 
 #### Response contracts and OpenAPI
 
+See the guides for the full behavior: [typed input validation](/guide/typed-validation), [response contracts](/guide/response-contracts), [OpenAPI export](/guide/openapi) and the [contracts API reference](/reference/contracts). This section keeps the summary.
+
 Routes may declare validators by response status. Register `responseValidationPlugin()` to validate values passed to `ctx.res.json()` or `ctx.res.send()`; the parsed value is sent, so validator transforms are preserved. The default `strict` mode turns invalid output into an HTTP 500 error. Use `mode: "warn"` to report safe route/status metadata and send the original value while migrating existing handlers.
 
 ```ts
