@@ -328,6 +328,7 @@ export class Router {
           prefix: group.prefix,
           ...(route.schema ? { schema: route.schema } : {}),
           ...(route.responses ? { responses: route.responses } : {}),
+          ...(route.openapi ? { openapi: route.openapi } : {}),
           policies: inspectPolicies(
             {
               global: [...globalPolicies],

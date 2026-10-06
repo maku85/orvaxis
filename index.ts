@@ -57,6 +57,7 @@ export type {
   RouteInfo,
   RouteInspection,
   RouteMatch,
+  RouteOpenApiMetadata,
   RouteResponseSchemas,
   RouteSchema,
   SchemaField,

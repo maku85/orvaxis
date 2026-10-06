@@ -7,8 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **OpenAPI export no longer approximates or overwrites** — `generateOpenApiDocument` now raises a contextual `TypeError` for wildcard routes (previously emitted as a bogus path such as `/files/*rest`), for HTTP methods it cannot describe (previously skipped silently), and for collisions (same operation twice, or templates differing only in parameter names). Parameter names with characters such as `-` or `.` are translated correctly. Converter output with local `$ref`s (for example `#/$defs/x`) is rejected because it cannot resolve inside the document. To keep a wildcard or internal route out of the document, pass `exclude: (route) => route.path.includes("*")`.
+
 ### Added
 
+- **OpenAPI route metadata and options** — routes accept an optional `openapi` object (`operationId`, `summary`, `description`, `tags`, `deprecated`, an optional `body` with `mediaType`, and per-status `description`/`mediaType`); `generateOpenApiDocument` accepts `exclude` and `componentSchemas`. Defaults and existing output are unchanged without them. `examples/openapi-export.ts` is validated against OpenAPI 3.1 in the test suite with a development-only validator.
 - **Installed-tarball package check** — `pnpm check:package` now runs `npm pack`, validates the tarball (whitelist, export targets, size budgets) and installs only that tarball into isolated temporary consumers: without peers, with Express 4, and with Express 5, Fastify 5 and OpenTelemetry. Every subpath is exercised through CJS, ESM and NodeNext types, and importing an integration subpath without its peer is asserted to fail naming the missing package.
 - **HTTP compatibility matrix** — `pnpm test:compat` runs the adapter tests over real sockets against Express 4, Express 5 and Fastify 5 (allow/deny, policy errors, HEAD, mounted guard prefix, responses already sent, timeout and disconnect with late-finishing policies), `pnpm typecheck:compat` checks the Express adapter against `@types/express` 4, CI runs both on Node 22.13.0 and 24, and coverage now includes `http/**` and `openapi/**` with per-area floors.
 - **Route protection report and baseline diff** — `orvaxis/testing` exports `buildProtectionReport`, `diffProtectionReports` and Markdown formatters. The report is deterministic, static JSON of each route's policies (layer, phase, scope, always/conditional/never); the diff lists added and removed routes and policies and changed scopes, phases or applicability, ignoring reordering. Changes are informational: only the `failOn` kinds (`policy-removed`, `policy-weakened`) fail. `pnpm check:protection` and a CI artifact demonstrate it on the tenant demo.

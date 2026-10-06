@@ -134,6 +134,7 @@ export type RouteInspection = RouteInfo & {
   policies: PolicyInspection[]
   schema?: RouteSchema
   responses?: RouteResponseSchemas
+  openapi?: RouteOpenApiMetadata
 }
 
 export type RouteMatch = {
@@ -213,6 +214,23 @@ export type RouteSchema = {
 /** Optional response validators keyed by the HTTP status returned by the handler. */
 export type RouteResponseSchemas = Record<number, SchemaField>
 
+/**
+ * Optional OpenAPI metadata for one route, read only by `orvaxis/openapi`. Nothing here is
+ * inferred from the validators: a `parse` method cannot say whether a body is optional or which
+ * media type it uses.
+ */
+export type RouteOpenApiMetadata = {
+  operationId?: string
+  summary?: string
+  description?: string
+  tags?: readonly string[]
+  deprecated?: boolean
+  /** Request body options; the body is required with `application/json` unless stated. */
+  body?: { required?: boolean; mediaType?: string }
+  /** Per-status options for responses already declared in `responses`. */
+  responses?: Record<number, { description?: string; mediaType?: string }>
+}
+
 export type Route<
   TState extends Record<string, unknown> = Record<string, unknown>,
   TMeta extends Record<string, unknown> = Record<never, never>,
@@ -224,6 +242,7 @@ export type Route<
   policies?: Policy<TState, TMeta>[]
   schema?: RouteSchema
   responses?: RouteResponseSchemas
+  openapi?: RouteOpenApiMetadata
 }
 
 export type ServerAdapter = {

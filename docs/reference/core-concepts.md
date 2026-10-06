@@ -742,7 +742,34 @@ const document = generateOpenApiDocument(app, {
 })
 ```
 
-The generator emits OpenAPI 3.1 paths, JSON request bodies, query/header/path parameters, declared JSON responses, and a default Orvaxis error envelope. It reads route metadata only; it never executes handlers or policies. Unsupported or non-object converter output raises a `TypeError` naming the route and schema field instead of silently omitting the contract. OpenAPI cannot express the runtime's streaming validation restriction, so streaming endpoints should omit response schemas and document their media type separately.
+The generator emits OpenAPI 3.1 paths, request bodies, query/header/path parameters, declared responses, and a default Orvaxis error envelope. It reads route metadata only; it never executes handlers or policies. Anything it cannot describe faithfully raises a `TypeError` naming the route instead of being dropped or approximated.
+
+**Paths.** `:name` segments become `{name}` (any name without braces). Wildcards (`*rest`, `*`) have no OpenAPI path-template equivalent: the call fails unless the route is excluded with `exclude: (route) => route.path.includes("*")`, which is the only way a route is omitted. Braces in static segments, empty parameter names, a parameter repeated in one path, and HTTP methods OpenAPI lacks also raise. Two operations are never merged silently: the same method on the same template, or templates that differ only in parameter names (`GET /items/:id` with `POST /items/:itemId`, forbidden by OpenAPI) raise a collision error. Only the OpenAPI document is affected; Orvaxis routing accepts the second case.
+
+**Converter contract.** `schemaConverter(validator, { method, path, field, status })` must return a Schema Object. A `$ref` may point to `#/components/schemas/<name>` declared in the `componentSchemas` option, or to an external URI (passed through, not resolved). Local references such as `#/$defs/x` raise, because they stop resolving once the schema is placed in the document; inline them or hoist them into `componentSchemas`. For `params`, `query` and `headers` the result must be an object schema: every property becomes one parameter carrying that property's schema (object and array schemas included), `required` is honored, and path parameters are always required. OpenAPI tools ignore `Accept`, `Content-Type` and `Authorization` header parameters.
+
+**Optional metadata.** A `parse` method cannot tell whether a body is optional or which media type it uses, so none of this is inferred. Declare it on the route:
+
+```ts
+{
+  method: "PUT",
+  path: "/items/:id",
+  schema: { params, body },
+  responses: { 200: item, 204: empty },
+  openapi: {
+    operationId: "replaceItem",   // unique across the document
+    summary: "Replace an item",
+    tags: ["items"],
+    body: { required: false, mediaType: "application/json" },
+    responses: { 204: { description: "Replaced without a body" } },
+  },
+  handler,
+}
+```
+
+Defaults are unchanged without `openapi`: a required `application/json` body and `application/json` responses. 204 and 304 responses never have content, and a `mediaType` on them raises. Metadata for a status missing from `responses`, or `body` metadata without a body schema, raises. OpenAPI cannot express the runtime's streaming validation restriction, so streaming endpoints should omit response schemas and document their media type separately.
+
+`examples/openapi-export.ts` builds a complete document (parameters, 204/304, media types, an excluded wildcard); `pnpm exec tsx examples/openapi-export.ts` prints it. The repository tests validate it against the OpenAPI 3.1 schema with a development-only validator; the package itself has no validator dependency.
 
 ---
 
