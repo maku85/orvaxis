@@ -9,6 +9,11 @@ export {
   type UnifiedEvent,
 } from "./debug/buildExecutionSummary.js"
 export { formatExecutionSummary } from "./debug/formatExecutionSummary.js"
+export {
+  buildRequestReport,
+  type RequestReport,
+  type RequestReportOptions,
+} from "./debug/requestReport.js"
 export { traceEvent } from "./debug/traceEvent.js"
 export {
   type AdapterOptions,

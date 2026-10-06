@@ -1,6 +1,7 @@
 import { fullRoutePath } from "../core/Router.js"
 import type { OrvaxisContext } from "../types/index.js"
 import { buildExecutionSummary } from "./buildExecutionSummary.js"
+import { errorStatus, safeLabel } from "./requestReport.js"
 
 /**
  * Format a request's recorded decisions for logs and bug reports.
@@ -64,21 +65,4 @@ export function formatExecutionSummary(ctx: OrvaxisContext): string {
     lines.push(`Not reached: ${summary.notReachedStages.join(" → ")}`)
   }
   return lines.join("\n")
-}
-
-function errorStatus(error: unknown): number | undefined {
-  if (typeof error !== "object" || error === null || !("status" in error)) return undefined
-  const status = error.status
-  return typeof status === "number" && Number.isInteger(status) && status >= 100 && status <= 599
-    ? status
-    : undefined
-}
-
-function safeLabel(value: unknown): string {
-  if (typeof value !== "string" && typeof value !== "number") return "unknown"
-  return String(value)
-    .replaceAll("\r", " ")
-    .replaceAll("\n", " ")
-    .replaceAll("\t", " ")
-    .slice(0, 100)
 }

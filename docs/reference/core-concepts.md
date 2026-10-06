@@ -180,6 +180,20 @@ Policies run in two phases. Existing policies default to `preValidation`, so aut
 
 Policy decisions are added to `ctx.meta.trace.events` as `POLICY_DECISION` events. Each event reports the policy name, a declaration `policyId`, layer (`global`, `group`, or `route`), phase, `declarationIndex`, `order`, priority, elapsed time, and outcome (`allow`, `deny`, `skipped`, or `error`). `policyId` has the form `layer:index`, where `index` is the zero-based position of the policy in that layer's declaration array (global policies in registration order, then the group's and the route's `policies` arrays), independent of phase, priority and scope. It is the same value as `PolicyInspection.id` from `app.inspectRoutes()`, so a decision can be matched to the static report even when names are duplicated. It is unique within one route's chain, not across routes (`group:0` names different policies in different groups), and a policy object reused in several declarations has one ID per declaration. `declarationIndex` is that index alone; `order` is the one-based evaluation position within the layer and phase after priority sorting. Denials and evaluation errors are terminal; later request stages do not run. The same events appear in `buildExecutionSummary().policyDecisions` and are forwarded to OpenTelemetry spans.
 
+#### Request report
+
+`buildRequestReport(ctx, options?)` returns a JSON object for attaching a request's explanation to an issue or a structured log. It has `schemaVersion: 1`, the request method, the matched route (method and full template, or `null`), `outcome` (`completed`, `denied`, `error` or `unknown`), the response (`sent`, `status`, and `statusSource` of `sent`, `error` or `unknown`), `durationMs`, `handler` (`executed`, `not-executed` or `unknown`), the terminal decision, and the trace state (collection mode, recorded and dropped decisions, `truncated`, `maxEvents`).
+
+Unknown is reported as unknown: `status` is `null` when nothing was sent and the error carries no HTTP status, and `terminalDecision` is `{ state: "unknown", cause: "collection-off" }` when policy collection is `off`, instead of being inferred from missing events. A hook that fails after a response was sent reports `outcome: "error"` with the status that was actually sent.
+
+The report copies only fixed, bounded fields (labels are cut at 100 characters and stripped of control characters). It never includes HTTP objects, credentials, URLs, params, headers, bodies, stacks, error messages, `ctx.meta` or `ctx.state`. Two opt-in options exist: `includeRequestId` (clients can choose request IDs) and `includeReasons`, which adds the terminal decision's reason only when `detailed` tracing recorded one through your redactor. Route templates and policy names are configuration labels and remain the application's responsibility, as does anything its own redactor lets through.
+
+```ts
+import { buildRequestReport } from "orvaxis"
+
+console.log(JSON.stringify(buildRequestReport(ctx)))
+```
+
 Collection defaults to a bounded summary of at most 100 decisions per request. `maxEvents` accepts 1–1000 and bounds the non-terminal decisions recorded; the terminal decision (a denial or evaluation error) is always recorded in addition, so a truncated trace still explains why the request stopped. When decisions are dropped, a `POLICY_TRACE_LIMIT` event is added and `buildExecutionSummary().policyTrace` reports `truncated` and `droppedDecisions` (policies skipped by scope are recorded as `skipped` and are not counted as dropped). Policy decision events do not copy request bodies, headers, cookies, identity values, free-form denial reasons, or exception messages. Names should be stable configuration labels, never values derived from a request. Configure collection on `Orvaxis`:
 
 ```ts

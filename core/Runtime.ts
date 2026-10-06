@@ -18,6 +18,7 @@ import { HttpError } from "./HttpError.js"
 import { Pipeline } from "./Pipeline.js"
 import {
   evaluatePolicies as evaluatePolicySet,
+  initPolicyTrace,
   PolicyEngine,
   type PolicyLayer,
 } from "./PolicyEngine.js"
@@ -112,6 +113,7 @@ export class Runtime {
   async execute(req: OrvaxisRequest, res: OrvaxisResponse): Promise<OrvaxisContext> {
     const ctx = createContext(req, res, this.logsMaxSize)
     captureContext(ctx)
+    initPolicyTrace(ctx, this.policyTrace)
     const tracer = new Tracer(req.id ?? generateId())
     ctx.meta.tracer = tracer
 
@@ -252,6 +254,7 @@ export class Runtime {
   async authorize(req: OrvaxisRequest, res: OrvaxisResponse): Promise<OrvaxisContext> {
     const ctx = createContext(req, res, this.logsMaxSize)
     captureContext(ctx)
+    initPolicyTrace(ctx, this.policyTrace)
     const tracer = new Tracer(req.id ?? generateId())
     ctx.meta.tracer = tracer
 

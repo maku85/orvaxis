@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Serializable request report** — `buildRequestReport(ctx, options?)` returns a versioned JSON object with method, full route template, outcome, sent status, duration, handler state, terminal decision (including its policy ID) and trace truncation. Unknown facts are reported as unknown rather than inferred, and request values, headers, bodies, stacks, error messages and `ctx.meta` are never copied; request ID and redacted reasons are opt-in. `buildExecutionSummary().policyTrace` also reports the collection `mode`.
 - **Policy declaration IDs in traces** — `POLICY_DECISION` events now carry `policyId` and `declarationIndex`, and `formatExecutionSummary` prints the terminal policy's ID. `policyId` (`layer:index`) is the same value as `PolicyInspection.id` from `inspectRoutes()`, so a decision maps to the static report even with duplicate names or reused policy objects. Existing fields, including `policy` (the name) and `order`, are unchanged; the inspector IDs keep their previous values.
 
 ### Fixed

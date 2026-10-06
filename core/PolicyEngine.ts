@@ -79,10 +79,19 @@ export type PolicyDecision = {
   scope?: { path?: string; method?: string }
 }
 
-type TraceState = { count: number; truncated: boolean; dropped: number; limit: number }
+type TraceState = {
+  count: number
+  truncated: boolean
+  dropped: number
+  limit: number
+  mode: PolicyTraceMode | undefined
+}
+type PolicyTraceMode = "summary" | "detailed" | "off"
 const traceStates = new WeakMap<OrvaxisContext, TraceState>()
 
 export type PolicyTraceInfo = {
+  /** Collection mode for the request; `undefined` when the runtime did not announce it. */
+  mode: PolicyTraceMode | undefined
   /** True when at least one non-terminal decision was not recorded because of `maxEvents`. */
   truncated: boolean
   /** Number of decisions not recorded. Skipped-by-scope policies that were recorded are not counted. */
@@ -91,9 +100,21 @@ export type PolicyTraceInfo = {
   maxEvents: number | undefined
 }
 
+/** Called by the runtime when a request starts so reports can tell "off" from "nothing happened". */
+export function initPolicyTrace(ctx: OrvaxisContext, options: PolicyTraceOptions): void {
+  traceStates.set(ctx, {
+    count: 0,
+    truncated: false,
+    dropped: 0,
+    limit: options.mode === "off" ? 0 : (options.maxEvents ?? 100),
+    mode: options.mode ?? "summary",
+  })
+}
+
 export function getPolicyTraceInfo(ctx: OrvaxisContext): PolicyTraceInfo {
   const state = traceStates.get(ctx)
   return {
+    mode: state?.mode,
     truncated: state?.truncated ?? false,
     droppedDecisions: state?.dropped ?? 0,
     maxEvents: state?.limit,
@@ -106,7 +127,13 @@ export function recordPolicyDecision(
   decision: PolicyDecision
 ): void {
   if (!options || options.mode === "off") return
-  const state = traceStates.get(ctx) ?? { count: 0, truncated: false, dropped: 0, limit: 0 }
+  const state = traceStates.get(ctx) ?? {
+    count: 0,
+    truncated: false,
+    dropped: 0,
+    limit: 0,
+    mode: options.mode ?? "summary",
+  }
   traceStates.set(ctx, state)
   const requestedLimit = options.maxEvents ?? 100
   const limit = Number.isFinite(requestedLimit)

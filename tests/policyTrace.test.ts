@@ -228,6 +228,7 @@ describe("policy decision tracing", () => {
     })
     expect(deniedSummary.policyDecisions).toHaveLength(2)
     expect(deniedSummary.policyTrace).toEqual({
+      mode: "summary",
       truncated: true,
       droppedDecisions: 1,
       maxEvents: 1,
