@@ -90,6 +90,21 @@ pnpm typecheck:compat  # Express adapter compiled against @types/express 4
 
 Not covered, on purpose: the lowest declared peer versions (Express 4.20.0, Fastify 5.0.0) — the matrix uses the latest of each declared major; other Node versions; the Express guard has no Fastify counterpart.
 
+## Project metadata
+
+One product description is used everywhere: `package.json` `description` is the source, the documentation site reads it for its `<meta>` and link-preview tags, and the README tagline says the same thing in short. When it changes, change it in `package.json`; `pnpm check:docs-assets` fails if the site's home page description drifts, if a page's `og:image` or `twitter:image` is not an absolute `https://maku85.github.io/orvaxis/` URL, or if the image is missing from the build.
+
+Assets: `assets/orvaxis-banner.webp` (1536×1024, about 80 kB) is the single banner source. The README loads it from `raw.githubusercontent.com` so GitHub and npm show the same file, and the site imports it from `assets/`. `docs/public/social-card.jpg` (1200×630) is the link-preview image. Regenerate them from the original artwork rather than editing them.
+
+Repository settings are not part of the code and are changed by a maintainer in GitHub, not by a commit. Suggested values, consistent with the package:
+
+- **Description:** Structured, observable and testable execution runtime for Node.js APIs: routing, policies, middleware, typed contracts, tracing and testing, with Express and Fastify adapters.
+- **Website:** https://maku85.github.io/orvaxis/
+- **Topics:** `nodejs`, `typescript`, `express`, `fastify`, `middleware`, `policy-engine`, `authorization`, `openapi`, `opentelemetry`, `observability`, `testing`, `api`
+- **Social preview:** upload `docs/public/social-card.jpg` (1200×630) under Settings → General → Social preview.
+
+Orvaxis is a library, not an IAM service or a hosted backend; do not describe it as either.
+
 ## Releasing
 
 Maintainers release from `main` with a clean tree, an authenticated npm session (`npm login`; the script never reads or stores credentials), and release notes written under `## [Unreleased]` in `CHANGELOG.md`.

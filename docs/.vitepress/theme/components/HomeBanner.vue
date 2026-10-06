@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import banner from "./orvaxis-banner.png"
+// One source for README and site; the file is also served from raw.githubusercontent.com.
+import banner from "../../../../assets/orvaxis-banner.webp"
 </script>
 
 <template>

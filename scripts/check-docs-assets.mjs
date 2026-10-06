@@ -35,5 +35,38 @@ for (const file of htmlFiles(dist)) {
   }
 }
 
+// Link-preview metadata must use absolute public URLs that exist in the build output, and the
+// description must be the package description (one product description everywhere).
+const site = `https://maku85.github.io${base}`
+const pkg = JSON.parse(readFileSync(resolve("package.json"), "utf8"))
+const metaPattern = /<meta\s+(?:property|name)="((?:og|twitter):[a-z:]+)"\s+content="([^"]*)"/g
+const metaChecked = new Set()
+for (const file of htmlFiles(dist)) {
+  const html = readFileSync(file, "utf8")
+  const label = file.slice(dist.length + 1)
+  const found = new Map([...html.matchAll(metaPattern)].map((match) => [match[1], match[2]]))
+  if (!found.has("og:image")) {
+    if (!label.startsWith("404")) problems.push(`${label}: no og:image`)
+    continue
+  }
+  for (const key of ["og:image", "twitter:image", "og:url"]) {
+    const value = found.get(key)
+    if (!value?.startsWith(site))
+      problems.push(`${label}: ${key} is not an absolute URL under ${site}: ${value}`)
+  }
+  const image = found.get("og:image") ?? ""
+  if (image.startsWith(site) && !metaChecked.has(image)) {
+    metaChecked.add(image)
+    if (!existsSync(join(dist, image.slice(site.length))))
+      problems.push(`${label}: og:image ${image} does not exist in the build output`)
+  }
+  if (found.get("og:description") !== pkg.description && !label.includes("/")) {
+    // Pages with their own frontmatter description may differ; top-level pages must not.
+    if (label === "index.html")
+      problems.push(`${label}: og:description differs from the package description`)
+  }
+}
+if (!existsSync(join(dist, "sitemap.xml"))) problems.push("sitemap.xml was not generated")
+
 assert.equal(problems.length, 0, `Asset reference problems:\n${problems.join("\n")}`)
 console.log(`Docs assets OK: ${checked.size} unique files referenced under ${base}`)

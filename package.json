@@ -1,7 +1,7 @@
 {
   "name": "orvaxis",
   "version": "0.4.0",
-  "description": "Lightweight policy-driven execution runtime for Node.js",
+  "description": "Structured, observable and testable execution runtime for Node.js APIs: routing, policies, middleware, typed contracts, tracing and testing, with Express and Fastify adapters.",
   "type": "commonjs",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -74,25 +74,33 @@
   ],
   "license": "MIT",
   "homepage": "https://maku85.github.io/orvaxis/",
+  "bugs": {
+    "url": "https://github.com/maku85/orvaxis/issues"
+  },
   "repository": {
     "type": "git",
     "url": "https://github.com/maku85/orvaxis.git"
   },
   "keywords": [
-    "policy",
-    "policy-engine",
-    "middleware",
-    "router",
-    "runtime",
-    "express",
-    "fastify",
     "nodejs",
     "typescript",
-    "http",
+    "api",
+    "runtime",
+    "request-lifecycle",
+    "router",
+    "middleware",
+    "policy",
+    "policy-engine",
+    "authorization",
+    "express",
+    "fastify",
+    "validation",
+    "openapi",
     "observability",
+    "tracing",
     "opentelemetry",
+    "testing",
     "sse",
-    "server-sent-events",
     "graceful-shutdown"
   ],
   "scripts": {

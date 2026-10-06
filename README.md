@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="./assets/orvaxis-banner.png" width="800" alt="Orvaxis structures Node.js API execution with routing, policies, middleware, hooks, typed contracts, tracing, and testing"/>
+  <img src="https://raw.githubusercontent.com/maku85/orvaxis/main/assets/orvaxis-banner.webp" width="800" alt="Orvaxis structures Node.js API execution with routing, policies, middleware, hooks, typed contracts, tracing, and testing"/>
 </p>
 
 <h1 align="center">Orvaxis</h1>

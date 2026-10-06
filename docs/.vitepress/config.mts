@@ -1,11 +1,15 @@
 import { defineConfig } from "vitepress"
-import { version } from "../../package.json"
+import type { HeadConfig } from "vitepress"
+import { description, version } from "../../package.json"
 
 const base = "/orvaxis/"
+const site = `https://maku85.github.io${base}`
+const socialImage = `${site}social-card.jpg`
 
 export default defineConfig({
   title: "Orvaxis",
-  description: "Policy-driven execution and authorization diagnostics for Node.js APIs.",
+  // One description for npm, the site and link previews.
+  description,
   lang: "en-US",
   base,
   srcExclude: ["roadmap.md"],
@@ -14,6 +18,36 @@ export default defineConfig({
     ["link", { rel: "icon", type: "image/svg+xml", href: `${base}favicon.svg` }],
     ["meta", { name: "theme-color", content: "#080d1d" }],
   ],
+  sitemap: { hostname: site },
+  transformHead({ pageData }) {
+    const path = pageData.relativePath.replace(/(^|\/)index\.md$/, "$1").replace(/\.md$/, ".html")
+    const url = `${site}${path}`
+    const title = pageData.title && pageData.title !== "Orvaxis" ? `${pageData.title} | Orvaxis` : "Orvaxis"
+    const summary = (pageData.frontmatter.description as string | undefined) ?? description
+    const tags: HeadConfig[] = [
+      ["link", { rel: "canonical", href: url }],
+      ["meta", { property: "og:type", content: "website" }],
+      ["meta", { property: "og:site_name", content: "Orvaxis" }],
+      ["meta", { property: "og:title", content: title }],
+      ["meta", { property: "og:description", content: summary }],
+      ["meta", { property: "og:url", content: url }],
+      ["meta", { property: "og:image", content: socialImage }],
+      ["meta", { property: "og:image:width", content: "1200" }],
+      ["meta", { property: "og:image:height", content: "630" }],
+      [
+        "meta",
+        {
+          property: "og:image:alt",
+          content: "Orvaxis: structured execution for Node.js APIs — control, contracts, observe and test",
+        },
+      ],
+      ["meta", { name: "twitter:card", content: "summary_large_image" }],
+      ["meta", { name: "twitter:title", content: title }],
+      ["meta", { name: "twitter:description", content: summary }],
+      ["meta", { name: "twitter:image", content: socialImage }],
+    ]
+    return tags
+  },
   transformPageData(pageData) {
     pageData.frontmatter.packageVersion = version
   },
