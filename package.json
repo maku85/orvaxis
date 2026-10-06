@@ -104,6 +104,7 @@
     "build:esm": "tsc -p tsconfig.esm.json && node -e \"require('fs').writeFileSync('dist/esm/package.json', JSON.stringify({type:'module'}))\"",
     "build": "pnpm build:cjs && pnpm build:esm",
     "check:package": "node scripts/check-package.mjs",
+    "check:docs-assets": "node scripts/check-docs-assets.mjs",
     "lint": "biome lint .",
     "format": "biome format . --write",
     "check": "biome check .",

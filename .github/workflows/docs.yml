@@ -37,6 +37,9 @@ jobs:
       - name: Build VitePress site and validate internal links
         run: pnpm docs:build
 
+      - name: Check asset paths under the site base
+        run: pnpm check:docs-assets
+
       - name: Upload Pages artifact
         if: github.event_name != 'pull_request'
         uses: actions/upload-pages-artifact@v4

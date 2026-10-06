@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Documentation favicon path** — the site favicon link now includes the `/orvaxis/` base, and `pnpm check:docs-assets` (run in the documentation workflow) fails when a built page references an asset outside the base or one missing from the build output.
 - **Terminal policy decision survives `maxEvents`** — the decision that denied the request or failed evaluation is now always recorded, even when the limit is already reached, so `stoppedByPolicy`, `testPolicyMatrix` and `formatExecutionSummary` keep explaining the stop. `maxEvents` bounds the other decisions; the terminal one is added on top, so a trace holds at most `maxEvents + 1` policy decisions. `buildExecutionSummary().policyTrace` reports `truncated` and `droppedDecisions`, and the formatter prints a truncation line.
 - **`formatExecutionSummary` robustness** — thrown strings, numbers and other non-object values no longer break the formatter, and only HTTP statuses in the 100–599 range are read from errors. When a response was already sent, its status is preserved and the outcome notes that an error followed it. The summary now shows the full route template including the group prefix and the request method, with the matched route method for HEAD → GET fallback.
 

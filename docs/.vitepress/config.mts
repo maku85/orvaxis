@@ -1,15 +1,17 @@
 import { defineConfig } from "vitepress"
 import { version } from "../../package.json"
 
+const base = "/orvaxis/"
+
 export default defineConfig({
   title: "Orvaxis",
   description: "Policy-driven execution and authorization diagnostics for Node.js APIs.",
   lang: "en-US",
-  base: "/orvaxis/",
+  base,
   srcExclude: ["roadmap.md"],
   lastUpdated: true,
   head: [
-    ["link", { rel: "icon", type: "image/svg+xml", href: "/favicon.svg" }],
+    ["link", { rel: "icon", type: "image/svg+xml", href: `${base}favicon.svg` }],
     ["meta", { name: "theme-color", content: "#080d1d" }],
   ],
   transformPageData(pageData) {
