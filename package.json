@@ -1,6 +1,6 @@
 {
   "name": "orvaxis",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "Structured, observable and testable execution runtime for Node.js APIs: routing, policies, middleware, typed contracts, tracing and testing, with Express and Fastify adapters.",
   "type": "commonjs",
   "main": "dist/index.js",

@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-10-07
+
 ### Changed
 
 - **Documentation reflects the published 0.5.0** — the 0.4.0 → 0.5.0 migration guide is new (`/migration/0.4.0-to-0.5.0`), `/migration/next` now says there are no unreleased behavior changes, and the pages and example catalog that marked features as "unreleased" or "main only" now say "since 0.5.0".
