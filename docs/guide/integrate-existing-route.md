@@ -78,7 +78,7 @@ export async function explainDenial(userId: string, documentId: string) {
 }
 ```
 
-> **Unreleased.** The `(route:0)` ID after `Stopped by:` is on `main` only; the 0.4.0 package prints `Stopped by: document-owner`.
+The `(route:0)` ID after `Stopped by:` is printed from 0.5.0; 0.4.0 prints `Stopped by: document-owner`.
 
 `explainDenial("bob", "alice")` returns:
 

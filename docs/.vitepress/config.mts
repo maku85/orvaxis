@@ -179,8 +179,9 @@ export default defineConfig({
       {
         text: "More",
         items: [
+          { text: "Migration 0.4.0 → 0.5.0", link: "/migration/0.4.0-to-0.5.0" },
           { text: "Migration 0.3.1 → 0.4.0", link: "/migration/0.3.1-to-0.4.0" },
-          { text: "Unreleased changes", link: "/migration/next" },
+          { text: "Changes after 0.5.0", link: "/migration/next" },
           { text: "Cookbook", link: "/cookbook" },
           { text: "Benchmarks", link: "/benchmarks" },
           { text: "Changelog", link: "https://github.com/maku85/orvaxis/blob/main/CHANGELOG.md" },
@@ -204,8 +205,9 @@ export default defineConfig({
         {
           text: "Migration",
           items: [
+            { text: "0.4.0 → 0.5.0", link: "/migration/0.4.0-to-0.5.0" },
             { text: "0.3.1 → 0.4.0", link: "/migration/0.3.1-to-0.4.0" },
-            { text: "Unreleased changes", link: "/migration/next" },
+            { text: "Changes after 0.5.0", link: "/migration/next" },
           ],
         },
       ],

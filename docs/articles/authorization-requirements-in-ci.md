@@ -26,7 +26,7 @@ if (!report.passed) process.exitCode = 1
 
 Exact route templates and path globs select routes. A selector matching no routes fails, so a renamed route cannot silently escape the check. Every declared exception needs a reason. Conditional scopes are reported as unverifiable because static inspection does not call regular expressions or predicates; opt into `failOnUnverifiable` when those need to block CI.
 
-> **Unreleased.** `buildProtectionReport` and `diffProtectionReports` are on `main` only and are not in the published 0.4.0 package. `checkPolicyRequirements` below is available in 0.4.0.
+`buildProtectionReport` and `diffProtectionReports` were added in 0.5.0; they are not in 0.4.0. `checkPolicyRequirements` below is available in 0.4.0.
 
 ## Review protection changes against a baseline
 

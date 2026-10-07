@@ -182,7 +182,7 @@ The [testing guide](docs/guide/testing.md) covers the response shape, permission
 
 ## Documentation
 
-This README and the documentation site describe the `main` branch. The published package is 0.4.0; changes made since then are listed under *Unreleased* in the [changelog](CHANGELOG.md) and in [Unreleased changes](docs/migration/next.md), and marked as unreleased where they are documented. Upgrading from 0.3.1? See [Migrating from 0.3.1 to 0.4.0](docs/migration/0.3.1-to-0.4.0.md).
+This README and the documentation site describe version 0.5.0, the latest release. Changes made on `main` since then are listed under *Unreleased* in the [changelog](CHANGELOG.md) and on [Changes after 0.5.0](docs/migration/next.md). Upgrading? See [Migrating from 0.4.0 to 0.5.0](docs/migration/0.4.0-to-0.5.0.md) or, from 0.3.1, [Migrating from 0.3.1 to 0.4.0](docs/migration/0.3.1-to-0.4.0.md).
 
 Browse the [Orvaxis documentation site](https://maku85.github.io/orvaxis/) for the getting-started guide, navigable references, examples, and articles. The Markdown sources remain available below and in `docs/`.
 

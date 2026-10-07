@@ -45,4 +45,4 @@ Returns the route with handler types inferred from the output of each declared v
 
 Returns `{ openapi: "3.1.0", info, paths, components }`. `RouteOpenApiMetadata` is `{ operationId?, summary?, description?, tags?, deprecated?, body?: { required?, mediaType? }, responses?: Record<status, { description?, mediaType? }> }`.
 
-> **Unreleased.** `exclude`, `componentSchemas`, `Route.openapi` and the strict path and reference checks are on `main` only; see [OpenAPI export](/guide/openapi#what-0-4-0-does-and-what-is-on-main).
+`exclude`, `componentSchemas`, `Route.openapi` and the strict path and reference checks exist since 0.5.0; see [OpenAPI export](/guide/openapi#what-changed-in-0-5-0).

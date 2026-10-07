@@ -16,7 +16,7 @@ const result = await testRequest(app, {
 if (result.ctx) console.log(formatExecutionSummary(result.ctx))
 ```
 
-> **Unreleased.** The `(route:0)` policy ID after `Stopped by:` appears from the next release; 0.4.0 prints `Stopped by: document-owner`. Everything else below matches 0.4.0.
+The `(route:0)` policy ID after `Stopped by:` is printed from 0.5.0; 0.4.0 prints `Stopped by: document-owner`. Everything else below matches 0.4.0.
 
 A denial will look like this:
 

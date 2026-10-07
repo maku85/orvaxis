@@ -8,7 +8,7 @@ Orvaxis tests run the real runtime without a server. This page covers the tools 
 | `testPolicyMatrix` | Does each identity get the status, terminal policy and handler reachability I expect? | yes |
 | `checkPolicyRequirements` | Is every route I care about declared with the policies it must have? | **no** |
 | `app.inspectRoutes()` | What is declared on each route? | **no** |
-| `buildProtectionReport` / `diffProtectionReports` | What did this change add to or remove from the declarations? | **no** (main only; see the [CI article](/articles/authorization-requirements-in-ci)) |
+| `buildProtectionReport` / `diffProtectionReports` | What did this change add to or remove from the declarations? | **no** (since 0.5.0; see the [CI article](/articles/authorization-requirements-in-ci)) |
 
 All of them come from `orvaxis/testing`, which is not part of what your server imports. The tests on this page are real: they live in [`examples/testing/`](https://github.com/maku85/orvaxis/tree/main/examples/testing), run with `pnpm exec vitest run examples/testing` (and with the repository's `pnpm test`), and are shown exactly as written.
 

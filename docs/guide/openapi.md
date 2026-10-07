@@ -124,11 +124,11 @@ The `PUT` operation declares `body: { required: false }`, so its request body is
 
 Every operation also gets a `default` response referencing the shared `ErrorResponse` schema that describes the adapters' error envelope.
 
-## What 0.4.0 does and what is on `main`
+## What changed in 0.5.0
 
-> **Unreleased.** The strict checks, `exclude`, `componentSchemas`, converter reference validation and `route.openapi` metadata exist only on `main`. They ship with the release after 0.4.0; see [Unreleased changes](/migration/next).
+The strict checks, `exclude`, `componentSchemas`, converter reference validation and `route.openapi` metadata exist since 0.5.0; see [Migrating from 0.4.0 to 0.5.0](/migration/0.4.0-to-0.5.0).
 
-| | 0.4.0 (published) | `main` |
+| | 0.4.0 | 0.5.0 and later |
 |---|---|---|
 | Parameters | `:name` rewritten with a regular expression that recognizes only letters, digits and `_` (`:user-id` becomes `{user}-id`) | segment-based; any name without braces |
 | Wildcards, collisions | not detected | `TypeError`, or `exclude` |
