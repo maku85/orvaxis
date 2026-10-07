@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-10-07
+
 ### Changed
 
 - **Testing guide and examples catalog** — `/guide/testing` presents `testRequest` over success, invalid input, middleware, a handler error and streaming with real tests (`examples/testing/`), keeps permission matrices and static requirements as distinct tools, and shows a policy that is attached but wrong passing the static check and failing the matrix. `/examples/` is regrouped into Start, Execution, Policies, Types and contracts, Observability, HTTP and streaming, and Testing and CI, with each example's command, port, expected output and needs, and marks the ones that depend on `main`. `pnpm test:examples` starts every listed example and checks the documented answers; it runs in CI and in the release checks. All server examples honor `PORT`.
