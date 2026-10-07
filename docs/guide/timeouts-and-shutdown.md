@@ -131,15 +131,15 @@ const shutdown = (signal: string) => {
     }
   )
 }
-process.once("SIGTERM", () => shutdown("SIGTERM"))
-process.once("SIGINT", () => shutdown("SIGINT"))
+process.on("SIGTERM", () => shutdown("SIGTERM"))
+process.on("SIGINT", () => shutdown("SIGINT"))
 
 server.listen(Number(process.env.PORT ?? 3006), (port) =>
   console.log(`listening on ${port} (pid ${process.pid})`)
 )
 ```
 
-Run it with `pnpm exec tsx examples/graceful-shutdown.ts`, open `curl -N http://localhost:3006/api/events`, then press Ctrl+C or run `kill -TERM <pid>` with the pid it prints. The stream receives `event: bye`, the process logs `closed` and exits with status 0. The tests run exactly this sequence. A second signal while closing is ignored, so it cannot start a second `close()`. Under an orchestrator, set the termination grace period longer than `shutdownTimeout`.
+Run it with `pnpm exec tsx examples/graceful-shutdown.ts`, open `curl -N http://localhost:3006/api/events`, then press Ctrl+C or run `kill -TERM <pid>` with the pid it prints. The stream receives `event: bye`, the process logs `closed` and exits with status 0. The tests run exactly this sequence. A second signal while closing is ignored, so it cannot start a second `close()`. Register the handlers with `process.on`, not `process.once`: when the script runs under `tsx`, a `once` handler that has already run lets `tsx` exit the process with status 143 before `close()` finishes. Under an orchestrator, set the termination grace period longer than `shutdownTimeout`.
 
 ## Limits
 

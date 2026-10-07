@@ -44,8 +44,8 @@ const shutdown = (signal: string) => {
     }
   )
 }
-process.once("SIGTERM", () => shutdown("SIGTERM"))
-process.once("SIGINT", () => shutdown("SIGINT"))
+process.on("SIGTERM", () => shutdown("SIGTERM"))
+process.on("SIGINT", () => shutdown("SIGINT"))
 
 server.listen(Number(process.env.PORT ?? 3006), (port) =>
   console.log(`listening on ${port} (pid ${process.pid})`)
