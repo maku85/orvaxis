@@ -2,13 +2,15 @@ import { spawnSync } from "node:child_process"
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
-import { afterEach, describe, expect, it } from "vitest"
+import { afterEach, describe, expect, it, vi } from "vitest"
 
 // End-to-end tests of scripts/release.sh against real git repositories (a working clone and a
 // bare "remote" on disk). `pnpm` is a logging stub and `npm` is a stub for whoami/view/publish
 // that delegates version/pack to the real npm, so nothing is ever published or pushed anywhere.
 const script = resolve("scripts/release.sh")
 const realNpm = spawnSync("sh", ["-c", "command -v npm"], { encoding: "utf8" }).stdout.trim()
+// Every scenario runs the real script, real git and real npm: allow a slow, cold CI runner.
+vi.setConfig({ testTimeout: 60_000 })
 const roots: string[] = []
 
 afterEach(() => {
@@ -38,6 +40,7 @@ function setup(options: { changelog?: string } = {}) {
   const log = join(root, "events.log")
   const registry = join(root, "registry.txt")
   mkdirSync(bin)
+  mkdirSync(join(root, "home"))
   mkdirSync(work)
   writeFileSync(log, "")
   writeFileSync(registry, "")
@@ -94,9 +97,29 @@ echo "unexpected npm $*" >&2; exit 99`
     const result = spawnSync("bash", [script, ...args], {
       cwd: work,
       encoding: "utf8",
-      env: { ...process.env, PATH: `${bin}:${process.env.PATH}`, ...env },
+      env: {
+        ...process.env,
+        PATH: `${bin}:${process.env.PATH}`,
+        // Isolate from the machine: no global git configuration (signing, hooks, default branch),
+        // a private npm cache and no npm log files, which concurrent npm processes can race on.
+        HOME: join(root, "home"),
+        GIT_CONFIG_GLOBAL: "/dev/null",
+        GIT_CONFIG_NOSYSTEM: "1",
+        npm_config_cache: join(root, "npm-cache"),
+        npm_config_logs_max: "0",
+        npm_config_update_notifier: "false",
+        npm_config_audit: "false",
+        npm_config_fund: "false",
+        ...env,
+      },
     })
-    return { status: result.status, out: result.stdout, err: result.stderr }
+    return { status: result.status, out: result.stdout, err: result.stderr, signal: result.signal }
+  }
+  /** Run with --prepare-only and require success, showing the script's output when it fails. */
+  const prepare = (bump = "minor") => {
+    const result = run([bump, "--prepare-only"])
+    expect(result.status, `${result.err}\n${result.out}\nsignal: ${result.signal}`).toBe(0)
+    return result
   }
   const events = () => readFileSync(log, "utf8").trim().split("\n").filter(Boolean)
   const published = () => readFileSync(registry, "utf8").trim().split("\n").filter(Boolean)
@@ -107,6 +130,7 @@ echo "unexpected npm $*" >&2; exit 99`
     work,
     remote,
     run,
+    prepare,
     events,
     published,
     remoteTags,
@@ -339,7 +363,7 @@ describe("release script — failures and recovery", () => {
 
   it("--resume after --prepare-only completes the release", () => {
     const repo = setup()
-    expect(repo.run(["minor", "--prepare-only"]).status).toBe(0)
+    repo.prepare()
     const resumed = repo.run(["--resume"])
     expect(resumed.status, resumed.err).toBe(0)
     expect(repo.published()).toEqual(["0.4.0"])
@@ -354,7 +378,7 @@ describe("release script — failures and recovery", () => {
     expect(publishedEvents(none.events())).toEqual([])
 
     const moved = setup()
-    expect(moved.run(["minor", "--prepare-only"]).status).toBe(0)
+    moved.prepare()
     writeFileSync(join(moved.work, "later.txt"), "x")
     moved.git("add", ".")
     moved.git("commit", "-m", "later work")
@@ -366,7 +390,7 @@ describe("release script — failures and recovery", () => {
 
   it("does not overwrite a remote tag that points elsewhere", () => {
     const repo = setup()
-    expect(repo.run(["minor", "--prepare-only"]).status).toBe(0)
+    repo.prepare()
     // Someone else created v0.4.0 on the remote at a different commit.
     const other = join(repo.root, "other")
     git(repo.root, "clone", repo.remote, other)
