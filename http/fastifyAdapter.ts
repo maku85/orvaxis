@@ -83,9 +83,29 @@ export function createFastifyServer(
   // Fastify stops tracking a hijacked (streamed) response, so its own close() neither waits for it
   // nor force-closes it. The adapter tracks streams itself to honor `shutdownTimeout`.
   const activeStreams = new Set<ServerResponse>()
+  // Fastify's close() does not wait for requests the adapter is still running either, so the
+  // adapter waits for its own work: requests in flight (`activeControllers`) and open streams.
+  const drainWaiters = new Set<() => void>()
+  const notifyDrain = () => {
+    for (const waiter of [...drainWaiters]) waiter()
+  }
   const trackStream = (raw: ServerResponse) => {
     activeStreams.add(raw)
-    raw.once("close", () => activeStreams.delete(raw))
+    raw.once("close", () => {
+      activeStreams.delete(raw)
+      notifyDrain()
+    })
+  }
+  const drained = async () => {
+    while (activeControllers.size > 0 || activeStreams.size > 0) {
+      await new Promise<void>((resolve) => {
+        const waiter = () => {
+          drainWaiters.delete(waiter)
+          resolve()
+        }
+        drainWaiters.add(waiter)
+      })
+    }
   }
   fastify.all("/*", async (req, reply) => {
     const path = (req.url ?? "/").split("?")[0]
@@ -129,6 +149,7 @@ export function createFastifyServer(
       }
     } finally {
       activeControllers.delete(controller)
+      notifyDrain()
     }
   })
 
@@ -175,19 +196,22 @@ export function createFastifyServer(
       // ctx.req.signal already used for per-request timeouts — see the "Timeouts and graceful shutdown" guide.
       for (const controller of activeControllers) controller.abort()
       fastify.server.closeIdleConnections()
-      const streams = [...activeStreams]
-      const streamsClosed = Promise.all(
-        streams.map((raw) => new Promise<void>((resolve) => raw.once("close", () => resolve())))
-      )
+      let forced: () => void = () => {}
+      const forcedClose = new Promise<void>((resolve) => {
+        forced = resolve
+      })
       const deadline =
         shutdownTimeout > 0
           ? setTimeout(() => {
               fastify.server.closeAllConnections()
-              for (const raw of streams) raw.destroy()
+              for (const raw of activeStreams) raw.destroy()
+              forced()
             }, shutdownTimeout)
           : undefined
       try {
-        await Promise.all([fastify.close(), streamsClosed])
+        // Wait for Fastify, and for the adapter's own requests and streams (which Fastify stops
+        // tracking once a response is hijacked), unless the deadline cuts them off first.
+        await Promise.all([fastify.close(), Promise.race([drained(), forcedClose])])
       } finally {
         clearTimeout(deadline)
         listening = false

@@ -566,3 +566,46 @@ describe("createFastifyServer — shutdown deadline for streamed responses", () 
     expect(result.body).toContain("late")
   }, 8000)
 })
+
+describe("createFastifyServer — a stream that starts while the server is closing", () => {
+  it("is still waited for and cut off at shutdownTimeout", async () => {
+    const app = new Orvaxis()
+    app.group({
+      prefix: "/",
+      routes: [
+        {
+          method: "GET",
+          path: "/late",
+          handler: async (ctx) => {
+            await new Promise((resolve) => setTimeout(resolve, 150))
+            ctx.res.write(": started late\n\n")
+            await new Promise((resolve) => setTimeout(resolve, 3_000))
+            if (!ctx.res.completed) ctx.res.end()
+          },
+        },
+      ],
+    })
+    const fastifyInstance = Fastify()
+    const server = createFastifyServer(app, fastifyInstance, { timeout: 0, shutdownTimeout: 400 })
+    await server.listen(0)
+    const { port } = fastifyInstance.server.address() as AddressInfo
+    const outcome = fetch(`http://127.0.0.1:${port}/late`).then(
+      async (response) => {
+        try {
+          await response.text()
+          return "ended"
+        } catch {
+          return "terminated"
+        }
+      },
+      () => "terminated"
+    )
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    const started = Date.now()
+    await server.close()
+    const waited = Date.now() - started
+    expect(await outcome).toBe("terminated")
+    expect(waited).toBeGreaterThanOrEqual(300)
+    expect(waited).toBeLessThan(2_000)
+  }, 8000)
+})

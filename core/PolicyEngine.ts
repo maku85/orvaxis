@@ -117,7 +117,7 @@ export function getPolicyTraceInfo(ctx: OrvaxisContext): PolicyTraceInfo {
     mode: state?.mode,
     truncated: state?.truncated ?? false,
     droppedDecisions: state?.dropped ?? 0,
-    maxEvents: state?.limit,
+    maxEvents: state?.mode === "off" ? undefined : state?.limit,
   }
 }
 

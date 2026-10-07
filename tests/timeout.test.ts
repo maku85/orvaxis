@@ -187,3 +187,20 @@ describe("sanitizeErrorMessage", () => {
     vi.unstubAllEnvs()
   })
 })
+
+describe("abandoned requests keep a standard AbortError reason", () => {
+  it("rejects signal-aware work with an AbortError and is recognized by the runtime", async () => {
+    const { abandonRequest, isRequestAbandoned } = await import("../core/requestAbandoned")
+    const controller = new AbortController()
+    const pending = fetch("http://127.0.0.1:9", { signal: controller.signal }).catch(
+      (error) => error
+    )
+    abandonRequest(controller, "timeout")
+    const error = await pending
+    expect(error.name).toBe("AbortError")
+    expect(isRequestAbandoned(controller.signal)).toBe(true)
+    const plain = new AbortController()
+    plain.abort()
+    expect(isRequestAbandoned(plain.signal)).toBe(false)
+  })
+})
