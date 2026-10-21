@@ -1,1 +1,5 @@
-export { createExpressPolicyGuard, createExpressServer } from "./http/expressAdapter.js"
+export {
+  createExpressPolicyGuard,
+  createExpressServer,
+  type ExpressAdapterOptions,
+} from "./http/expressAdapter.js"

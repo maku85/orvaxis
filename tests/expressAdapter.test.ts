@@ -558,3 +558,68 @@ describe("createExpressServer — shutdown after a stream ends itself", () => {
     expect(await body).toContain("event: bye")
   }, 8000)
 })
+
+describe("createExpressServer — JSON body parsing", () => {
+  function echoApp() {
+    const app = new Orvaxis()
+    app.group({
+      prefix: "/",
+      routes: [
+        {
+          method: "POST",
+          path: "/echo",
+          handler: (ctx) => ctx.res.json({ body: ctx.req.body ?? null }),
+        },
+      ],
+    })
+    return app
+  }
+
+  async function post(
+    server: ReturnType<typeof createExpressServer>,
+    body: string
+  ): Promise<{ status: number; text: string }> {
+    let port = 0
+    await server.listen(0, (p) => {
+      port = p
+    })
+    try {
+      const res = await fetch(`http://127.0.0.1:${port}/echo`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body,
+      })
+      return { status: res.status, text: await res.text() }
+    } finally {
+      await server.close()
+    }
+  }
+
+  it("parses JSON by default when the adapter creates the Express app", async () => {
+    const result = await post(createExpressServer(echoApp()), '{"x":1}')
+    expect(JSON.parse(result.text)).toEqual({ body: { x: 1 } })
+  })
+
+  it("applies the size limit and answers with the error envelope", async () => {
+    const server = createExpressServer(echoApp(), undefined, { bodyParser: { limit: "10b" } })
+    const result = await post(server, JSON.stringify({ big: "x".repeat(100) }))
+    expect(result.status).toBe(413)
+    expect(JSON.parse(result.text)).toHaveProperty("requestId")
+  })
+
+  it("can be disabled", async () => {
+    const server = createExpressServer(echoApp(), undefined, { bodyParser: false })
+    expect(JSON.parse((await post(server, '{"x":1}')).text)).toEqual({ body: null })
+  })
+
+  it("leaves an Express app passed in as configured, unless bodyParser is given", async () => {
+    const own = await post(createExpressServer(echoApp(), express()), '{"x":1}')
+    expect(JSON.parse(own.text)).toEqual({ body: null })
+
+    const opted = await post(
+      createExpressServer(echoApp(), express(), { bodyParser: {} }),
+      '{"x":1}'
+    )
+    expect(JSON.parse(opted.text)).toEqual({ body: { x: 1 } })
+  })
+})

@@ -52,11 +52,29 @@ function wrapExpressResponse(res: Response, onStreamStart: () => void): OrvaxisR
   return wrapped
 }
 
+export type ExpressAdapterOptions = AdapterOptions & {
+  /**
+   * JSON body parsing, registered before the adapter. By default it is enabled only when the
+   * adapter creates the Express app itself (no `server` argument), so `ctx.req.body` is populated
+   * as it is on Fastify; an app you pass in is left as you configured it. Pass `{ limit }` to
+   * set the size limit (default `"100kb"`) or to enable parsing on your own app, and `false` to
+   * never register a parser.
+   */
+  bodyParser?: false | { limit?: string | number }
+}
+
 export function createExpressServer(
   app: Orvaxis,
-  server: Application = express(),
-  options: AdapterOptions = {}
+  serverArg?: Application,
+  options: ExpressAdapterOptions = {}
 ): ServerAdapter {
+  const server = serverArg ?? express()
+  if (
+    options.bodyParser !== false &&
+    (options.bodyParser !== undefined || serverArg === undefined)
+  ) {
+    server.use(express.json({ limit: options.bodyParser?.limit }))
+  }
   const timeoutMs = options.timeout ?? 30_000
   const logger = options.logger ?? console
   const requestIdHeader = options.requestIdHeader ?? "X-Request-ID"

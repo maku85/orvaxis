@@ -88,7 +88,7 @@ Code that reads a query value directly and assumes it's a string (`ctx.req.query
 
 Orvaxis does not enforce its own body size limit. The ceiling is set entirely by the body-parsing layer of the underlying framework, **before** the request reaches the Orvaxis runtime.
 
-**Express** — body parsing is opt-in. Pass a `limit` to `express.json()` (default `"100kb"`):
+**Express** — when `createExpressServer(app)` creates the Express app itself, it registers `express.json()` (limit `"100kb"`) so `ctx.req.body` is filled as it is on Fastify. Set the limit with `{ bodyParser: { limit: "256kb" } }` in the options, or turn parsing off with `{ bodyParser: false }`. When you pass your own Express app, the adapter leaves its parsers alone unless you give `bodyParser`. Pass a `limit` to `express.json()` yourself (default `"100kb"`):
 
 ```ts
 import express from "express"
