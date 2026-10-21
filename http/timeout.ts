@@ -25,12 +25,35 @@ export function sanitizeErrorMessage(err: unknown): string {
   return "Internal Server Error"
 }
 
-export function buildErrorBody(err: unknown, requestId?: string): ErrorResponse {
+export type ErrorBodyOptions = {
+  /**
+   * The error comes from the HTTP framework's own request handling (body parsing, size limits),
+   * not from application code, so its string `code` (e.g. `FST_ERR_CTP_BODY_TOO_LARGE`) is safe to
+   * expose. `details` is never taken from such errors.
+   */
+  frameworkError?: boolean
+}
+
+/**
+ * Only `HttpError` is an intentional response, so only it contributes `code` and `details`.
+ * Any other error (a database driver, an HTTP client) may carry connection strings, hosts or
+ * query text in those fields, which must not reach the client.
+ */
+export function buildErrorBody(
+  err: unknown,
+  requestId?: string,
+  options: ErrorBodyOptions = {}
+): ErrorResponse {
   const body: ErrorResponse = { error: sanitizeErrorMessage(err) }
-  const code = (err as { code?: unknown } | null)?.code
-  if (typeof code === "string") body.code = code
-  const details = (err as { details?: unknown } | null)?.details
-  if (details !== undefined) body.details = details
+  const intentional = err instanceof HttpError
+  if (intentional || options.frameworkError) {
+    const code = (err as { code?: unknown } | null)?.code
+    if (typeof code === "string") body.code = code
+  }
+  if (intentional) {
+    const details = err.details
+    if (details !== undefined) body.details = details
+  }
   if (requestId !== undefined) body.requestId = requestId
   return body
 }

@@ -105,6 +105,32 @@ describe("withTimeout", () => {
 })
 
 describe("buildErrorBody", () => {
+  it("does not expose code or details of errors that are not HttpError", () => {
+    const err = Object.assign(new Error("password=hunter2"), {
+      code: "ER_ACCESS_DENIED",
+      details: { host: "10.0.0.5" },
+    })
+    expect(buildErrorBody(err, "req-1")).toEqual({
+      error: expect.any(String),
+      requestId: "req-1",
+    })
+  })
+
+  it("exposes code and details declared on an HttpError", () => {
+    const err = new HttpError(422, "Invalid", { code: "invalid", details: [{ path: ["a"] }] })
+    expect(buildErrorBody(err)).toMatchObject({ code: "invalid", details: [{ path: ["a"] }] })
+  })
+
+  it("exposes only the code of a framework error, never its details", () => {
+    const err = Object.assign(new Error("too large"), {
+      code: "FST_ERR_CTP_BODY_TOO_LARGE",
+      details: { secret: 1 },
+    })
+    const body = buildErrorBody(err, undefined, { frameworkError: true })
+    expect(body.code).toBe("FST_ERR_CTP_BODY_TOO_LARGE")
+    expect(body).not.toHaveProperty("details")
+  })
+
   it("always includes the error message", () => {
     expect(buildErrorBody(new HttpError(404, "Not Found"))).toMatchObject({ error: "Not Found" })
   })

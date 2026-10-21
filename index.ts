@@ -18,6 +18,7 @@ export { traceEvent } from "./debug/traceEvent.js"
 export {
   type AdapterOptions,
   buildErrorBody,
+  type ErrorBodyOptions,
   type ErrorResponse,
   sanitizeErrorMessage,
   withTimeout,

@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Error responses leaked `code` and `details` of any error** — `buildErrorBody` copied `err.code` and `err.details` from every thrown error, so in production a database or HTTP-client error reached the client with fields such as `ER_ACCESS_DENIED` and an internal host. Only `HttpError` now contributes `code` and `details`; the framework's own request-parsing errors keep their `code` (not `details`). Applications that threw plain errors carrying `code` or `details` on purpose must throw `HttpError` instead.
 - **Policy scopes could be bypassed with repeated slashes** — the router collapses `//` to `/` before matching, but policy `scope.path` (string, RegExp and predicate) was tested against the raw path, so `GET //admin/users` reached the `/admin` route without running a policy scoped to `/admin`. Scopes now see the same normalized path as the router. Upgrade if you rely on path-scoped policies for authorization.
 
 ## [0.5.1] - 2026-10-07

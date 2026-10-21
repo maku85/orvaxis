@@ -169,7 +169,7 @@ export function createFastifyServer(
     reply
       .header(requestIdHeader, requestId)
       .status(e.statusCode ?? e.status ?? 500)
-      .send(buildErrorBody(err, requestId))
+      .send(buildErrorBody(err, requestId, { frameworkError: true }))
   })
 
   let listening = false

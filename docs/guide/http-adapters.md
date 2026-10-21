@@ -142,6 +142,8 @@ Message sanitization depends on `NODE_ENV`:
 | `production` | `"Internal Server Error"` | original message |
 | anything else | original message | original message |
 
+Only `HttpError` contributes `code` and `details`. For any other error they are dropped, because database drivers and HTTP clients put hosts, usernames or query text there. The one exception is the code of an error raised by Express or Fastify while parsing the request (for example `FST_ERR_CTP_BODY_TOO_LARGE`), which is forwarded without `details`.
+
 `HttpError` messages are always forwarded because they are intentional user-facing responses. All other error messages are hidden in production to avoid leaking internal details such as stack traces, file paths, or database error text.
 
 **This includes errors that never reach the Orvaxis runtime.** A malformed JSON body rejected by `express.json()`, or a request over Fastify's `bodyLimit`, happens in the underlying framework's own parsing layer, before Orvaxis's routing and policies ever run. Both adapters register a dedicated error handler for this case (a 4-arg middleware on Express, `fastify.setErrorHandler` on Fastify) so these responses go through the same `ErrorResponse` envelope and carry the same `requestId` — instead of Express's default HTML error page or Fastify's native `{ statusCode, code, error, message }` shape.

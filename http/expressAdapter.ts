@@ -133,7 +133,7 @@ export function createExpressServer(
     res
       .set(requestIdHeader, requestId)
       .status(e.status ?? e.statusCode ?? 500)
-      .json(buildErrorBody(err, requestId))
+      .json(buildErrorBody(err, requestId, { frameworkError: true }))
   })
 
   let httpServer: ReturnType<typeof server.listen> | null = null
