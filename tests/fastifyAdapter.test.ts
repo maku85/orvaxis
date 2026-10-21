@@ -609,3 +609,55 @@ describe("createFastifyServer — a stream that starts while the server is closi
     expect(waited).toBeLessThan(2_000)
   }, 8000)
 })
+
+describe("createFastifyServer — multi-value headers", () => {
+  function fetchHeaders(
+    port: number,
+    path: string
+  ): Promise<Record<string, string | string[] | undefined>> {
+    return new Promise((resolve, reject) => {
+      get({ port, path }, (res) => {
+        res.resume()
+        res.on("end", () => resolve(res.headers))
+      }).on("error", reject)
+    })
+  }
+
+  it("sends each Set-Cookie as its own header, for buffered and streamed responses", async () => {
+    const app = new Orvaxis()
+    const cookies = ["a=1; Path=/", "b=2; Path=/"]
+    app.group({
+      prefix: "/",
+      routes: [
+        {
+          method: "GET",
+          path: "/buffered",
+          handler: (ctx) => {
+            ctx.res.setHeader("Set-Cookie", cookies)
+            ctx.res.json({ ok: true })
+          },
+        },
+        {
+          method: "GET",
+          path: "/streamed",
+          handler: (ctx) => {
+            ctx.res.setHeader("Set-Cookie", cookies)
+            ctx.res.write("x")
+            ctx.res.end()
+          },
+        },
+      ],
+    })
+    const server = createFastifyServer(app, Fastify())
+    let port = 0
+    await server.listen(0, (p) => {
+      port = p
+    })
+    try {
+      expect((await fetchHeaders(port, "/buffered"))["set-cookie"]).toEqual(cookies)
+      expect((await fetchHeaders(port, "/streamed"))["set-cookie"]).toEqual(cookies)
+    } finally {
+      await server.close()
+    }
+  })
+})

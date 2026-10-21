@@ -47,7 +47,8 @@ function wrapFastifyResponse(
       reply.send(body)
     },
     setHeader(name, value) {
-      reply.header(name, Array.isArray(value) ? value.join(", ") : value)
+      // Arrays are passed through: joining them with ", " would merge several Set-Cookie headers into one.
+      reply.header(name, value)
       return wrapped
     },
     write(chunk) {
