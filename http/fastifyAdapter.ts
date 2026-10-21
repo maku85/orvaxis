@@ -3,7 +3,7 @@ import Fastify, { type FastifyReply } from "fastify"
 import type { Orvaxis } from "../core/Orvaxis.js"
 import { abandonRequest } from "../core/requestAbandoned.js"
 import type { OrvaxisRequest, OrvaxisResponse, ServerAdapter } from "../types/index.js"
-import { type AdapterOptions, buildErrorBody, withTimeout } from "./timeout.js"
+import { type AdapterOptions, buildErrorBody, resolveRequestId, withTimeout } from "./timeout.js"
 
 function wrapFastifyResponse(
   reply: FastifyReply,
@@ -110,8 +110,7 @@ export function createFastifyServer(
   }
   fastify.all("/*", async (req, reply) => {
     const path = (req.url ?? "/").split("?")[0]
-    const requestId =
-      (req.headers[requestIdHeaderLower] as string) || (req.id as string) || crypto.randomUUID()
+    const requestId = resolveRequestId(req.headers[requestIdHeaderLower], options.trustRequestId)
     const controller = new AbortController()
     activeControllers.add(controller)
     // FastifyRequest defines 'signal' (and others) as getter-only on the prototype.
@@ -164,8 +163,7 @@ export function createFastifyServer(
       logger.error("[orvaxis] unhandled error after response sent:", err)
       return
     }
-    const requestId =
-      (req.headers[requestIdHeaderLower] as string) || (req.id as string) || crypto.randomUUID()
+    const requestId = resolveRequestId(req.headers[requestIdHeaderLower], options.trustRequestId)
     const e = err as { statusCode?: number; status?: number }
     reply
       .header(requestIdHeader, requestId)

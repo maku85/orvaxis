@@ -20,6 +20,7 @@ export {
   buildErrorBody,
   type ErrorBodyOptions,
   type ErrorResponse,
+  resolveRequestId,
   sanitizeErrorMessage,
   withTimeout,
 } from "./http/timeout.js"

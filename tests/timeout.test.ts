@@ -1,6 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { HttpError } from "../core/HttpError"
-import { buildErrorBody, sanitizeErrorMessage, withTimeout } from "../http/timeout"
+import {
+  buildErrorBody,
+  resolveRequestId,
+  sanitizeErrorMessage,
+  withTimeout,
+} from "../http/timeout"
 
 describe("withTimeout", () => {
   beforeEach(() => {
@@ -228,5 +233,32 @@ describe("abandoned requests keep a standard AbortError reason", () => {
     const plain = new AbortController()
     plain.abort()
     expect(isRequestAbandoned(plain.signal)).toBe(false)
+  })
+})
+
+describe("resolveRequestId", () => {
+  const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
+
+  it("keeps a well-formed incoming ID", () => {
+    expect(resolveRequestId("abc-123_X.y")).toBe("abc-123_X.y")
+    expect(resolveRequestId("a".repeat(128))).toBe("a".repeat(128))
+  })
+
+  it.each([
+    ["too long", "a".repeat(129)],
+    ["empty", ""],
+    ["spaces", "a b"],
+    ["newline", "a\nb"],
+    ["comma list from repeated headers", "a, b"],
+    ["markup", "<script>"],
+    ["non-ASCII", "id-\u00e9"],
+    ["array", ["a", "b"]],
+    ["missing", undefined],
+  ])("replaces an invalid ID (%s) with a UUID", (_label, value) => {
+    expect(resolveRequestId(value as string | string[] | undefined)).toMatch(uuid)
+  })
+
+  it("ignores a valid incoming ID when trust is disabled", () => {
+    expect(resolveRequestId("abc", false)).toMatch(uuid)
   })
 })

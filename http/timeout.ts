@@ -8,6 +8,25 @@ export type AdapterOptions = {
   logger?: Logger
   /** Header used to read/propagate the request ID. Default: "X-Request-ID". */
   requestIdHeader?: string
+  /**
+   * Accept a request ID sent by the client in `requestIdHeader`. Default: `true`. An incoming ID
+   * is used only when it is 1-128 characters of `A-Za-z0-9._-`; anything else is replaced by a
+   * generated UUID. Set `false` when clients are not behind a proxy you control, so every request
+   * gets a server-generated ID.
+   */
+  trustRequestId?: boolean
+}
+
+const VALID_REQUEST_ID = /^[A-Za-z0-9._-]{1,128}$/
+
+/**
+ * The request ID ends up in logs, traces, span attributes and the response header, so a
+ * client-supplied value is length- and charset-limited (no spaces, newlines or control
+ * characters) before it is trusted.
+ */
+export function resolveRequestId(incoming: string | string[] | undefined, trust = true): string {
+  if (trust && typeof incoming === "string" && VALID_REQUEST_ID.test(incoming)) return incoming
+  return crypto.randomUUID()
 }
 
 export type ErrorResponse = {

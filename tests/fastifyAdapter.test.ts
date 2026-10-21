@@ -661,3 +661,40 @@ describe("createFastifyServer — multi-value headers", () => {
     }
   })
 })
+
+describe("request IDs", () => {
+  function requestId(port: number, headers: Record<string, string>): Promise<string> {
+    return new Promise((resolve, reject) => {
+      get({ port, path: "/health", headers }, (res) => {
+        res.resume()
+        res.on("end", () => resolve(String(res.headers["x-request-id"])))
+      }).on("error", reject)
+    })
+  }
+
+  it("uses a UUID instead of Fastify's sequential id, and drops invalid or untrusted incoming IDs", async () => {
+    const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-/
+    const trusting = createFastifyServer(makeApp(), Fastify())
+    let port = 0
+    await trusting.listen(0, (p) => {
+      port = p
+    })
+    try {
+      expect(await requestId(port, {})).toMatch(uuid)
+      expect(await requestId(port, { "x-request-id": "client-id-1" })).toBe("client-id-1")
+      expect(await requestId(port, { "x-request-id": "bad id" })).toMatch(uuid)
+    } finally {
+      await trusting.close()
+    }
+
+    const strict = createFastifyServer(makeApp(), Fastify(), { trustRequestId: false })
+    await strict.listen(0, (p) => {
+      port = p
+    })
+    try {
+      expect(await requestId(port, { "x-request-id": "client-id-1" })).toMatch(uuid)
+    } finally {
+      await strict.close()
+    }
+  })
+})

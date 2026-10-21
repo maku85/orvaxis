@@ -42,6 +42,7 @@ Run a complete example from a checkout: `pnpm exec tsx examples/express-server.t
 | `shutdownTimeout` | 10 000 ms | how long `close()` waits before cutting connections; `0` waits indefinitely |
 | `logger` | `console` | receives errors that happen after a response was sent |
 | `requestIdHeader` | `X-Request-ID` | header read for the request ID and set on the response |
+| `trustRequestId` | `true` | accept a client-sent request ID when it is 1–128 characters of `A-Za-z0-9._-`; `false` always generates a UUID |
 
 `listen` rejects with `Server is already listening. Call close() first.` if called twice, and `close()` resolves even when nothing is listening, so calling it twice is safe. An Express adapter can `listen` again after `close()`; a Fastify instance cannot be reopened (Fastify throws), so create a new `Fastify()` and adapter to restart.
 

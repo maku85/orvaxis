@@ -8,7 +8,7 @@ import express, {
 import type { Orvaxis } from "../core/Orvaxis.js"
 import { abandonRequest, isRequestAbandoned } from "../core/requestAbandoned.js"
 import type { OrvaxisRequest, OrvaxisResponse, ServerAdapter } from "../types/index.js"
-import { type AdapterOptions, buildErrorBody, withTimeout } from "./timeout.js"
+import { type AdapterOptions, buildErrorBody, resolveRequestId, withTimeout } from "./timeout.js"
 
 function wrapExpressResponse(res: Response, onStreamStart: () => void): OrvaxisResponse {
   const wrapped: OrvaxisResponse = {
@@ -64,7 +64,7 @@ export function createExpressServer(
   const activeControllers = new Set<AbortController>()
   let closing = false
   server.use(async (req: Request, res: Response, _next: NextFunction) => {
-    const requestId = (req.headers[requestIdHeaderLower] as string) || crypto.randomUUID()
+    const requestId = resolveRequestId(req.headers[requestIdHeaderLower], options.trustRequestId)
     const controller = new AbortController()
     activeControllers.add(controller)
     // Express.request defines 'path' (and others) as getter-only on the prototype.
@@ -128,7 +128,7 @@ export function createExpressServer(
       logger.error("[orvaxis] unhandled error after headers sent:", err)
       return
     }
-    const requestId = (req.headers[requestIdHeaderLower] as string) || crypto.randomUUID()
+    const requestId = resolveRequestId(req.headers[requestIdHeaderLower], options.trustRequestId)
     const e = err as { status?: number; statusCode?: number }
     res
       .set(requestIdHeader, requestId)
@@ -194,7 +194,7 @@ export function createExpressPolicyGuard(
   const requestIdHeaderLower = requestIdHeader.toLowerCase()
 
   return (req, res, next) => {
-    const requestId = (req.headers[requestIdHeaderLower] as string) || crypto.randomUUID()
+    const requestId = resolveRequestId(req.headers[requestIdHeaderLower], options.trustRequestId)
     const controller = new AbortController()
     const routePath = `${req.baseUrl}${req.path}`.replace(/\/+/g, "/")
     const adapted = Object.create(req) as OrvaxisRequest
