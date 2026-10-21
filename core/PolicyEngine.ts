@@ -7,7 +7,7 @@ import type {
   PolicyTraceOptions,
 } from "../types/index.js"
 import { HttpError } from "./HttpError.js"
-import { mergeSafe } from "./utils.js"
+import { mergeSafe, normalizePath } from "./utils.js"
 
 /**
  * Deterministic identity of a policy declaration: the layer plus its zero-based position in that
@@ -39,18 +39,19 @@ export function matchesPolicyScope(scope: PolicyScope | undefined, ctx: OrvaxisC
 
   if (scope.path) {
     const path = scope.path
-    if (typeof path === "function") return path(ctx.req.path)
+    const requestPath = normalizePath(ctx.req.path)
+    if (typeof path === "function") return path(requestPath)
     if (path instanceof RegExp) {
       path.lastIndex = 0
       try {
-        return path.test(ctx.req.path)
+        return path.test(requestPath)
       } finally {
         path.lastIndex = 0
       }
     }
     // string: prefix match — "/api" matches "/api" and "/api/v1/users" but not "/apiv2"
     const prefix = path.endsWith("/") ? path : `${path}/`
-    return ctx.req.path === path || ctx.req.path.startsWith(prefix)
+    return requestPath === path || requestPath.startsWith(prefix)
   }
 
   return true

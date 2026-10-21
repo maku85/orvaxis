@@ -11,6 +11,7 @@ import type {
 } from "../types/index.js"
 import { HttpError } from "./HttpError.js"
 import { policyDeclarationId } from "./PolicyEngine.js"
+import { normalizePath } from "./utils.js"
 import { validateGroup } from "./validation.js"
 
 function decodeSafe(segment: string): string {
@@ -346,7 +347,7 @@ export class Router {
   }
 
   match(req: { path: string; method: string }): RouteMatch | null {
-    const path = req.path.replace(/\/+/g, "/")
+    const path = normalizePath(req.path)
     const result = this.trie.match(req.method, path)
     if (result) return result
     if (req.method.toUpperCase() === "HEAD") return this.trie.match("GET", path)
@@ -354,7 +355,7 @@ export class Router {
   }
 
   allowedMethods(path: string): string[] {
-    const normalized = path.replace(/\/+/g, "/")
+    const normalized = normalizePath(path)
     const methods = this.trie.allowedMethods(normalized)
     if (methods.includes("GET") && !methods.includes("HEAD")) {
       methods.push("HEAD")

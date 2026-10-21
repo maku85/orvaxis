@@ -5,3 +5,7 @@ export function mergeSafe(target: Record<string, unknown>, source: Record<string
     if (!UNSAFE_KEYS.has(key)) target[key] = source[key]
   }
 }
+
+export function normalizePath(path: string): string {
+  return path.replace(/\/+/g, "/")
+}

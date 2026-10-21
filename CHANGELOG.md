@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Policy scopes could be bypassed with repeated slashes** — the router collapses `//` to `/` before matching, but policy `scope.path` (string, RegExp and predicate) was tested against the raw path, so `GET //admin/users` reached the `/admin` route without running a policy scoped to `/admin`. Scopes now see the same normalized path as the router. Upgrade if you rely on path-scoped policies for authorization.
+
 ## [0.5.1] - 2026-10-07
 
 ### Changed
