@@ -62,7 +62,10 @@ describe("PolicyEngine", () => {
     const engine = new PolicyEngine()
     engine.register(makePolicy({ name: "auth-policy", evaluate: async () => ({ allow: false }) }))
 
-    await expect(engine.evaluate(makeCtx())).rejects.toThrow("Blocked by auth-policy")
+    await expect(engine.evaluate(makeCtx())).rejects.toMatchObject({
+      message: "Forbidden",
+      policyName: "auth-policy",
+    })
   })
 
   it("merges modify data into ctx.meta on allow", async () => {

@@ -1,3 +1,4 @@
+import { STATUS_CODES } from "node:http"
 import type {
   OrvaxisContext,
   Policy,
@@ -280,7 +281,10 @@ export async function evaluatePolicies(
       })
     }
     if (!allowed) {
-      throw new HttpError(result.status ?? 403, result.reason ?? `Blocked by ${policy.name}`, {
+      const status = result.status ?? 403
+      // The fallback is sent to the client, so it must not name the policy: that would reveal
+      // which rule stopped the request. The name stays on `err.policyName` and in the trace.
+      throw new HttpError(status, result.reason ?? STATUS_CODES[status] ?? "Forbidden", {
         policyName: policy.name,
       })
     }

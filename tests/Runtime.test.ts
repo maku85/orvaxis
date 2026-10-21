@@ -1047,7 +1047,7 @@ describe("Runtime", () => {
   })
 
   describe("policy edge cases", () => {
-    it("uses fallback 'Blocked by <name>' when group policy denies without reason", async () => {
+    it("uses a generic fallback that does not name the policy when a group policy denies without reason", async () => {
       const runtime = new Runtime()
       runtime.router.group(
         makeGroup("/api", {
@@ -1056,7 +1056,9 @@ describe("Runtime", () => {
       )
 
       const err = await runtime.execute(makeReq("/api/resource"), makeRes()).catch((e) => e)
-      expect(err.message).toBe("Blocked by silent-blocker")
+      expect(err.message).toBe("Forbidden")
+      expect(err.message).not.toContain("silent-blocker")
+      expect((err as { policyName?: string }).policyName).toBe("silent-blocker")
       expect(err.status).toBe(403)
     })
 
