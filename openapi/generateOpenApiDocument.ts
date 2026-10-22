@@ -1,3 +1,4 @@
+import { isStandardSchema } from "../core/schema.js"
 import type { RouteInfo, RouteInspection, SchemaField } from "../types/index.js"
 
 export type OpenApiSchemaContext = {
@@ -7,7 +8,11 @@ export type OpenApiSchemaContext = {
   status?: number
 }
 
-/** Converts a validator into a JSON Schema/OpenAPI Schema Object. No converter is bundled. */
+/**
+ * Converts a validator into a JSON Schema/OpenAPI Schema Object. No converter is bundled: without
+ * one, a validator that implements Standard JSON Schema (`~standard.jsonSchema`, as Zod 4 does)
+ * describes itself, and anything else raises.
+ */
 export type OpenApiSchemaConverter = (
   validator: SchemaField,
   context: OpenApiSchemaContext
@@ -319,17 +324,14 @@ function convert(
   known: ReadonlySet<string>,
   status?: number
 ): Record<string, unknown> {
-  if (!options.schemaConverter) {
-    throw new TypeError(
-      `An OpenAPI schemaConverter is required for ${field} schema on ${route.method} ${route.path}`
-    )
-  }
-  const schema = options.schemaConverter(validator, {
-    method: route.method,
-    path: route.path,
-    field,
-    ...(status === undefined ? {} : { status }),
-  })
+  const schema = options.schemaConverter
+    ? options.schemaConverter(validator, {
+        method: route.method,
+        path: route.path,
+        field,
+        ...(status === undefined ? {} : { status }),
+      })
+    : describeStandard(validator, route, field)
   if (!schema || typeof schema !== "object" || Array.isArray(schema)) {
     throw new TypeError(
       `schemaConverter must return a JSON Schema object for ${route.method} ${route.path}`
@@ -337,6 +339,43 @@ function convert(
   }
   assertReferences(schema, known, `${field} schema on ${route.method} ${route.path}`)
   return schema
+}
+
+/**
+ * A validator that implements Standard JSON Schema describes itself: its input shape for what
+ * clients send (body, params, query, headers) and its output shape for responses. OpenAPI 3.1
+ * uses the JSON Schema 2020-12 dialect, so that is the requested target; the root `$schema`
+ * keyword is dropped because the document already declares the dialect.
+ */
+function describeStandard(
+  validator: SchemaField,
+  route: RouteInspection,
+  field: OpenApiSchemaContext["field"]
+): Record<string, unknown> {
+  const generator = isStandardSchema(validator) ? validator["~standard"].jsonSchema : undefined
+  if (!generator) {
+    throw new TypeError(
+      `An OpenAPI schemaConverter is required for ${field} schema on ${route.method} ${route.path}: ` +
+        "the validator does not implement Standard JSON Schema (~standard.jsonSchema)"
+    )
+  }
+  let schema: Record<string, unknown>
+  try {
+    schema = (field === "response" ? generator.output : generator.input)({
+      target: "draft-2020-12",
+    })
+  } catch (error) {
+    throw new TypeError(
+      `The validator for the ${field} schema on ${route.method} ${route.path} cannot be described as JSON Schema: ${(error as Error).message}. Pass a schemaConverter to describe it yourself`
+    )
+  }
+  if (!schema || typeof schema !== "object" || Array.isArray(schema)) {
+    throw new TypeError(
+      `The validator for the ${field} schema on ${route.method} ${route.path} returned no JSON Schema object`
+    )
+  }
+  const { $schema: _dialect, ...rest } = schema
+  return rest
 }
 
 function statusDescription(status: number): string {

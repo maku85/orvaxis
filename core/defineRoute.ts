@@ -1,8 +1,21 @@
-import type { OrvaxisContext, OrvaxisRequest, Route, RouteSchema } from "../types/index.js"
+import type {
+  OrvaxisContext,
+  OrvaxisRequest,
+  Route,
+  RouteSchema,
+  StandardSchemaV1,
+} from "../types/index.js"
 
-type ZodLike<T> = { parse(data: unknown): T }
+type ZodLike<T> = { parse(data: unknown): T } | StandardSchemaV1<unknown, T>
 
-type OutputOf<TSchema> = TSchema extends { parse(data: unknown): infer TOutput } ? TOutput : never
+// A Standard Schema's declared output type wins over `parse`, matching what runs at request time.
+type OutputOf<TSchema> = TSchema extends {
+  readonly "~standard": { readonly types?: { readonly output: infer TOutput } | undefined }
+}
+  ? TOutput
+  : TSchema extends { parse(data: unknown): infer TOutput }
+    ? TOutput
+    : never
 
 type SchemaOutput<
   TSchema extends RouteSchema,

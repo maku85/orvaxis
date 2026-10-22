@@ -236,9 +236,44 @@ export type PolicyScope = {
   method?: HttpMethod
 }
 
-export type SchemaField<TOutput = unknown> = {
-  parse(data: unknown): TOutput
+/**
+ * The Standard Schema interface (https://standardschema.dev), implemented by Zod 3.24+, Valibot,
+ * ArkType and others. Declared here so Orvaxis has no dependency on the spec package.
+ */
+export type StandardIssue = {
+  readonly message: string
+  readonly path?: ReadonlyArray<PropertyKey | { readonly key: PropertyKey }> | undefined
 }
+
+export type StandardResult<Output> =
+  | { readonly value: Output; readonly issues?: undefined }
+  | { readonly issues: ReadonlyArray<StandardIssue> }
+
+export interface StandardSchemaV1<Input = unknown, Output = Input> {
+  readonly "~standard": {
+    readonly version: 1
+    readonly vendor: string
+    readonly validate: (value: unknown) => StandardResult<Output> | Promise<StandardResult<Output>>
+    readonly types?: { readonly input: Input; readonly output: Output } | undefined
+    /**
+     * Standard JSON Schema (optional, implemented by Zod 4): lets `orvaxis/openapi` describe the
+     * validator without a converter.
+     */
+    readonly jsonSchema?: {
+      readonly input: (options: { readonly target: string }) => Record<string, unknown>
+      readonly output: (options: { readonly target: string }) => Record<string, unknown>
+    }
+  }
+}
+
+/**
+ * A request or response validator: a Standard Schema, or any object with a synchronous `parse`
+ * that returns the parsed value and throws on failure (the shape of Zod's `parse`). When an
+ * object has both, the Standard Schema is used.
+ */
+export type SchemaField<TOutput = unknown> =
+  | StandardSchemaV1<unknown, TOutput>
+  | { parse(data: unknown): TOutput }
 
 export type RouteSchema = {
   body?: SchemaField

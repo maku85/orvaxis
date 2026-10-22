@@ -85,3 +85,40 @@ typedGroupApp.group({
     },
   ],
 })
+
+// A Standard Schema with no `parse` method: the handler types come from `~standard.types.output`.
+type Output = { id: number; tags: string[] }
+declare const standardOnly: {
+  readonly "~standard": {
+    readonly version: 1
+    readonly vendor: "test"
+    readonly validate: (
+      value: unknown
+    ) => { readonly value: Output } | { readonly issues: ReadonlyArray<{ message: string }> }
+    readonly types?: { readonly input: unknown; readonly output: Output } | undefined
+  }
+}
+
+defineRoute({
+  method: "POST",
+  path: "/standard",
+  schema: { body: standardOnly },
+  handler(ctx) {
+    const id: number = ctx.req.body.id
+    const tags: string[] = ctx.req.body.tags
+    // @ts-expect-error the declared output has a numeric id
+    const incorrect: string = ctx.req.body.id
+    void [id, tags, incorrect]
+  },
+})
+
+// The explicit body-type overload accepts a Standard Schema too.
+defineRoute<Output>({
+  method: "POST",
+  path: "/standard-explicit",
+  schema: { body: standardOnly },
+  handler(ctx) {
+    const id: number = ctx.req.body.id
+    void id
+  },
+})

@@ -2,18 +2,20 @@
 
 Orvaxis can parse and transform the four request inputs of a route — `body`, `params`, `query` and `headers` — before the handler runs, and can infer the handler's types from what the validators return. Validation is opt-in: nothing is parsed unless the route declares a schema **and** `schemaValidationPlugin` is registered.
 
-## Any validator with `.parse()`
+## Any Standard Schema, or any validator with `.parse()`
 
-A schema field is any object with a `parse(data)` method that returns the value or throws. Zod schemas qualify; so does a hand-written object. Orvaxis bundles no validator.
+A schema field is a [Standard Schema](https://standardschema.dev) (the `~standard` interface that Zod 3.24+, Valibot, ArkType and others implement), or any object with a `parse(data)` method that returns the value or throws. Orvaxis bundles no validator. When an object has both, `~standard` is used, so Zod behaves the same either way and its asynchronous refinements work.
 
 ```ts
-type SchemaField<TOutput = unknown> = { parse(data: unknown): TOutput }
+type SchemaField<TOutput = unknown> =
+  | StandardSchemaV1<unknown, TOutput> // { "~standard": { validate, types?, jsonSchema? } }
+  | { parse(data: unknown): TOutput }
 type RouteSchema = { body?: SchemaField; params?: SchemaField; query?: SchemaField; headers?: SchemaField }
 ```
 
-What goes into `parse`, and what it replaces, depends on the field:
+What goes into the validator (`validate` or `parse`), and what it replaces, depends on the field:
 
-| Field | Input to `parse` | Replaced by the parsed value |
+| Field | Input to the validator | Replaced by the parsed value |
 |---|---|---|
 | `body` | `ctx.req.body`, as the adapter parsed it | `ctx.req.body` |
 | `params` | the path parameters, all strings | `ctx.params` (and `ctx.meta.route.params`) |
@@ -70,7 +72,7 @@ app.group({
 
 ## A failed parse is a 422
 
-When a field does not parse, the request ends with `422` and `Validation failed: <field>`. The adapters send the standard error envelope, and `details` carries the validator's issues as `{ path, message }` pairs when it reports them (as Zod does). The handler does not run.
+`validate` may be asynchronous for request fields (the runtime awaits it); a `parse`-only validator must be synchronous. Response schemas are always synchronous: an asynchronous Standard Schema there fails the response with a clear error. When a field does not parse, the request ends with `422` and `Validation failed: <field>`. The adapters send the standard error envelope, and `details` carries the validator's issues as `{ path, message }` pairs when it reports them (as Zod does). The handler does not run.
 
 <!-- contract: invalid-body status,envelope,events -->
 ```json

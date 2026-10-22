@@ -68,6 +68,7 @@ export type {
   RouteSchema,
   SchemaField,
   ServerAdapter,
+  StandardSchemaV1,
   Trace,
   TraceEvent,
   TracerLike,

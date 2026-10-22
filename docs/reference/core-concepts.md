@@ -348,7 +348,7 @@ const server = createExpressServer(app, undefined, { logger })
 app.register(loggerPlugin({ logger }))
 ```
 
-**`schemaValidationPlugin`** — validates `body`, `params`, `query`, and `headers` against a `route.schema` after middleware and before post-validation policies and the handler. Any library whose objects expose a `.parse(data)` method works (Zod, TypeBox, custom validators):
+**`schemaValidationPlugin`** — validates `body`, `params`, `query`, and `headers` against a `route.schema` after middleware and before post-validation policies and the handler. Any [Standard Schema](https://standardschema.dev) works (Zod 3.24+, Valibot, ArkType), and so does any object with a `.parse(data)` method (custom validators):
 
 ```ts
 import { Orvaxis, schemaValidationPlugin } from "orvaxis"
@@ -737,7 +737,7 @@ app.group({
 
 Response validation is opt-in and only covers JSON/body values sent through the Orvaxis response methods. It selects the schema using the final status code. Adapter-generated errors and failures that occur before the handler (for example, Express JSON parsing errors) are outside this plugin's boundary. Streaming routes are never buffered: in `strict` mode the first `write`, `pipe`, or chunked `end` fails if that status has a declared schema; in `warn` mode the plugin reports `stream-not-validated` and lets the stream pass through. Leave streaming response schemas undeclared.
 
-OpenAPI generation is available from the optional `orvaxis/openapi` subpath and has no runtime dependency on a validator library. Supply a converter because `.parse()` alone does not expose a JSON Schema:
+OpenAPI generation is available from the optional `orvaxis/openapi` subpath and has no runtime dependency on a validator library. A validator that implements Standard JSON Schema (Zod 4) is described automatically; otherwise supply a converter, because `.parse()` alone does not expose a JSON Schema. An explicit converter always wins:
 
 ```ts
 import { generateOpenApiDocument } from "orvaxis/openapi"
@@ -758,7 +758,7 @@ The generator emits OpenAPI 3.1 paths, request bodies, query/header/path paramet
 
 **Converter contract.** `schemaConverter(validator, { method, path, field, status })` must return a Schema Object. A `$ref` may point to `#/components/schemas/<name>` declared in the `componentSchemas` option, or to an external URI (passed through, not resolved). Local references such as `#/$defs/x` raise, because they stop resolving once the schema is placed in the document; inline them or hoist them into `componentSchemas`. For `params`, `query` and `headers` the result must be an object schema: every property becomes one parameter carrying that property's schema (object and array schemas included), `required` is honored, and path parameters are always required. OpenAPI tools ignore `Accept`, `Content-Type` and `Authorization` header parameters.
 
-**Optional metadata.** A `parse` method cannot tell whether a body is optional or which media type it uses, so none of this is inferred. Declare it on the route:
+**Optional metadata.** A validator cannot tell whether a body is optional or which media type it uses, so none of this is inferred. Declare it on the route:
 
 ```ts
 {

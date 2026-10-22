@@ -1,4 +1,5 @@
 import { HttpError } from "../core/HttpError.js"
+import { parseSchemaSync } from "../core/schema.js"
 import type { OrvaxisContext, OrvaxisResponse, RouteResponseSchemas } from "../types/index.js"
 import type { Plugin } from "./PluginManager.js"
 
@@ -79,7 +80,7 @@ function wrapResponse(
     const schema = currentSchema()
     if (!schema) return value
     try {
-      return schema.parse(value)
+      return parseSchemaSync(schema, value)
     } catch {
       const issue = baseIssue("invalid-response")
       if (mode === "strict") {
@@ -115,6 +116,9 @@ function wrapResponse(
     },
     send(body) {
       original.send(validate(body))
+    },
+    getHeader(name) {
+      return original.getHeader?.(name)
     },
     setHeader(name, value) {
       original.setHeader(name, value)

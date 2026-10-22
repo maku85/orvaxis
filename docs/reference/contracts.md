@@ -6,7 +6,7 @@ Signatures and options for request validation, response contracts and OpenAPI ex
 
 | Name | Description |
 |---|---|
-| `SchemaField<TOutput>` | `{ parse(data: unknown): TOutput }`. Any validator with a `parse` method that returns the value or throws |
+| `SchemaField<TOutput>` | A Standard Schema (`StandardSchemaV1`, the `~standard` interface), or `{ parse(data: unknown): TOutput }`. `~standard` wins when both exist |
 | `RouteSchema` | `{ body?, params?, query?, headers? }`, each a `SchemaField` |
 | `RouteResponseSchemas` | `Record<number, SchemaField>`, the contract per HTTP status |
 | `Route.schema`, `Route.responses` | where a route declares them |
