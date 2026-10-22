@@ -36,6 +36,8 @@ export {
 } from "./plugins/responseValidationPlugin.js"
 export { schemaValidationPlugin } from "./plugins/schemaValidationPlugin.js"
 export type {
+  AroundFunction,
+  AroundStage,
   Authenticator,
   ContextMeta,
   DebugEntry,

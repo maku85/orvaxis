@@ -1,5 +1,7 @@
 import { type Plugin, PluginManager } from "../plugins/PluginManager.js"
 import type {
+  AroundFunction,
+  AroundStage,
   Authenticator,
   Middleware,
   OrvaxisContext,
@@ -94,6 +96,7 @@ export class Runtime {
   readonly router = new Router()
 
   private authenticator: Authenticator | undefined
+  private readonly wrappers: Record<AroundStage, AroundFunction[]> = { request: [], handler: [] }
   private closeHandlers: Array<() => Promise<void> | void> = []
   private readonly logsMaxSize: number | undefined
   private readonly policyTrace: PolicyTraceOptions
@@ -142,10 +145,30 @@ export class Runtime {
       hooks: { on: (name, fn) => this.hooks.on(name, fn) },
       addPolicy: (policy) => this.policies.register(policy),
       use: (fn) => this.pipeline.use(fn),
+      around: (stage, fn) => {
+        if (!(stage in this.wrappers)) throw new TypeError(`Unknown around stage "${stage}"`)
+        this.wrappers[stage].push(fn)
+      },
       onClose: (fn) => {
         this.closeHandlers.push(fn)
       },
     }
+  }
+
+  private async around(stage: AroundStage, ctx: OrvaxisContext, fn: () => Promise<void>) {
+    const wrappers = this.wrappers[stage]
+    const run = async (index: number): Promise<void> => {
+      const wrapper = wrappers[index]
+      if (!wrapper) return fn()
+      let called = false
+      await wrapper(ctx, () => {
+        if (called) throw new Error(`An around("${stage}") wrapper called next() twice`)
+        called = true
+        return run(index + 1)
+      })
+      if (!called) throw new Error(`An around("${stage}") wrapper did not call next()`)
+    }
+    await run(0)
   }
 
   addPlugin(plugin: Plugin) {
@@ -182,7 +205,7 @@ export class Runtime {
     const tracer = new Tracer(req.id ?? generateId())
     ctx.meta.tracer = tracer
 
-    return runWithContext(ctx, async () => {
+    const run = async (): Promise<OrvaxisContext> => {
       this.debugger.log(ctx, "REQUEST_START")
 
       try {
@@ -286,7 +309,9 @@ export class Runtime {
         this.debugger.log(ctx, "HOOK:beforeHandler")
         if (this.isSettled(ctx)) return await this.finishRequest(ctx, tracer)
         tracer.markHandlerExecuted()
-        await match.route.handler(ctx)
+        await this.around("handler", ctx, async () => {
+          await match.route.handler(ctx)
+        })
         this.debugger.log(ctx, "HANDLER_EXECUTED")
         await this.hooks.trigger("afterHandler", ctx)
         this.debugger.log(ctx, "HOOK:afterHandler")
@@ -316,6 +341,16 @@ export class Runtime {
         }
         throw err
       }
+    }
+
+    return runWithContext(ctx, async () => {
+      if (!this.wrappers.request.length) return run()
+      let result: OrvaxisContext | undefined
+      await this.around("request", ctx, async () => {
+        result = await run()
+      })
+      if (!result) throw new Error('An around("request") wrapper swallowed the request result')
+      return result
     })
   }
 

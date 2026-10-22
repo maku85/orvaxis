@@ -47,7 +47,10 @@ export function otelPlugin({ tracer }: OtelPluginOptions) {
     name: "otel",
 
     apply(runtime: PluginContext) {
-      runtime.hooks.on("onRequest", (ctx: OrvaxisContext) => {
+      // The root span is created and activated here, not in an `onRequest` hook, so everything
+      // that runs for the request (hooks, policies, middleware) happens inside it and spans made
+      // by instrumented libraries (database, HTTP clients) become its children.
+      runtime.around("request", async (ctx: OrvaxisContext, next) => {
         const parentCtx = propagation.extract(context.active(), ctx.req.headers, headerGetter)
         const root = tracer.startSpan(
           resolveSpanName(ctx),
@@ -63,6 +66,27 @@ export function otelPlugin({ tracer }: OtelPluginOptions) {
         )
         const rootCtx = trace.setSpan(parentCtx, root)
         states.set(ctx, { root, rootCtx })
+        try {
+          await context.with(rootCtx, next)
+        } finally {
+          // `afterPipeline` and `onError` normally end the span; this covers a request that left
+          // the runtime through neither, so a span is never left open.
+          const state = states.get(ctx)
+          if (state) {
+            state.pipeline?.end()
+            state.handler?.end()
+            state.root.end()
+            states.delete(ctx)
+          }
+        }
+      })
+
+      // While the handler runs, its own span is the active one.
+      runtime.around("handler", (ctx: OrvaxisContext, next) => {
+        const state = states.get(ctx)
+        if (!state) return next()
+        const active = state.handler ? trace.setSpan(state.rootCtx, state.handler) : state.rootCtx
+        return context.with(active, next)
       })
 
       runtime.hooks.on("beforePipeline", (ctx: OrvaxisContext) => {

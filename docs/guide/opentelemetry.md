@@ -19,6 +19,10 @@ const app = new Orvaxis()
 app.register(otelPlugin({ tracer: trace.getTracer("my-service") }))
 ```
 
+## Spans from your own code and libraries
+
+While a request runs, `otelPlugin` keeps its spans active: the root span for hooks, policies and middleware, and `orvaxis.handler` inside the route handler (including after `await`). A span started there by an instrumented library (a database driver, `fetch`, an HTTP client) or by your own `tracer.startActiveSpan` therefore becomes a child of the right Orvaxis span. This needs a context manager, which the OpenTelemetry SDK registers when you start it (`NodeSDK` does); without one the API is a no-op and nothing is nested.
+
 ## What a request produces
 
 <!-- snippet: examples/otel-local.ts#app -->

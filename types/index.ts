@@ -295,6 +295,9 @@ export type TraceEvent = {
  * Everything a plugin can reach. It is a dedicated object, not the runtime: a plugin cannot read
  * or replace the router, the other plugins or the hook lists.
  */
+export type AroundStage = "request" | "handler"
+export type AroundFunction = (ctx: OrvaxisContext, next: () => Promise<void>) => Promise<void>
+
 export interface PluginContext {
   hooks: {
     on(name: HookName, fn: (ctx: OrvaxisContext, error?: Error) => Promise<void> | void): void
@@ -303,6 +306,14 @@ export interface PluginContext {
   addPolicy(policy: Policy): void
   /** Add a global middleware, as `app.use()` does. */
   use(fn: Middleware): void
+  /**
+   * Wrap a stage of every request. `"request"` covers the whole execution (hooks, policies,
+   * middleware, handler, error handling); `"handler"` covers only the route handler. `fn` must
+   * call `next()` exactly once and return its promise; this is what lets a plugin keep an
+   * `AsyncLocalStorage`-style context (such as OpenTelemetry's active span) active while that
+   * stage runs. Wrappers nest in registration order, the first one outermost.
+   */
+  around(stage: AroundStage, fn: AroundFunction): void
   /** Run `fn` when `app.close()` is called (and by the adapters' `close()`), in reverse order of registration. */
   onClose(fn: () => Promise<void> | void): void
 }

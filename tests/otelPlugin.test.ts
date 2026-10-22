@@ -1,14 +1,20 @@
+import { AsyncLocalStorage } from "node:async_hooks"
 import {
+  type Context,
+  type ContextManager,
   context,
   propagation,
+  ROOT_CONTEXT,
   type Span,
   SpanKind,
   SpanStatusCode,
   type TextMapGetter,
   type Tracer,
+  trace,
 } from "@opentelemetry/api"
 import { afterEach, describe, expect, it, vi } from "vitest"
 import { HttpError } from "../core/HttpError"
+import { createMockResponse } from "../core/mockResponse"
 import { Orvaxis } from "../core/Orvaxis"
 import { Runtime } from "../core/Runtime"
 import { testRequest } from "../core/testHarness"
@@ -428,32 +434,97 @@ describe("otelPlugin — afterPipeline with undefined trace", () => {
   it("does not call addEvent when ctx.meta.trace is not set before afterPipeline fires", async () => {
     const { tracer, created } = makeMockTracer()
     const runtime = new Runtime()
+    // Registered before the plugin, so it runs first and removes the trace the runtime just set.
+    runtime.hooks.on("afterPipeline", (ctx) => {
+      delete ctx.meta.trace
+    })
     runtime.addPlugin(otelPlugin({ tracer }))
+    runtime.router.group({
+      prefix: "/",
+      routes: [{ method: "GET", path: "/test", handler: (ctx) => ctx.res.json({}) }],
+    })
 
-    const ctx = {
-      req: { path: "/test", method: "GET", headers: {}, id: "req-no-trace" },
-      res: {
-        statusCode: 200,
-        sent: false,
-        status: vi.fn(),
-        json: vi.fn(),
-        send: vi.fn(),
-        setHeader: vi.fn().mockReturnThis(),
-        write: vi.fn(),
-        end: vi.fn(),
-        pipe: vi.fn(),
-      },
-      params: {},
-      meta: {},
-      state: {},
-      logs: [],
-    } as unknown as OrvaxisContext
-
-    await runtime.hooks.trigger("onRequest", ctx)
-    // ctx.meta.trace intentionally left undefined — exercises the `?? []` branch
-    await runtime.hooks.trigger("afterPipeline", ctx)
+    await runtime.execute(
+      { path: "/test", method: "GET", headers: {}, id: "req-no-trace" },
+      createMockResponse()
+    )
 
     expect(created[0].addEvent).not.toHaveBeenCalled()
+    expect(created[0].end).toHaveBeenCalledOnce()
+  })
+})
+
+describe("otelPlugin — active span context", () => {
+  // A minimal context manager over AsyncLocalStorage, like the SDK's, so `context.with` works.
+  const storage = new AsyncLocalStorage<Context>()
+  const manager: ContextManager = {
+    active: () => storage.getStore() ?? ROOT_CONTEXT,
+    with: (ctx, fn, thisArg, ...args) => storage.run(ctx, () => fn.call(thisArg, ...args)),
+    bind: (_ctx, target) => target,
+    enable() {
+      return this
+    },
+    disable() {
+      return this
+    },
+  }
+
+  afterEach(() => {
+    context.disable()
+  })
+
+  function setup() {
+    context.setGlobalContextManager(manager)
+    const { tracer, created } = makeMockTracer()
+    const seen: Record<string, Span | undefined> = {}
+    const app = new Orvaxis()
+    app.register(otelPlugin({ tracer }))
+    app.policy({
+      name: "probe",
+      evaluate: () => {
+        seen.policy = trace.getSpan(context.active())
+        return { allow: true }
+      },
+    })
+    app.group({
+      prefix: "/api",
+      routes: [
+        {
+          method: "GET",
+          path: "/x",
+          handler: async (ctx) => {
+            // A library call made after an await still sees the handler span.
+            await Promise.resolve()
+            seen.handler = trace.getSpan(context.active())
+            ctx.res.json({})
+          },
+        },
+      ],
+    })
+    return { app, created, seen }
+  }
+
+  it("makes the root span active for policies and the handler span active in the handler", async () => {
+    const { app, created, seen } = setup()
+    await testRequest(app, { path: "/api/x" })
+
+    // created: root, orvaxis.pipeline, orvaxis.handler
+    expect(seen.policy).toBe(created[0])
+    expect(seen.handler).toBe(created[2])
+  })
+
+  it("keeps requests isolated when they run concurrently", async () => {
+    const { app, created, seen } = setup()
+    await Promise.all([testRequest(app, { path: "/api/x" }), testRequest(app, { path: "/api/x" })])
+    expect(created).toHaveLength(6)
+    expect(created.slice(0, 6).every((s) => s.end.mock.calls.length === 1)).toBe(true)
+    expect(seen.handler).toBeDefined()
+  })
+
+  it("ends the root span even when the request fails before routing", async () => {
+    const { app, created } = setup()
+    await testRequest(app, { path: "/missing" })
+    expect(created).toHaveLength(1)
     expect(created[0].end).toHaveBeenCalledOnce()
   })
 })

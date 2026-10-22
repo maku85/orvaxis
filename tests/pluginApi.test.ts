@@ -56,7 +56,13 @@ describe("plugin context", () => {
     })
     expect(received).not.toHaveProperty("router")
     expect(received).not.toHaveProperty("plugins")
-    expect(Object.keys(received ?? {}).sort()).toEqual(["addPolicy", "hooks", "onClose", "use"])
+    expect(Object.keys(received ?? {}).sort()).toEqual([
+      "addPolicy",
+      "around",
+      "hooks",
+      "onClose",
+      "use",
+    ])
   })
 })
 
