@@ -1,5 +1,35 @@
 import type { Middleware, OrvaxisContext } from "../types/index.js"
 
+/**
+ * Run `middlewares` in order, each continuing through `next()`. Resolves to `true` when every
+ * middleware called `next()` and no response was sent, `false` when the chain stopped early.
+ */
+export async function composeMiddleware(
+  middlewares: readonly Middleware[],
+  ctx: OrvaxisContext
+): Promise<boolean> {
+  let index = -1
+  let stopped = false
+
+  const runner = async (i: number): Promise<void> => {
+    if (i <= index) return
+    index = i
+    if (ctx.res.sent) return
+    const fn = middlewares[i]
+    if (!fn) return
+    let calledNext = false
+    await fn(ctx, async () => {
+      if (calledNext) return
+      calledNext = true
+      await runner(i + 1)
+    })
+    if (!calledNext || ctx.res.sent) stopped = true
+  }
+
+  await runner(0)
+  return !stopped && !ctx.res.sent
+}
+
 export class Pipeline {
   private middlewares: Middleware[] = []
 
@@ -7,32 +37,7 @@ export class Pipeline {
     this.middlewares.push(fn)
   }
 
-  async execute(ctx: OrvaxisContext): Promise<boolean> {
-    let index = -1
-
-    const runner = async (i: number): Promise<void> => {
-      if (i <= index) return
-      index = i
-
-      if (ctx.res.sent) return
-
-      const fn = this.middlewares[i]
-      if (!fn) return
-
-      let calledNext = false
-      await fn(ctx, async () => {
-        if (calledNext) return
-        calledNext = true
-        await runner(i + 1)
-      })
-
-      if (!calledNext || ctx.res.sent) {
-        stopped = true
-      }
-    }
-
-    let stopped = false
-    await runner(0)
-    return !stopped && !ctx.res.sent
+  execute(ctx: OrvaxisContext): Promise<boolean> {
+    return composeMiddleware(this.middlewares, ctx)
   }
 }

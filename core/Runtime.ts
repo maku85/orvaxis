@@ -12,6 +12,7 @@ import type {
   Policy,
   PolicyPhase,
   PolicyTraceOptions,
+  RouteMatch,
 } from "../types/index.js"
 import { createContext } from "./Context.js"
 import { captureContext, runWithContext } from "./contextStore.js"
@@ -19,7 +20,7 @@ import { Debugger } from "./Debugger.js"
 import { isTypedRoute } from "./defineRoute.js"
 import { HookSystem } from "./Hook.js"
 import { HttpError } from "./HttpError.js"
-import { Pipeline } from "./Pipeline.js"
+import { composeMiddleware, Pipeline } from "./Pipeline.js"
 import {
   evaluatePolicies as evaluatePolicySet,
   initPolicyTrace,
@@ -199,11 +200,7 @@ export class Runtime {
   }
 
   async execute(req: OrvaxisRequest, res: OrvaxisResponse): Promise<OrvaxisContext> {
-    const ctx = createContext(req, res, this.logsMaxSize)
-    captureContext(ctx)
-    initPolicyTrace(ctx, this.policyTrace)
-    const tracer = new Tracer(req.id ?? generateId())
-    ctx.meta.tracer = tracer
+    const { ctx, tracer } = this.createRequestScope(req, res)
 
     const run = async (): Promise<OrvaxisContext> => {
       this.debugger.log(ctx, "REQUEST_START")
@@ -271,12 +268,7 @@ export class Runtime {
         if (this.isSettled(ctx)) return await this.finishRequest(ctx, tracer)
 
         this.debugger.log(ctx, "POLICY_START")
-        await this.policies.evaluate(ctx, "preValidation", {
-          layer: "global",
-          trace: this.policyTrace,
-        })
-        await this.evaluatePolicies(match.group.policies ?? [], ctx, "group")
-        await this.evaluatePolicies(match.route.policies ?? [], ctx, "route")
+        await this.evaluatePolicyPhase(ctx, match, "preValidation")
         this.debugger.log(ctx, "POLICY_END")
 
         await this.hooks.trigger("beforePipeline", ctx)
@@ -285,11 +277,11 @@ export class Runtime {
         this.debugger.log(ctx, "PIPELINE_DONE")
         if (!pipelineContinues) return await this.finishRequest(ctx, tracer)
 
-        const groupContinues = await this.runMiddlewareChain(match.group.middleware ?? [], ctx)
+        const groupContinues = await composeMiddleware(match.group.middleware ?? [], ctx)
         this.debugger.log(ctx, "GROUP_MIDDLEWARE_DONE")
         if (!groupContinues) return await this.finishRequest(ctx, tracer)
 
-        const routeContinues = await this.runMiddlewareChain(match.route.middleware ?? [], ctx)
+        const routeContinues = await composeMiddleware(match.route.middleware ?? [], ctx)
         this.debugger.log(ctx, "ROUTE_MIDDLEWARE_DONE")
         if (!routeContinues) return await this.finishRequest(ctx, tracer)
 
@@ -297,13 +289,7 @@ export class Runtime {
         this.debugger.log(ctx, "HOOK:onValidation")
         if (this.isSettled(ctx)) return await this.finishRequest(ctx, tracer)
 
-        await this.policies.evaluate(ctx, "postValidation", {
-          layer: "global",
-          trace: this.policyTrace,
-          beforeEvaluate: (policy) => this.assertPolicyRequirements(policy, ctx),
-        })
-        await this.evaluatePolicies(match.group.policies ?? [], ctx, "group", "postValidation")
-        await this.evaluatePolicies(match.route.policies ?? [], ctx, "route", "postValidation")
+        await this.evaluatePolicyPhase(ctx, match, "postValidation")
 
         await this.hooks.trigger("beforeHandler", ctx)
         this.debugger.log(ctx, "HOOK:beforeHandler")
@@ -355,11 +341,7 @@ export class Runtime {
   }
 
   async authorize(req: OrvaxisRequest, res: OrvaxisResponse): Promise<OrvaxisContext> {
-    const ctx = createContext(req, res, this.logsMaxSize)
-    captureContext(ctx)
-    initPolicyTrace(ctx, this.policyTrace)
-    const tracer = new Tracer(req.id ?? generateId())
-    ctx.meta.tracer = tracer
+    const { ctx, tracer } = this.createRequestScope(req, res)
 
     return runWithContext(ctx, async () => {
       try {
@@ -390,12 +372,7 @@ export class Runtime {
         }
 
         await this.runAuthenticator(ctx, tracer)
-        await this.policies.evaluate(ctx, "preValidation", {
-          layer: "global",
-          trace: this.policyTrace,
-        })
-        await this.evaluatePolicies(match.group.policies ?? [], ctx, "group")
-        await this.evaluatePolicies(match.route.policies ?? [], ctx, "route")
+        await this.evaluatePolicyPhase(ctx, match, "preValidation")
         ctx.meta.trace = tracer.end({
           outcome: "success",
           responseSentAtRuntimeEnd: ctx.res.sent,
@@ -417,6 +394,36 @@ export class Runtime {
         throw err
       }
     })
+  }
+
+  /** The context and tracer every request, full or policy-only, starts from. */
+  private createRequestScope(
+    req: OrvaxisRequest,
+    res: OrvaxisResponse
+  ): { ctx: OrvaxisContext; tracer: Tracer } {
+    const ctx = createContext(req, res, this.logsMaxSize)
+    captureContext(ctx)
+    initPolicyTrace(ctx, this.policyTrace)
+    const tracer = new Tracer(req.id ?? generateId())
+    ctx.meta.tracer = tracer
+    return { ctx, tracer }
+  }
+
+  /** Global, then group, then route policies of one phase for the matched route. */
+  private async evaluatePolicyPhase(
+    ctx: OrvaxisContext,
+    match: RouteMatch,
+    phase: PolicyPhase
+  ): Promise<void> {
+    await this.policies.evaluate(ctx, phase, {
+      layer: "global",
+      trace: this.policyTrace,
+      ...(phase === "postValidation"
+        ? { beforeEvaluate: (policy: Policy) => this.assertPolicyRequirements(policy, ctx) }
+        : {}),
+    })
+    await this.evaluatePolicies(match.group.policies ?? [], ctx, "group", phase)
+    await this.evaluatePolicies(match.route.policies ?? [], ctx, "route", phase)
   }
 
   /** A response is already out, or the adapter gave up on the request (timeout, disconnect). */
@@ -472,31 +479,5 @@ export class Runtime {
         `Post-validation policy "${policy.name}" requires route schema for: ${missing.join(", ")}`
       )
     }
-  }
-
-  private async runMiddlewareChain(
-    middlewares: Middleware[],
-    ctx: OrvaxisContext
-  ): Promise<boolean> {
-    let index = -1
-    let stopped = false
-
-    const runner = async (i: number): Promise<void> => {
-      if (i <= index) return
-      index = i
-      if (ctx.res.sent) return
-      const fn = middlewares[i]
-      if (!fn) return
-      let calledNext = false
-      await fn(ctx, async () => {
-        if (calledNext) return
-        calledNext = true
-        await runner(i + 1)
-      })
-      if (!calledNext || ctx.res.sent) stopped = true
-    }
-
-    await runner(0)
-    return !stopped && !ctx.res.sent
   }
 }

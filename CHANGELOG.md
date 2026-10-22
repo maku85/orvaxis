@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Plugins can wrap a request or its handler (`ctx.around`)** — `PluginContext.around("request" | "handler", fn)` runs `fn(ctx, next)` around the whole execution or only the route handler, so a plugin can keep an `AsyncLocalStorage`-based context active while the stage runs. A wrapper that does not call `next()`, or calls it twice, fails the request with a clear error.
 
+### Changed
+
+- **Internal: one middleware runner and one request setup** — `Pipeline` and the group/route middleware chains shared two identical copies of the `next()` runner; both now use `composeMiddleware`. `Runtime.execute` and `Runtime.authorize` shared the request setup and the global, group and route policy evaluation; each now has a single implementation. No behavior change.
+
 ### Fixed
 
 - **`otelPlugin` did not activate its spans** — spans were created but never made the active OpenTelemetry context, so spans started by instrumented libraries or `startActiveSpan` inside policies, middleware and handlers were not children of `orvaxis.handler` (they started new traces). The root span is now created in the `request` wrapper, before `onRequest` hooks run, and active for the whole request; `orvaxis.handler` is active inside the handler. The span tree and names are unchanged, and the span now also exists for requests that fail request validation. Requires a registered context manager, which the OpenTelemetry SDK provides.
