@@ -154,7 +154,7 @@ describe("Standard Schema response validation", () => {
 
   it("fails a response that does not match, in strict mode", async () => {
     const res = await testRequest(
-      responseApp(standard<{ n: number }>((v) => ({ issues: [{ message: "bad" }] }) as never)),
+      responseApp(standard<{ n: number }>((_v) => ({ issues: [{ message: "bad" }] }) as never)),
       { path: "/r" }
     )
     expect(res.status).toBe(500)
@@ -165,6 +165,12 @@ describe("Standard Schema response validation", () => {
     expect(() => parseSchemaSync(slow, 1)).toThrow(/synchronously/)
   })
 })
+
+// Walks a generated document without `any`; the assertions below check the shape.
+// biome-ignore lint/suspicious/noExplicitAny: test helper over arbitrary JSON
+function at(value: unknown, ...path: string[]): any {
+  return path.reduce((node, key) => (node as Record<string, unknown>)[key], value)
+}
 
 describe("OpenAPI from Standard JSON Schema", () => {
   const describedApp = (extra: Record<string, unknown> = {}) => {
@@ -191,7 +197,7 @@ describe("OpenAPI from Standard JSON Schema", () => {
 
   it("describes Zod 4 validators without a converter", () => {
     const doc = generateOpenApiDocument(describedApp(), { title: "t", version: "1" })
-    const op = (doc.paths["/api/items/{id}"] as Record<string, any>).post
+    const op = at(doc.paths["/api/items/{id}"], "post")
     expect(op.requestBody.content["application/json"].schema).toMatchObject({
       type: "object",
       properties: { name: { type: "string" } },
@@ -221,9 +227,7 @@ describe("OpenAPI from Standard JSON Schema", () => {
         },
       ],
     })
-    const op = (
-      generateOpenApiDocument(app, { title: "t", version: "1" }).paths["/s"] as Record<string, any>
-    ).post
+    const op = at(generateOpenApiDocument(app, { title: "t", version: "1" }).paths["/s"], "post")
     expect(op.requestBody.content["application/json"].schema).toEqual({ type: "object" })
     expect(op.responses["200"].content["application/json"].schema).toEqual({
       type: "object",
@@ -241,7 +245,7 @@ describe("OpenAPI from Standard JSON Schema", () => {
         description: "custom",
       }),
     })
-    const op = (doc.paths["/api/items/{id}"] as Record<string, any>).post
+    const op = at(doc.paths["/api/items/{id}"], "post")
     expect(op.requestBody.content["application/json"].schema.description).toBe("custom")
   })
 

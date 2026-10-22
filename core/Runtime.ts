@@ -4,7 +4,6 @@ import type {
   AroundStage,
   Authenticator,
   Logger,
-  Middleware,
   OrvaxisContext,
   OrvaxisOptions,
   OrvaxisRequest,

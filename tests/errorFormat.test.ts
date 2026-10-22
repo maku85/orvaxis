@@ -1,4 +1,3 @@
-import express from "express"
 import Fastify from "fastify"
 import { afterEach, describe, expect, it, vi } from "vitest"
 import { z } from "zod"
@@ -234,6 +233,14 @@ describe("renderError", () => {
   })
 })
 
+// Walks a generated document without `any`.
+function at(value: unknown, ...path: string[]): Record<string, Record<string, unknown>> {
+  return path.reduce((node, key) => (node as Record<string, unknown>)[key], value) as Record<
+    string,
+    Record<string, unknown>
+  >
+}
+
 describe("OpenAPI error format", () => {
   const app = () => {
     const a = new Orvaxis()
@@ -243,8 +250,8 @@ describe("OpenAPI error format", () => {
 
   it("documents ProblemDetails as application/problem+json", () => {
     const doc = generateOpenApiDocument(app(), { title: "t", version: "1", errorFormat: "problem" })
-    const response = (doc.paths["/x"] as Record<string, any>).get.responses.default
-    expect(response.content["application/problem+json"].schema).toEqual({
+    const response = at(doc.paths["/x"], "get", "responses", "default")
+    expect(response.content["application/problem+json"]?.schema).toEqual({
       $ref: "#/components/schemas/ProblemDetails",
     })
     expect(doc.components.schemas.ProblemDetails).toBeDefined()

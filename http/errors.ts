@@ -37,7 +37,7 @@ export type ErrorInfo = {
 }
 
 /** Central place to turn any error into a response; return `undefined` to keep the default. */
-export type ErrorMapper = (err: unknown, info: ErrorInfo) => ErrorMapping | undefined | void
+export type ErrorMapper = (err: unknown, info: ErrorInfo) => ErrorMapping | undefined
 
 export type ErrorOptions = {
   /** Default: `"envelope"`. */
