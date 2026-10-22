@@ -88,6 +88,11 @@ export class Orvaxis {
     return this.runtime.enforcesDenyByDefault
   }
 
+  /** Per-route `timeout` and `bodyLimit` for a request; the built-in adapters call this. */
+  routeSettings(req: { path: string; method: string }) {
+    return this.runtime.router.routeSettings(req)
+  }
+
   routes() {
     return this.runtime.router.routes()
   }

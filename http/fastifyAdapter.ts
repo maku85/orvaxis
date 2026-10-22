@@ -5,6 +5,7 @@ import { abandonRequest } from "../core/requestAbandoned.js"
 import type { OrvaxisRequest, OrvaxisResponse, ServerAdapter } from "../types/index.js"
 import {
   type AdapterOptions,
+  assertBodyWithinLimit,
   buildErrorBody,
   closeApp,
   resolveRequestId,
@@ -142,11 +143,14 @@ export function createFastifyServer(
     wrapped.setHeader(requestIdHeader, requestId)
 
     try {
+      const settings = app.routeSettings({ method: req.method, path })
+      if (settings?.bodyLimit !== undefined) assertBodyWithinLimit(adapted, settings.bodyLimit)
+      const routeTimeout = settings?.timeout ?? timeoutMs
       const handlePromise = app.handle(adapted, wrapped)
-      if (timeoutMs > 0) {
+      if (routeTimeout > 0) {
         await withTimeout(
           handlePromise,
-          timeoutMs,
+          routeTimeout,
           controller,
           (cancel) => {
             cancelTimer = cancel

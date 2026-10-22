@@ -10,6 +10,7 @@ import { abandonRequest, isRequestAbandoned } from "../core/requestAbandoned.js"
 import type { OrvaxisRequest, OrvaxisResponse, ServerAdapter } from "../types/index.js"
 import {
   type AdapterOptions,
+  assertBodyWithinLimit,
   buildErrorBody,
   closeApp,
   resolveRequestId,
@@ -126,11 +127,14 @@ export function createExpressServer(
     wrapped.setHeader(requestIdHeader, requestId)
 
     try {
+      const settings = app.routeSettings({ method: req.method, path: req.path })
+      if (settings?.bodyLimit !== undefined) assertBodyWithinLimit(adapted, settings.bodyLimit)
+      const routeTimeout = settings?.timeout ?? timeoutMs
       const handlePromise = app.handle(adapted, wrapped)
-      if (timeoutMs > 0) {
+      if (routeTimeout > 0) {
         await withTimeout(
           handlePromise,
-          timeoutMs,
+          routeTimeout,
           controller,
           (cancel) => {
             cancelTimer = cancel
@@ -265,12 +269,14 @@ export function createExpressPolicyGuard(
     const wrapped = wrapExpressResponse(res, () => cancelTimer?.())
     wrapped.setHeader(requestIdHeader, requestId)
 
+    const routeTimeout =
+      app.routeSettings({ method: req.method, path: routePath })?.timeout ?? timeoutMs
     const authorize = app.authorize(adapted, wrapped)
     const pending =
-      timeoutMs > 0
+      routeTimeout > 0
         ? withTimeout(
             authorize,
-            timeoutMs,
+            routeTimeout,
             controller,
             (cancel) => {
               cancelTimer = cancel

@@ -22,6 +22,36 @@ app.group({
 - Several groups may share a prefix, and the same pattern may exist under different prefixes or with different methods.
 - `Route.method` is one of `GET`, `POST`, `PUT`, `DELETE`, `PATCH`, `HEAD`, `OPTIONS`; it is normalized to uppercase when registering and matching, and any other method is rejected with a `TypeError`.
 
+## Nested groups
+
+A group can contain groups. The child's `prefix` is appended to its parent's, and it inherits the parent's middleware, policies, `timeout` and `bodyLimit`:
+
+```ts
+app.group({
+  prefix: "/api",
+  policies: [authenticate],
+  middleware: [requestLog],
+  groups: [
+    {
+      prefix: "/tenants/:tenantId",
+      policies: [tenantMember],
+      routes: [{ method: "GET", path: "/projects", handler }],
+      groups: [
+        { prefix: "/admin", policies: [adminOnly], routes: [{ method: "GET", path: "/audit", handler }] },
+      ],
+    },
+  ],
+})
+// GET /api/tenants/:tenantId/projects        -> authenticate, tenantMember
+// GET /api/tenants/:tenantId/admin/audit     -> authenticate, tenantMember, adminOnly
+```
+
+- A parent may have no `routes`. A child prefix follows the same rules as a top-level one (starts with `/`, no trailing `/`); `"/"` adds nothing.
+- Policies and middleware of the ancestors run before the child's, then the route's. A child's policies never apply to its parent's routes or to siblings.
+- The policies of a group and its ancestors form one `group` layer, so `priority` orders them together: a child policy with a higher `priority` than its parent's runs first. Give an ancestor policy a higher priority than anything below it when it must always run first.
+- Duplicate and conflicting routes are detected across levels, and `app.routes()`, `app.inspectRoutes()`, the protection report and span names show the full prefix.
+- A route's own `timeout` and `bodyLimit` win over its group's, the nearest group wins over its parent (see [Timeouts](/guide/timeouts-and-shutdown#per-route-options)).
+
 ## Wildcards
 
 A segment starting with `*` captures the rest of the path and must be last. `*filepath` is available as `ctx.params.filepath`; a bare `*` is `ctx.params["*"]`.

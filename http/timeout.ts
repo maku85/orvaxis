@@ -42,6 +42,29 @@ export type ErrorResponse = {
   details?: unknown
 }
 
+/**
+ * Rejects with 413 when a request body is over a per-route `bodyLimit`, for adapters whose
+ * framework already parsed the body under its own limit. The declared `Content-Length` decides;
+ * without one (chunked uploads) the serialized parsed body is measured instead.
+ */
+export function assertBodyWithinLimit(
+  req: { headers: Record<string, string | string[] | undefined>; body?: unknown },
+  limit: number
+): void {
+  const declared = Number(req.headers["content-length"])
+  let size: number | undefined = Number.isFinite(declared) ? declared : undefined
+  if (size === undefined && req.body !== undefined && req.body !== null) {
+    try {
+      size = Buffer.byteLength(JSON.stringify(req.body))
+    } catch {
+      size = undefined
+    }
+  }
+  if (size !== undefined && size > limit) {
+    throw new HttpError(413, "Request body too large", { code: "BODY_TOO_LARGE" })
+  }
+}
+
 /** Run the app's plugin close handlers; a failing handler is logged and never blocks shutdown. */
 export async function closeApp(app: { close(): Promise<void> }, logger: Logger): Promise<void> {
   try {

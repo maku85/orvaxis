@@ -15,7 +15,15 @@ export function validateRequest(req: OrvaxisRequest): void {
   }
 }
 
-export function validateGroup(group: Group): void {
+function validateLimit(name: string, value: unknown, where: string): void {
+  if (value === undefined) return
+  if (typeof value !== "number" || !Number.isFinite(value) || value < 0) {
+    throw new TypeError(`${name} must be a non-negative finite number ${where}`)
+  }
+}
+
+/** Validates a group and, recursively, its sub-groups. */
+export function validateGroup(group: Group, parentPrefix?: string): void {
   if (typeof group.prefix !== "string" || group.prefix === "") {
     throw new TypeError("group.prefix must be a non-empty string")
   }
@@ -25,7 +33,16 @@ export function validateGroup(group: Group): void {
   if (group.prefix.length > 1 && group.prefix.endsWith("/")) {
     throw new TypeError(`group.prefix must not end with '/': "${group.prefix}"`)
   }
-  for (const route of group.routes) {
+  const where = `in group "${parentPrefix ? joinPrefix(parentPrefix, group.prefix) : group.prefix}"`
+  validateLimit("group.timeout", group.timeout, where)
+  validateLimit("group.bodyLimit", group.bodyLimit, where)
+  if (group.routes !== undefined && !Array.isArray(group.routes)) {
+    throw new TypeError(`group.routes must be an array ${where}`)
+  }
+  if (group.groups !== undefined && !Array.isArray(group.groups)) {
+    throw new TypeError(`group.groups must be an array ${where}`)
+  }
+  for (const route of group.routes ?? []) {
     if (typeof route.path !== "string") {
       throw new TypeError(`route.path must be a string in group "${group.prefix}"`)
     }
@@ -45,5 +62,17 @@ export function validateGroup(group: Group): void {
         `route.method "${route.method}" is not a valid HTTP method for path "${route.path}" in group "${group.prefix}"`
       )
     }
+    validateLimit("route.timeout", route.timeout, `on ${route.method} ${route.path} ${where}`)
+    validateLimit("route.bodyLimit", route.bodyLimit, `on ${route.method} ${route.path} ${where}`)
   }
+  for (const child of group.groups ?? []) {
+    validateGroup(child, parentPrefix ? joinPrefix(parentPrefix, group.prefix) : group.prefix)
+  }
+}
+
+/** `/api` + `/v1` is `/api/v1`; a root prefix or a root child adds nothing. */
+export function joinPrefix(parent: string, child: string): string {
+  if (child === "/") return parent
+  if (parent === "/") return child
+  return parent + child
 }

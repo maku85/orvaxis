@@ -172,21 +172,26 @@ export function createNodeServer(app: Orvaxis, options: NodeAdapterOptions = {})
     try {
       const url = req.url ?? "/"
       const queryStart = url.indexOf("?")
+      const path = queryStart === -1 ? url : url.slice(0, queryStart)
+      const method = req.method ?? "GET"
+      // The route is known before the body is read, so its own limits apply exactly.
+      const settings = app.routeSettings({ method, path })
       const adapted: OrvaxisRequest = {
-        path: queryStart === -1 ? url : url.slice(0, queryStart),
-        method: req.method ?? "GET",
+        path,
+        method,
         headers: req.headers,
         query: parseQuery(queryStart === -1 ? "" : url.slice(queryStart + 1)),
-        body: await readJsonBody(req, bodyLimit),
+        body: await readJsonBody(req, settings?.bodyLimit ?? bodyLimit),
         id: requestId,
         signal: controller.signal,
         raw: req,
       }
+      const routeTimeout = settings?.timeout ?? timeoutMs
       const handlePromise = app.handle(adapted, wrapped)
-      if (timeoutMs > 0) {
+      if (routeTimeout > 0) {
         await withTimeout(
           handlePromise,
-          timeoutMs,
+          routeTimeout,
           controller,
           (cancel) => {
             cancelTimer = cancel

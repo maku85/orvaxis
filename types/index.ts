@@ -81,7 +81,17 @@ export type Group<
   prefix: string
   middleware?: Middleware<TState, TMeta>[]
   policies?: Policy<TState, TMeta>[]
-  routes: Route<TState, TMeta>[]
+  routes?: Route<TState, TMeta>[]
+  /**
+   * Nested groups. A child's `prefix` is appended to this one's, and it inherits this group's
+   * middleware and policies (the parent's first), `timeout` and `bodyLimit`. The policies of a
+   * group and its ancestors form one `group` layer, ordered by `priority` like any other layer.
+   */
+  groups?: Group<TState, TMeta>[]
+  /** Default `timeout` for the routes of this group and its sub-groups; a route's own wins. */
+  timeout?: number
+  /** Default `bodyLimit` for the routes of this group and its sub-groups; a route's own wins. */
+  bodyLimit?: number
 }
 
 export type HookName =
@@ -314,6 +324,18 @@ export type Route<
   schema?: RouteSchema
   responses?: RouteResponseSchemas
   openapi?: RouteOpenApiMetadata
+  /**
+   * Deadline for this route in milliseconds, replacing the adapter's `timeout`; `0` disables it.
+   * Applied by the built-in adapters.
+   */
+  timeout?: number
+  /**
+   * Largest request body accepted for this route, in bytes. The `node:http` adapter enforces it
+   * exactly. On Express and Fastify the framework parses the body first under its own limit, so a
+   * route can only lower it, checked against `Content-Length` (or, without one, the serialized
+   * parsed body).
+   */
+  bodyLimit?: number
   /**
    * Declares that the route is intentionally reachable without a policy. Only consulted by
    * `denyByDefault`, `app.unprotectedRoutes()` and `app.assertProtected()`.

@@ -12,7 +12,7 @@ import type {
 import { HttpError } from "./HttpError.js"
 import { policyDeclarationId } from "./PolicyEngine.js"
 import { normalizePath } from "./utils.js"
-import { validateGroup } from "./validation.js"
+import { joinPrefix, validateGroup } from "./validation.js"
 
 function decodeSafe(segment: string): string {
   try {
@@ -152,6 +152,32 @@ class Trie {
   }
 }
 
+/**
+ * A group as the router stores it: nested groups are flattened into one of these per level, with
+ * the full prefix and the middleware, policies and limits inherited from their ancestors.
+ */
+type FlatGroup = Group & { routes: Route[] }
+
+function flattenGroup(group: Group, parent?: FlatGroup): FlatGroup[] {
+  const timeout = group.timeout ?? parent?.timeout
+  const bodyLimit = group.bodyLimit ?? parent?.bodyLimit
+  // A top-level group with routes is stored as declared, so `RouteMatch.group` stays the caller's
+  // object; every other level is a new object carrying what it inherits.
+  const self: FlatGroup = parent
+    ? {
+        prefix: joinPrefix(parent.prefix, group.prefix),
+        middleware: [...(parent.middleware ?? []), ...(group.middleware ?? [])],
+        policies: [...(parent.policies ?? []), ...(group.policies ?? [])],
+        routes: group.routes ?? [],
+        ...(timeout !== undefined ? { timeout } : {}),
+        ...(bodyLimit !== undefined ? { bodyLimit } : {}),
+      }
+    : group.routes
+      ? (group as FlatGroup)
+      : { ...group, routes: [] }
+  return [self, ...(group.groups ?? []).flatMap((child) => flattenGroup(child, self))]
+}
+
 type PolicyLayer = PolicyInspection["layer"]
 type PolicySource = { policy: Policy; index: number; layer: PolicyLayer }
 
@@ -286,16 +312,19 @@ function inspectPolicies(
 }
 
 export class Router {
-  private groups: Group[] = []
+  private groups: FlatGroup[] = []
   private trie = new Trie()
 
   group(group: Group) {
     validateGroup(group)
-    this.groups.push(group)
+    const flat = flattenGroup(group)
+    this.groups.push(...flat)
     this.generation++
 
-    for (const route of group.routes) {
-      this.trie.insert(route.method, group.prefix + route.path, route, group)
+    for (const g of flat) {
+      for (const route of g.routes) {
+        this.trie.insert(route.method, g.prefix + route.path, route, g)
+      }
     }
   }
 
@@ -384,6 +413,22 @@ export class Router {
       }
     }
     return result
+  }
+
+  /** The per-route `timeout` and `bodyLimit` that apply to a request, if it matches a route. */
+  routeSettings(req: {
+    path: string
+    method: string
+  }): { timeout?: number; bodyLimit?: number } | undefined {
+    const match = this.match(req)
+    if (!match) return undefined
+    const timeout = match.route.timeout ?? match.group.timeout
+    const bodyLimit = match.route.bodyLimit ?? match.group.bodyLimit
+    if (timeout === undefined && bodyLimit === undefined) return undefined
+    return {
+      ...(timeout !== undefined ? { timeout } : {}),
+      ...(bodyLimit !== undefined ? { bodyLimit } : {}),
+    }
   }
 
   match(req: { path: string; method: string }): RouteMatch | null {

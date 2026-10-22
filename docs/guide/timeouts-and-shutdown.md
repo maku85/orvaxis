@@ -14,6 +14,26 @@ const server = createExpressServer(app, undefined, { timeout: 10_000, shutdownTi
 // the same options exist on createFastifyServer
 ```
 
+## Per-route options
+
+A route, or a group for all the routes beneath it, can set its own deadline and request body limit:
+
+```ts
+app.group({
+  prefix: "/api",
+  timeout: 5_000,
+  routes: [
+    { method: "GET", path: "/report", handler: buildReport, timeout: 120_000 },
+    { method: "GET", path: "/events", handler: stream, timeout: 0 },
+    { method: "POST", path: "/import", handler: importData, bodyLimit: 10 * 1024 * 1024 },
+  ],
+})
+```
+
+- `timeout` (milliseconds) replaces the adapter's `timeout` for that route; `0` disables the deadline for it. The route wins over its group, the nearest group over its parent, and the adapter's option applies when none is set. All three adapters apply it, and so does the Express policy guard.
+- `bodyLimit` (bytes) is the largest request body the route accepts; a larger one gets `413` with code `BODY_TOO_LARGE` before any policy or handler runs. The `node:http` adapter enforces it exactly, and a route can raise the limit above the adapter's `bodyLimit`. On Express and Fastify the framework parses the body first under its own limit (`express.json({ limit })`, Fastify's `bodyLimit`), so a route can only **lower** it, and the check compares the declared `Content-Length` (or, for a chunked upload, the size of the parsed body re-serialized, which is close but not byte-exact). To accept a larger body on a route, raise the framework's limit.
+- Invalid values (negative, `NaN`, not a number) are rejected when the group is registered, naming the route.
+
 ## One signal, three reasons
 
 `ctx.req.signal` is always set on the built-in adapters. It is aborted when:
