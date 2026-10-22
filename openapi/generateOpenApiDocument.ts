@@ -28,6 +28,12 @@ export type OpenApiOptions = {
    * OpenAPI cannot describe. This is the only way a route is omitted; it is never silent.
    */
   exclude?: (route: RouteInfo) => boolean
+  /**
+   * How the adapters write errors, so the default response is described accurately: `"envelope"`
+   * (default) documents `ErrorResponse` as `application/json`; `"problem"` documents
+   * `ProblemDetails` (RFC 9457) as `application/problem+json`. Match the adapters' `errorFormat`.
+   */
+  errorFormat?: "envelope" | "problem"
   /** Schema Objects that converter output may reference as `#/components/schemas/<name>`. */
   componentSchemas?: Record<string, unknown>
 }
@@ -68,10 +74,14 @@ export function generateOpenApiDocument(
   options: OpenApiOptions
 ): OpenApiDocument {
   const componentSchemas = { ...(options.componentSchemas ?? {}) }
-  if ("ErrorResponse" in componentSchemas) {
-    throw new TypeError("componentSchemas must not redefine the built-in 'ErrorResponse' schema")
+  const problem = options.errorFormat === "problem"
+  const errorSchemaName = problem ? "ProblemDetails" : "ErrorResponse"
+  if (errorSchemaName in componentSchemas) {
+    throw new TypeError(
+      `componentSchemas must not redefine the built-in '${errorSchemaName}' schema`
+    )
   }
-  const known = new Set(["ErrorResponse", ...Object.keys(componentSchemas)])
+  const known = new Set([errorSchemaName, ...Object.keys(componentSchemas)])
   const paths: OpenApiDocument["paths"] = {}
   const claimed = new Map<string, string>()
   const templates = new Map<string, string>()
@@ -218,7 +228,11 @@ export function generateOpenApiDocument(
     }
     responseMap.default = {
       description: "Orvaxis error response",
-      content: { "application/json": { schema: { $ref: "#/components/schemas/ErrorResponse" } } },
+      content: {
+        [problem ? "application/problem+json" : "application/json"]: {
+          schema: { $ref: `#/components/schemas/${errorSchemaName}` },
+        },
+      },
     }
     let operations = paths[path]
     if (!operations) {
@@ -238,16 +252,35 @@ export function generateOpenApiDocument(
     components: {
       schemas: {
         ...componentSchemas,
-        ErrorResponse: {
-          type: "object",
-          required: ["error"],
-          properties: {
-            error: { type: "string" },
-            code: { type: "string" },
-            requestId: { type: "string" },
-            details: {},
-          },
-        },
+        ...(problem
+          ? {
+              ProblemDetails: {
+                type: "object",
+                required: ["type", "title", "status"],
+                properties: {
+                  type: { type: "string" },
+                  title: { type: "string" },
+                  status: { type: "integer" },
+                  detail: { type: "string" },
+                  code: { type: "string" },
+                  requestId: { type: "string" },
+                  details: {},
+                },
+                additionalProperties: true,
+              },
+            }
+          : {
+              ErrorResponse: {
+                type: "object",
+                required: ["error"],
+                properties: {
+                  error: { type: "string" },
+                  code: { type: "string" },
+                  requestId: { type: "string" },
+                  details: {},
+                },
+              },
+            }),
       },
     },
   }

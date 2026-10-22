@@ -16,6 +16,14 @@ export {
 } from "./debug/requestReport.js"
 export { traceEvent } from "./debug/traceEvent.js"
 export {
+  type ErrorFormat,
+  type ErrorInfo,
+  type ErrorMapper,
+  type ErrorMapping,
+  renderError,
+  sendRenderedError,
+} from "./http/errors.js"
+export {
   type AdapterOptions,
   buildErrorBody,
   type ErrorBodyOptions,

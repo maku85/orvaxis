@@ -4,13 +4,8 @@ import type { Orvaxis } from "../core/Orvaxis.js"
 import { abandonRequest } from "../core/requestAbandoned.js"
 import { UNSAFE_KEYS } from "../core/utils.js"
 import type { OrvaxisRequest, OrvaxisResponse, ServerAdapter } from "../types/index.js"
-import {
-  type AdapterOptions,
-  buildErrorBody,
-  closeApp,
-  resolveRequestId,
-  withTimeout,
-} from "./timeout.js"
+import { renderError, sendRenderedError } from "./errors.js"
+import { type AdapterOptions, closeApp, resolveRequestId, withTimeout } from "./timeout.js"
 
 export type NodeAdapterOptions = AdapterOptions & {
   /**
@@ -92,7 +87,9 @@ function wrapNodeResponse(res: ServerResponse, onStreamStart: () => void): Orvax
     json(body) {
       const serialized = JSON.stringify(body) ?? "null"
       wrapped.sent = true
-      res.setHeader("Content-Type", "application/json; charset=utf-8")
+      if (!res.hasHeader("Content-Type")) {
+        res.setHeader("Content-Type", "application/json; charset=utf-8")
+      }
       res.setHeader("Content-Length", Buffer.byteLength(serialized))
       res.end(serialized)
     },
@@ -203,8 +200,15 @@ export function createNodeServer(app: Orvaxis, options: NodeAdapterOptions = {})
       }
     } catch (err) {
       if (!wrapped.sent && !res.headersSent) {
-        const e = err as { status?: number }
-        wrapped.status(e.status ?? 500).json(buildErrorBody(err, requestId))
+        sendRenderedError(
+          wrapped,
+          renderError(
+            err,
+            requestId,
+            { ...options, logger },
+            { method: req.method, path: req.url?.split("?")[0] }
+          )
+        )
       } else {
         logger.error("[orvaxis] unhandled error after response sent:", err)
         if (!res.writableEnded) res.destroy()

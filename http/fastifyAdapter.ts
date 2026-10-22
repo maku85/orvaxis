@@ -3,10 +3,10 @@ import Fastify, { type FastifyReply } from "fastify"
 import type { Orvaxis } from "../core/Orvaxis.js"
 import { abandonRequest } from "../core/requestAbandoned.js"
 import type { OrvaxisRequest, OrvaxisResponse, ServerAdapter } from "../types/index.js"
+import { renderError, sendRenderedError } from "./errors.js"
 import {
   type AdapterOptions,
   assertBodyWithinLimit,
-  buildErrorBody,
   closeApp,
   resolveRequestId,
   withTimeout,
@@ -162,8 +162,10 @@ export function createFastifyServer(
       }
     } catch (err) {
       if (!wrapped.sent) {
-        const e = err as { status?: number }
-        wrapped.status(e.status ?? 500).send(buildErrorBody(err, requestId))
+        sendRenderedError(
+          wrapped,
+          renderError(err, requestId, { ...options, logger }, { method: req.method, path })
+        )
       } else {
         logger.error("[orvaxis] unhandled error after response sent:", err)
       }
@@ -184,11 +186,15 @@ export function createFastifyServer(
       return
     }
     const requestId = resolveRequestId(req.headers[requestIdHeaderLower], options.trustRequestId)
-    const e = err as { statusCode?: number; status?: number }
-    reply
-      .header(requestIdHeader, requestId)
-      .status(e.statusCode ?? e.status ?? 500)
-      .send(buildErrorBody(err, requestId, { frameworkError: true }))
+    const rendered = renderError(
+      err,
+      requestId,
+      { ...options, logger },
+      { frameworkError: true, method: req.method, path: (req.url ?? "/").split("?")[0] }
+    )
+    reply.header(requestIdHeader, requestId).headers(rendered.headers)
+    if (rendered.contentType) reply.type(rendered.contentType)
+    reply.status(rendered.status).send(rendered.body)
   })
 
   let listening = false

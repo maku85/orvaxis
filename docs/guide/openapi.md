@@ -109,6 +109,8 @@ The `PUT` operation declares `body: { required: false }`, so its request body is
 
 ## What the generator accepts
 
+**Error responses.** Every operation gets a `default` response describing the adapters' error body: `ErrorResponse` as `application/json` by default, or `ProblemDetails` as `application/problem+json` with `errorFormat: "problem"` (match the adapters' option).
+
 **Paths.** `:name` segments become `{name}` (any name without braces). Wildcards such as `/files/*path` have no OpenAPI template, so the call raises a `TypeError` naming the route unless you exclude it with `exclude: (route) => route.path.includes("*")` — the only way a route is left out. Braces in static segments, empty parameter names, a parameter repeated in one path and HTTP methods OpenAPI lacks also raise. Two operations are never merged silently: the same method on the same template, or templates that differ only in parameter names (`GET /items/:id` with `POST /items/:itemId`, which OpenAPI forbids) raise a collision error.
 
 **No converter needed for Standard JSON Schema.** A validator that implements Standard JSON Schema (`~standard.jsonSchema`; Zod 4 does) describes itself: the generator asks for its input shape (JSON Schema 2020-12, which is what OpenAPI 3.1 uses) for `body`, `params`, `query` and `headers`, and its output shape for responses, and drops the root `$schema` keyword. With Zod 4 you can leave `schemaConverter` out entirely. A validator that cannot describe itself (a `parse`-only object, a Standard Schema without `jsonSchema`, a type JSON Schema cannot express such as `z.date()`) raises a `TypeError` naming the route and field and asking for a `schemaConverter`. Output that uses `$defs` (recursive or repeated types) hits the local-reference rule below.

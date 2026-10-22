@@ -8,10 +8,10 @@ import express, {
 import type { Orvaxis } from "../core/Orvaxis.js"
 import { abandonRequest, isRequestAbandoned } from "../core/requestAbandoned.js"
 import type { OrvaxisRequest, OrvaxisResponse, ServerAdapter } from "../types/index.js"
+import { renderError, sendRenderedError } from "./errors.js"
 import {
   type AdapterOptions,
   assertBodyWithinLimit,
-  buildErrorBody,
   closeApp,
   resolveRequestId,
   withTimeout,
@@ -146,8 +146,15 @@ export function createExpressServer(
       }
     } catch (err) {
       if (!wrapped.sent) {
-        const e = err as { status?: number }
-        wrapped.status(e.status ?? 500).json(buildErrorBody(err, requestId))
+        sendRenderedError(
+          wrapped,
+          renderError(
+            err,
+            requestId,
+            { ...options, logger },
+            { method: req.method, path: req.path }
+          )
+        )
       } else {
         logger.error("[orvaxis] unhandled error after response sent:", err)
       }
@@ -167,11 +174,15 @@ export function createExpressServer(
       return
     }
     const requestId = resolveRequestId(req.headers[requestIdHeaderLower], options.trustRequestId)
-    const e = err as { status?: number; statusCode?: number }
-    res
-      .set(requestIdHeader, requestId)
-      .status(e.status ?? e.statusCode ?? 500)
-      .json(buildErrorBody(err, requestId, { frameworkError: true }))
+    const rendered = renderError(
+      err,
+      requestId,
+      { ...options, logger },
+      { frameworkError: true, method: req.method, path: req.path }
+    )
+    res.set(requestIdHeader, requestId).set(rendered.headers)
+    if (rendered.contentType) res.type(rendered.contentType)
+    res.status(rendered.status).json(rendered.body)
   })
 
   let httpServer: ReturnType<typeof server.listen> | null = null
@@ -295,8 +306,15 @@ export function createExpressPolicyGuard(
           logger.error("[orvaxis] policy guard failed after response sent:", err)
           return
         }
-        const error = err as { status?: number }
-        wrapped.status(error.status ?? 500).json(buildErrorBody(err, requestId))
+        sendRenderedError(
+          wrapped,
+          renderError(
+            err,
+            requestId,
+            { ...options, logger },
+            { method: req.method, path: routePath }
+          )
+        )
       })
   }
 }

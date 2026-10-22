@@ -44,6 +44,9 @@ Run a complete example from a checkout: `pnpm exec tsx examples/express-server.t
 | `shutdownTimeout` | 10 000 ms | how long `close()` waits before cutting connections; `0` waits indefinitely |
 | `logger` | `console` | receives errors that happen after a response was sent |
 | `requestIdHeader` | `X-Request-ID` | header read for the request ID and set on the response |
+| `errorFormat` | `"envelope"` | `"problem"` writes RFC 9457 Problem Details; see [Error responses](#error-responses) |
+| `problemTypeBase` | none | prefix that turns an error `code` into the Problem Details `type` |
+| `mapError` | none | one function that turns any error into a status, message, code, headers and extra members; see [Error responses](#error-responses) |
 | `trustRequestId` | `true` | accept a client-sent request ID when it is 1–128 characters of `A-Za-z0-9._-`; `false` always generates a UUID |
 
 `listen` rejects with `Server is already listening. Call close() first.` if called twice, and `close()` resolves even when nothing is listening, so calling it twice is safe. An Express adapter can `listen` again after `close()`; a Fastify instance cannot be reopened (Fastify throws), so create a new `Fastify()` and adapter to restart.
@@ -181,13 +184,70 @@ Only `HttpError` contributes `code` and `details`. For any other error they are 
 
 The built-in router applies this rule to its own 404: outside production the message includes the unmatched path (`"Not Found: /api/users/42"`) to make debugging faster; in production it falls back to the generic `"Not Found"` to avoid reflecting user-controlled input in the response body.
 
-`buildErrorBody` and `sanitizeErrorMessage` are exported for custom adapters:
+### Problem Details (RFC 9457)
+
+Set `errorFormat: "problem"` to answer with [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457) Problem Details and `Content-Type: application/problem+json`:
+
+```ts
+const server = createNodeServer(app, {
+  errorFormat: "problem",
+  problemTypeBase: "https://api.example.com/problems/",
+})
+```
+
+```json
+{
+  "type": "https://api.example.com/problems/TEAPOT",
+  "title": "I'm a Teapot",
+  "status": 418,
+  "detail": "I'm a teapot",
+  "code": "TEAPOT",
+  "requestId": "6f1c…"
+}
+```
+
+- `type` is `about:blank` unless the error has a `code` and `problemTypeBase` is set, then it is the base plus the code. `title` is the standard text of the status, and `detail` is the message, left out when it would only repeat the title. `status` repeats the HTTP status. `code`, `requestId` and `details` (for a `422`, the validation issues) are extension members.
+- The exposure rules are unchanged: only `HttpError` contributes `code` and `details`, and in production a plain error's message is hidden, so its `detail` is absent.
+- Errors from Express's or Fastify's own request handling (malformed JSON, oversized body) use the same format.
+
+### One mapper for every error
+
+`mapError(err, info)` is called for every error an adapter writes, in either format, and may change what is sent. Return `undefined` to keep the default.
+
+```ts
+const server = createExpressServer(app, undefined, {
+  errorFormat: "problem",
+  mapError(err, { requestId, status, method, path, frameworkError }) {
+    if (err instanceof OutOfStock) {
+      return {
+        status: 409,
+        message: "Not enough stock",
+        code: "OUT_OF_STOCK",
+        type: "https://api.example.com/problems/out-of-stock",
+        title: "Out of stock",
+        headers: { "Retry-After": "60" },
+        extensions: { sku: err.sku },
+      }
+    }
+  },
+})
+```
+
+Every field of the mapping is optional: `status` (4xx or 5xx, otherwise ignored), `message` (`error` in the envelope, `detail` in Problem Details), `code`, `details`, `type` and `title` (Problem Details only), `headers`, and `extensions`, extra members that can never replace a standard one (`error`, `code`, `details`, `requestId`, and in Problem Details `type`, `title`, `status`, `detail`, `instance`). The mapper sees the raw error, so it can recognise your own error classes; the message it returns is sent to the client as is, so keep it free of internals. A mapper that throws is logged through the adapter's `logger` and the default is used. It does not change `onError` hooks, which still run inside the runtime.
+
+For a document that matches, pass `errorFormat: "problem"` to `generateOpenApiDocument` too: the default response is then `ProblemDetails` as `application/problem+json`.
+
+`buildErrorBody` and `sanitizeErrorMessage` are exported for custom adapters, and so are `renderError` and `sendRenderedError`, which apply `errorFormat` and `mapError` the way the built-in adapters do:
 
 ```ts
 import { buildErrorBody } from "orvaxis"
 
 // in a custom adapter's catch block — produces the full ErrorResponse envelope:
 res.status(err.status ?? 500).json(buildErrorBody(err, requestId))
+
+// or, honoring errorFormat and mapError:
+import { renderError, sendRenderedError } from "orvaxis"
+sendRenderedError(res, renderError(err, requestId, adapterOptions))
 ```
 
 ## Request ID

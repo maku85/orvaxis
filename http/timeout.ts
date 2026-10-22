@@ -1,8 +1,9 @@
 import { HttpError } from "../core/HttpError.js"
 import { abandonRequest } from "../core/requestAbandoned.js"
 import type { Logger } from "../types/index.js"
+import type { ErrorOptions } from "./errors.js"
 
-export type AdapterOptions = {
+export type AdapterOptions = ErrorOptions & {
   timeout?: number
   /**
    * HTTP status sent when the deadline passes. Default: `503`. A server-side deadline is not
