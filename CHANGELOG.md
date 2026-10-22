@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-10-22
+
 ### Added
 
 - **RFC 9457 Problem Details and a central error mapper** — the adapters (`node`, Express, Fastify and the Express policy guard) accept `errorFormat: "problem"` to answer with `application/problem+json` (`type`, `title`, `status`, `detail`, plus `code`, `requestId` and `details` as extensions), `problemTypeBase` to build `type` from an error `code`, and `mapError(err, info)`, one function called for every error in either format that can change the status, message, code, details, `type`, `title`, headers and extra members (reserved members are never replaced; a throwing mapper is logged and ignored). Errors from Express's and Fastify's own request handling use it too. All adapters now render errors through the exported `renderError` / `sendRenderedError`. `generateOpenApiDocument` takes `errorFormat` to document `ProblemDetails` instead of `ErrorResponse`. The default stays the existing envelope, byte for byte. The `node:http` adapter's `json()` no longer overwrites a `Content-Type` already set.
