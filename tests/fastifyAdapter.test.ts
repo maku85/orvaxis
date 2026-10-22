@@ -698,3 +698,15 @@ describe("request IDs", () => {
     }
   })
 })
+
+describe("createFastifyServer — plugin onClose", () => {
+  it("runs plugin close handlers after shutdown", async () => {
+    const app = makeApp()
+    const closed: string[] = []
+    app.register({ name: "p1", apply: (ctx) => ctx.onClose(() => void closed.push("p1")) })
+    const server = createFastifyServer(app, Fastify())
+    await server.listen(0)
+    await server.close()
+    expect(closed).toEqual(["p1"])
+  })
+})

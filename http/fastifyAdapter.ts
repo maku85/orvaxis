@@ -3,7 +3,13 @@ import Fastify, { type FastifyReply } from "fastify"
 import type { Orvaxis } from "../core/Orvaxis.js"
 import { abandonRequest } from "../core/requestAbandoned.js"
 import type { OrvaxisRequest, OrvaxisResponse, ServerAdapter } from "../types/index.js"
-import { type AdapterOptions, buildErrorBody, resolveRequestId, withTimeout } from "./timeout.js"
+import {
+  type AdapterOptions,
+  buildErrorBody,
+  closeApp,
+  resolveRequestId,
+  withTimeout,
+} from "./timeout.js"
 
 function wrapFastifyResponse(
   reply: FastifyReply,
@@ -225,6 +231,7 @@ export function createFastifyServer(
         clearTimeout(deadline)
         listening = false
       }
+      await closeApp(app, logger)
     },
   }
 }

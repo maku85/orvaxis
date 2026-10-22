@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **A real plugin API** — `PluginContext` now exposes `addPolicy`, `use` and `onClose` next to `hooks.on`, and a plugin may declare `dependsOn`. Until now the type listed only `hooks` while the runtime passed itself, so plugins could reach everything; they now receive a restricted object (`Runtime.createPluginContext()`). A missing dependency or a duplicate name throws before `apply` runs, and a plugin whose `apply` throws is no longer listed as registered. New `app.close()` runs the `onClose` handlers, last registered first; the Express and Fastify adapters call it at the end of `close()` and only log a failing handler. Plugins that only use `hooks.on` are unaffected; code that called `plugin.apply(runtime)` directly must pass `runtime.createPluginContext()`.
 - **`app.authenticate()` and `ctx.identity`** — one function that identifies the caller runs after routing and before every policy (also in `app.authorize()` and the Express policy guard). Return the identity, `null` for anonymous, or throw an `HttpError` to reject. Policies and handlers read `ctx.identity`, whose fields you declare by augmenting the exported `OrvaxisIdentity` interface, instead of an untyped value copied into `ctx.meta` by an earlier policy. The trace gains an `AUTHENTICATE` event (outcome only). Purely additive: policies that use `modify` keep working.
 
 ### Fixed

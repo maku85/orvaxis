@@ -623,3 +623,26 @@ describe("createExpressServer — JSON body parsing", () => {
     expect(JSON.parse(opted.text)).toEqual({ body: { x: 1 } })
   })
 })
+
+describe("createExpressServer — plugin onClose", () => {
+  it("runs plugin close handlers after shutdown, and a failing one does not block it", async () => {
+    const app = makeApp()
+    const closed: string[] = []
+    app.register({ name: "p1", apply: (ctx) => ctx.onClose(() => void closed.push("p1")) })
+    app.register({
+      name: "p2",
+      apply: (ctx) =>
+        ctx.onClose(() => {
+          throw new Error("boom")
+        }),
+    })
+    const errors: unknown[] = []
+    const server = createExpressServer(app, express(), {
+      logger: { info() {}, error: (...a: unknown[]) => void errors.push(a) },
+    })
+    await server.listen(0)
+    await server.close()
+    expect(closed).toEqual(["p1"])
+    expect(errors).toHaveLength(1)
+  })
+})

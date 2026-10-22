@@ -58,7 +58,9 @@ describe("Runtime.addPlugin", () => {
     runtime.addPlugin({ name: "p", apply })
 
     expect(apply).toHaveBeenCalledOnce()
-    expect(apply).toHaveBeenCalledWith(runtime)
+    expect(apply).toHaveBeenCalledWith(
+      expect.objectContaining({ hooks: expect.any(Object), addPolicy: expect.any(Function) })
+    )
   })
 
   it("plugin with explicit PluginContext annotation can register hooks", async () => {

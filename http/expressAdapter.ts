@@ -8,7 +8,13 @@ import express, {
 import type { Orvaxis } from "../core/Orvaxis.js"
 import { abandonRequest, isRequestAbandoned } from "../core/requestAbandoned.js"
 import type { OrvaxisRequest, OrvaxisResponse, ServerAdapter } from "../types/index.js"
-import { type AdapterOptions, buildErrorBody, resolveRequestId, withTimeout } from "./timeout.js"
+import {
+  type AdapterOptions,
+  buildErrorBody,
+  closeApp,
+  resolveRequestId,
+  withTimeout,
+} from "./timeout.js"
 
 function wrapExpressResponse(res: Response, onStreamStart: () => void): OrvaxisResponse {
   const wrapped: OrvaxisResponse = {
@@ -201,8 +207,8 @@ export function createExpressServer(
           clearTimeout(deadline)
           httpServer = null
           closing = false
-          if (err) reject(err)
-          else resolve()
+          if (err) return reject(err)
+          closeApp(app, logger).then(resolve)
         })
       }),
   }

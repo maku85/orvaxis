@@ -33,7 +33,7 @@ describe("loggerPlugin", () => {
     it("logs structured request on onRequest hook", async () => {
       const logger = makeLogger()
       const runtime = new Runtime()
-      loggerPlugin({ logger }).apply(runtime)
+      loggerPlugin({ logger }).apply(runtime.createPluginContext())
 
       await runtime.hooks.trigger("onRequest", makeCtx("/test", "req-abc"))
 
@@ -46,7 +46,7 @@ describe("loggerPlugin", () => {
     it("logs structured response on afterPipeline hook", async () => {
       const logger = makeLogger()
       const runtime = new Runtime()
-      loggerPlugin({ logger }).apply(runtime)
+      loggerPlugin({ logger }).apply(runtime.createPluginContext())
 
       const ctx = makeCtx("/test", "req-abc", 201)
       await runtime.hooks.trigger("onRequest", ctx)
@@ -70,7 +70,7 @@ describe("loggerPlugin", () => {
     it("logs structured error on onError hook", async () => {
       const logger = makeLogger()
       const runtime = new Runtime()
-      loggerPlugin({ logger }).apply(runtime)
+      loggerPlugin({ logger }).apply(runtime.createPluginContext())
 
       const err = new Error("something failed")
       await runtime.hooks.trigger("onError", makeCtx("/test", "req-xyz"), err)
@@ -91,7 +91,7 @@ describe("loggerPlugin", () => {
     it("includes the finalized runtime and response state in request error logs", async () => {
       const logger = makeLogger()
       const runtime = new Runtime()
-      loggerPlugin({ logger }).apply(runtime)
+      loggerPlugin({ logger }).apply(runtime.createPluginContext())
       runtime.router.group({
         prefix: "/api",
         routes: [
@@ -144,7 +144,7 @@ describe("loggerPlugin", () => {
     it("falls back to console when no logger is provided", async () => {
       const infoSpy = vi.spyOn(console, "info").mockImplementation(() => {})
       const runtime = new Runtime()
-      loggerPlugin().apply(runtime)
+      loggerPlugin().apply(runtime.createPluginContext())
 
       await runtime.hooks.trigger("onRequest", makeCtx("/x", "req-fallback"))
 
@@ -162,7 +162,7 @@ describe("loggerPlugin", () => {
     it("logs durationMs as undefined in JSON format when no start time was recorded", async () => {
       const logger = makeLogger()
       const runtime = new Runtime()
-      loggerPlugin({ logger }).apply(runtime)
+      loggerPlugin({ logger }).apply(runtime.createPluginContext())
 
       const ctx = makeCtx("/test", "req-no-start", 200)
       await runtime.hooks.trigger("afterPipeline", ctx)
@@ -176,7 +176,7 @@ describe("loggerPlugin", () => {
     it("logs duration as undefined in text format when no start time was recorded", async () => {
       const logger = makeLogger()
       const runtime = new Runtime()
-      loggerPlugin({ logger, format: "text" }).apply(runtime)
+      loggerPlugin({ logger, format: "text" }).apply(runtime.createPluginContext())
 
       const ctx = makeCtx("/test", "req-no-start", 200)
       await runtime.hooks.trigger("afterPipeline", ctx)
@@ -192,7 +192,7 @@ describe("loggerPlugin", () => {
     it("logs method, path, and requestId via logger.info on onRequest hook", async () => {
       const logger = makeLogger()
       const runtime = new Runtime()
-      loggerPlugin({ logger, format: "text" }).apply(runtime)
+      loggerPlugin({ logger, format: "text" }).apply(runtime.createPluginContext())
 
       await runtime.hooks.trigger("onRequest", makeCtx("/test", "req-abc"))
 
@@ -205,7 +205,7 @@ describe("loggerPlugin", () => {
     it("logs method, path, status, duration, and requestId via logger.info on afterPipeline hook", async () => {
       const logger = makeLogger()
       const runtime = new Runtime()
-      loggerPlugin({ logger, format: "text" }).apply(runtime)
+      loggerPlugin({ logger, format: "text" }).apply(runtime.createPluginContext())
 
       const ctx = makeCtx("/test", "req-abc", 200)
       await runtime.hooks.trigger("onRequest", ctx)
@@ -220,7 +220,7 @@ describe("loggerPlugin", () => {
     it("logs requestId and error via logger.error on onError hook", async () => {
       const logger = makeLogger()
       const runtime = new Runtime()
-      loggerPlugin({ logger, format: "text" }).apply(runtime)
+      loggerPlugin({ logger, format: "text" }).apply(runtime.createPluginContext())
 
       const err = new Error("something failed")
       await runtime.hooks.trigger("onError", makeCtx("/test", "req-xyz"), err)

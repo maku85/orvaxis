@@ -291,8 +291,18 @@ export type TraceEvent = {
   meta?: Record<string, unknown>
 }
 
+/**
+ * Everything a plugin can reach. It is a dedicated object, not the runtime: a plugin cannot read
+ * or replace the router, the other plugins or the hook lists.
+ */
 export interface PluginContext {
   hooks: {
     on(name: HookName, fn: (ctx: OrvaxisContext, error?: Error) => Promise<void> | void): void
   }
+  /** Register a global policy, as `app.policy()` does. */
+  addPolicy(policy: Policy): void
+  /** Add a global middleware, as `app.use()` does. */
+  use(fn: Middleware): void
+  /** Run `fn` when `app.close()` is called (and by the adapters' `close()`), in reverse order of registration. */
+  onClose(fn: () => Promise<void> | void): void
 }

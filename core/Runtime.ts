@@ -6,6 +6,7 @@ import type {
   OrvaxisOptions,
   OrvaxisRequest,
   OrvaxisResponse,
+  PluginContext,
   Policy,
   PolicyPhase,
   PolicyTraceOptions,
@@ -93,6 +94,7 @@ export class Runtime {
   readonly router = new Router()
 
   private authenticator: Authenticator | undefined
+  private closeHandlers: Array<() => Promise<void> | void> = []
   private readonly logsMaxSize: number | undefined
   private readonly policyTrace: PolicyTraceOptions
 
@@ -134,9 +136,43 @@ export class Runtime {
     this.debugger.log(ctx, "AUTHENTICATE_END")
   }
 
+  /** The restricted view of the runtime that a plugin receives. */
+  createPluginContext(): PluginContext {
+    return {
+      hooks: { on: (name, fn) => this.hooks.on(name, fn) },
+      addPolicy: (policy) => this.policies.register(policy),
+      use: (fn) => this.pipeline.use(fn),
+      onClose: (fn) => {
+        this.closeHandlers.push(fn)
+      },
+    }
+  }
+
   addPlugin(plugin: Plugin) {
+    // Validate before applying so a plugin that fails its checks leaves nothing behind, and
+    // register only afterwards so a plugin whose `apply` throws is not listed as installed.
+    this.plugins.assertRegistrable(plugin)
+    plugin.apply(this.createPluginContext())
     this.plugins.register(plugin)
-    plugin.apply(this)
+  }
+
+  /**
+   * Run the plugins' `onClose` handlers, last registered first, each at most once. Every handler
+   * runs even if an earlier one throws; failures are reported together afterwards.
+   */
+  async close(): Promise<void> {
+    const handlers = this.closeHandlers.reverse()
+    this.closeHandlers = []
+    const errors: unknown[] = []
+    for (const handler of handlers) {
+      try {
+        await handler()
+      } catch (err) {
+        errors.push(err)
+      }
+    }
+    if (errors.length === 1) throw errors[0]
+    if (errors.length > 1) throw new AggregateError(errors, "Multiple plugin close errors")
   }
 
   async execute(req: OrvaxisRequest, res: OrvaxisResponse): Promise<OrvaxisContext> {

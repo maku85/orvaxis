@@ -5,11 +5,22 @@ A plugin packages behavior that you would otherwise register by hand. Orvaxis sh
 ## The contract
 
 ```ts
-type Plugin = { name: string; apply: (ctx: PluginContext) => void }
-interface PluginContext { hooks: { on(name: HookName, fn: (ctx, error?) => void | Promise<void>): void } }
+type Plugin = {
+  name: string
+  dependsOn?: readonly string[]
+  apply: (ctx: PluginContext) => void
+}
+interface PluginContext {
+  hooks: { on(name: HookName, fn: (ctx, error?) => void | Promise<void>): void }
+  addPolicy(policy: Policy): void
+  use(fn: Middleware): void
+  onClose(fn: () => void | Promise<void>): void
+}
 ```
 
-`app.register(plugin)` applies the plugin immediately. The name must be unique: registering a second plugin with the same name throws a `TypeError`. A plugin registers hooks through `ctx.hooks.on`, which is **all** that `PluginContext` exposes; hooks run in registration order, mixed with hooks added by `app.on`. For middleware, policies or routes, write a factory that takes `app` and calls its public methods (`use`, `policy`, `group`) rather than reaching into the runtime. The hooks themselves, and which of them may answer a request, are explained in [Middleware and hooks](/guide/middleware-and-hooks).
+`app.register(plugin)` applies the plugin immediately. The name must be unique: registering a second plugin with the same name throws a `TypeError`. `dependsOn` lists plugins that must already be registered; a missing one throws before `apply` runs, naming it. A plugin that throws in `apply` is not listed as installed.
+
+`PluginContext` is a dedicated object, not the runtime: a plugin cannot reach the router, the other plugins or the hook lists. It can register hooks (`ctx.hooks.on`, which run in registration order mixed with hooks added by `app.on`), add a global policy (`ctx.addPolicy`, the same as `app.policy`), add a global middleware (`ctx.use`, the same as `app.use`) and release resources with `ctx.onClose`. Close handlers run when `app.close()` is called, which `createExpressServer` and `createFastifyServer` do at the end of their own `close()`; they run last registered first, each once, and a handler that throws is logged by the adapter and does not block shutdown. Routes are still added through `app.group`. The hooks themselves, and which of them may answer a request, are explained in [Middleware and hooks](/guide/middleware-and-hooks).
 
 <!-- snippet: examples/custom-plugin.ts#plugin -->
 ```ts

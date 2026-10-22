@@ -65,6 +65,11 @@ export class Orvaxis {
     return this
   }
 
+  /** Run plugin `onClose` handlers. The built-in adapters call this at the end of `close()`. */
+  async close() {
+    await this.runtime.close()
+  }
+
   routes() {
     return this.runtime.router.routes()
   }

@@ -42,6 +42,15 @@ export type ErrorResponse = {
   details?: unknown
 }
 
+/** Run the app's plugin close handlers; a failing handler is logged and never blocks shutdown. */
+export async function closeApp(app: { close(): Promise<void> }, logger: Logger): Promise<void> {
+  try {
+    await app.close()
+  } catch (err) {
+    logger.error("[orvaxis] plugin onClose failed:", err)
+  }
+}
+
 export function sanitizeErrorMessage(err: unknown): string {
   if (err instanceof HttpError) return err.message ?? "Internal Server Error"
   if (process.env.NODE_ENV !== "production") {
