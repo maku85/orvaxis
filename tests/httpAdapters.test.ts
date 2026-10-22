@@ -6,14 +6,20 @@ import { afterEach, describe, expect, it, vi } from "vitest"
 import { Orvaxis } from "../core/Orvaxis"
 import { createExpressPolicyGuard, createExpressServer } from "../http/expressAdapter"
 import { createFastifyServer } from "../http/fastifyAdapter"
+import { createNodeServer } from "../http/nodeAdapter"
 import type { ServerAdapter } from "../types"
 
 // Behavior matrix for the declared HTTP integrations, run over real sockets. `pnpm test:compat`
 // repeats it for Express 4, Express 5 and Fastify 5 (see scripts/run-compat.mjs).
-type Kind = "express" | "express-guard" | "fastify"
+type Kind = "express" | "express-guard" | "fastify" | "node"
 const target = process.env.ORVAXIS_COMPAT_TARGET
-const kinds: Kind[] = (["express", "express-guard", "fastify"] as const).filter((kind) =>
-  !target ? true : target.startsWith("express") ? kind !== "fastify" : kind === "fastify"
+// The node adapter has no peer, so it is part of every target.
+const kinds: Kind[] = (["express", "express-guard", "fastify", "node"] as const).filter((kind) =>
+  !target || kind === "node"
+    ? true
+    : target.startsWith("express")
+      ? kind !== "fastify"
+      : kind === "fastify"
 )
 
 type Deferred = { promise: Promise<void>; resolve: () => void }
@@ -126,7 +132,9 @@ async function start(
     const adapter: ServerAdapter =
       kind === "express"
         ? createExpressServer(app, express(), adapterOptions)
-        : createFastifyServer(app, Fastify(), adapterOptions)
+        : kind === "fastify"
+          ? createFastifyServer(app, Fastify(), adapterOptions)
+          : createNodeServer(app, adapterOptions)
     await adapter.listen(0, (assigned) => {
       port = assigned
     })

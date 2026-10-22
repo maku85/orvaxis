@@ -1,6 +1,6 @@
 # HTTP adapters
 
-An adapter connects Orvaxis to a Node.js HTTP framework: it turns the incoming request into an `OrvaxisRequest`, runs the lifecycle, and writes the response. Two are included, for Express and Fastify. This page covers choosing and installing one, creating a server, how it sits next to your framework, request parsing and limits, error responses, request IDs, and writing your own. Deadlines, cancellation and shutdown have their own page: [Timeouts and graceful shutdown](/guide/timeouts-and-shutdown); streamed responses are in [Streaming](/guide/streaming).
+An adapter connects Orvaxis to a Node.js HTTP framework: it turns the incoming request into an `OrvaxisRequest`, runs the lifecycle, and writes the response. Three are included: Express, Fastify, and plain `node:http` with no framework. This page covers choosing and installing one, creating a server, how it sits next to your framework, request parsing and limits, error responses, request IDs, and writing your own. Deadlines, cancellation and shutdown have their own page: [Timeouts and graceful shutdown](/guide/timeouts-and-shutdown); streamed responses are in [Streaming](/guide/streaming).
 
 ## Choose and install
 
@@ -8,13 +8,14 @@ An adapter connects Orvaxis to a Node.js HTTP framework: it turns the incoming r
 |---|---|---|---|
 | Express | `createExpressServer` from `orvaxis/express` | `express ^4.20 \|\| ^5` (types: `@types/express`) | Express 4.22 and 5.2 |
 | Fastify | `createFastifyServer` from `orvaxis/fastify` | `fastify ^5` | Fastify 5.8 |
+| Node.js `http` | `createNodeServer` from `orvaxis/node` | none | Node.js 22.13 and 24 |
 
 ```bash
 npm install orvaxis express           # or: npm install orvaxis fastify
 npm install -D @types/express         # TypeScript projects using Express
 ```
 
-Install only the framework you use. Both peers are optional, and each adapter has its own subpath so that importing `orvaxis` never needs either; `orvaxis`, `orvaxis/testing` and `orvaxis/openapi` need neither, and importing `orvaxis/express` or `orvaxis/fastify` without its peer fails with a module-not-found error that names the package. Node.js 22.13 or later is required. The adapter tests run on every change against the versions in the last column (`pnpm test:compat`); the lowest declared versions (Express 4.20, Fastify 5.0) are not tested separately.
+Install only the framework you use; `orvaxis/node` needs none. Both peers are optional, and each adapter has its own subpath so that importing `orvaxis` never needs either; `orvaxis`, `orvaxis/testing` and `orvaxis/openapi` need neither, and importing `orvaxis/express` or `orvaxis/fastify` without its peer fails with a module-not-found error that names the package. Node.js 22.13 or later is required. The adapter tests run on every change against the versions in the last column (`pnpm test:compat`); the lowest declared versions (Express 4.20, Fastify 5.0) are not tested separately.
 
 ## Create and run a server
 
@@ -46,6 +47,32 @@ Run a complete example from a checkout: `pnpm exec tsx examples/express-server.t
 | `trustRequestId` | `true` | accept a client-sent request ID when it is 1–128 characters of `A-Za-z0-9._-`; `false` always generates a UUID |
 
 `listen` rejects with `Server is already listening. Call close() first.` if called twice, and `close()` resolves even when nothing is listening, so calling it twice is safe. An Express adapter can `listen` again after `close()`; a Fastify instance cannot be reopened (Fastify throws), so create a new `Fastify()` and adapter to restart.
+
+## The `node:http` adapter
+
+`createNodeServer(app, options)` serves the app with Node's own HTTP server: no Express or Fastify, no peer dependency. Use it when Orvaxis owns every route and you want the smallest footprint.
+
+```ts
+import { createNodeServer } from "orvaxis/node"
+
+const server = createNodeServer(app, { bodyLimit: 512 * 1024 })
+await server.listen(3000)
+```
+
+It takes the `AdapterOptions` above plus:
+
+| Option | Default | Meaning |
+|---|---|---|
+| `server` | a new `http.Server` | the `node:http` or `node:https` server to attach to; the adapter adds its `request` listener and owns `listen()` and `close()` |
+| `bodyLimit` | `1_048_576` bytes | largest JSON body accepted; larger bodies get `413` (`BODY_TOO_LARGE`) |
+
+What differs from the framework adapters:
+
+- **Bodies.** `application/json` (and `+json`) bodies are parsed into `ctx.req.body`; malformed JSON is `400` (`INVALID_JSON`). Any other content type leaves `body` undefined and the stream readable on `ctx.req.raw`, the `IncomingMessage`. There is no form or multipart parsing.
+- **Query.** Parsed with `URLSearchParams` into the same flat shape as Express's `simple` parser: a repeated key becomes an array, there is no nesting.
+- **`ctx.res.send`.** A string is sent as `text/plain; charset=utf-8`, a `Buffer` as `application/octet-stream`, an object as JSON, unless you set `Content-Type` first.
+- **Nothing else answers.** Orvaxis handles every request on the server, so there are no routes or middleware next to it; put it behind a reverse proxy for TLS, compression and static files.
+- **Same behavior elsewhere.** Request IDs, the error envelope, `timeout`, `timeoutStatus`, disconnect and shutdown signalling through `ctx.req.signal`, `denyByDefault` at `listen()`, and plugin `onClose` handlers work as in the other adapters, and the same behavior tests run against it. Like Express, it can `listen` again after `close()`.
 
 ## Full runtime or Express guard
 

@@ -16,6 +16,7 @@
     "index.ts",
     "testing.ts",
     "express.ts",
+    "node.ts",
     "fastify.ts",
     "otel.ts",
     "openapi.ts",

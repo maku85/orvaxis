@@ -212,8 +212,9 @@ Adapters are thin wrappers that normalize the request and delegate to the runtim
 |---|---|---|
 | Express | `createExpressServer` from `orvaxis/express` | `express ^4.20 \|\| ^5` (types: `@types/express`) |
 | Fastify | `createFastifyServer` from `orvaxis/fastify` | `fastify ^5` |
+| Node.js `http` | `createNodeServer` from `orvaxis/node` | none |
 
-Both peers are optional and each adapter has its own subpath, so `orvaxis`, `orvaxis/testing` and `orvaxis/openapi` never need either. The core has no runtime dependencies. Details: [HTTP adapters](docs/guide/http-adapters.md).
+The Express and Fastify peers are optional and each adapter has its own subpath, so `orvaxis`, `orvaxis/testing` and `orvaxis/openapi` never need either; `orvaxis/node` serves the app with plain `node:http`. The core has no runtime dependencies. Details: [HTTP adapters](docs/guide/http-adapters.md).
 
 ```ts
 import { Orvaxis } from "orvaxis"

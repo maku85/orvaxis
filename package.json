@@ -36,6 +36,16 @@
         "default": "./dist/express.js"
       }
     },
+    "./node": {
+      "import": {
+        "types": "./dist/esm/node.d.ts",
+        "default": "./dist/esm/node.js"
+      },
+      "require": {
+        "types": "./dist/node.d.ts",
+        "default": "./dist/node.js"
+      }
+    },
     "./fastify": {
       "import": {
         "types": "./dist/esm/fastify.d.ts",
@@ -101,7 +111,8 @@
     "opentelemetry",
     "testing",
     "sse",
-    "graceful-shutdown"
+    "graceful-shutdown",
+    "node-http"
   ],
   "scripts": {
     "dev": "tsx examples/express-server.ts",

@@ -110,7 +110,7 @@ try {
   const subpaths = Object.keys(pkg.exports).map((key) =>
     key === "." ? "orvaxis" : `orvaxis/${key.slice(2)}`
   )
-  const coreSubpaths = ["orvaxis", "orvaxis/testing", "orvaxis/openapi"]
+  const coreSubpaths = ["orvaxis", "orvaxis/testing", "orvaxis/openapi", "orvaxis/node"]
   const peerSubpaths = {
     "orvaxis/express": "express",
     "orvaxis/fastify": "fastify",
@@ -234,6 +234,7 @@ async function serve(adapter) {
 import { Orvaxis, defineRoute, schemaValidationPlugin } from "orvaxis"
 import { testRequest } from "orvaxis/testing"
 import { generateOpenApiDocument } from "orvaxis/openapi"
+import { createNodeServer } from "orvaxis/node"
 const app = new Orvaxis()
 app.register(schemaValidationPlugin)
 app.group({ prefix: "/api", routes: [defineRoute({
@@ -248,6 +249,7 @@ app.group({ prefix: "/api", routes: [defineRoute({
 })] })
 testRequest(app, { path: "/api/items/42" })
 generateOpenApiDocument(app, { title: "Check", version: "1" })
+createNodeServer(app, { timeout: 0 })
 `
 
   // Consumer without peers: core, testing and OpenAPI work; integrations fail on the missing peer.
@@ -255,7 +257,9 @@ generateOpenApiDocument(app, { title: "Check", version: "1" })
     const directory = createConsumer("no-peers", [])
     const missing = () => `
 async function main() {
-  await smoke()
+  const app = await smoke()
+  const { createNodeServer } = await load("orvaxis/node")
+  await serve(createNodeServer(app, { timeout: 0 }))
   for (const [name, peer] of Object.entries(${JSON.stringify(peerSubpaths)})) {
     await assert.rejects(load(name), (error) => {
       const message = String(error.message)
