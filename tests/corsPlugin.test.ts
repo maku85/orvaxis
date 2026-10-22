@@ -231,4 +231,64 @@ describe("corsPlugin", () => {
       expect(res.status).toBe(404)
     })
   })
+
+  describe("configuration and caching", () => {
+    it("rejects credentials with a wildcard or default origin at registration", () => {
+      expect(() => corsPlugin({ credentials: true })).toThrow(TypeError)
+      expect(() => corsPlugin({ origin: "*", credentials: true })).toThrow(/explicit origin/)
+      expect(() => corsPlugin({ origin: "https://a.com", credentials: true })).not.toThrow()
+    })
+
+    it("sets Vary: Origin even when the request origin is refused", async () => {
+      const app = makeApp()
+      app.register(corsPlugin({ origin: "https://example.com" }))
+      const res = await testRequest(app, {
+        path: "/api/resource",
+        headers: { origin: "https://evil.example" },
+      })
+      expect(res.headers["Access-Control-Allow-Origin"]).toBeUndefined()
+      expect(res.headers.Vary).toBe("Origin")
+    })
+
+    it("appends to a Vary header set earlier instead of replacing it", async () => {
+      const app = makeApp()
+      app.on("onRequest", (ctx) => {
+        ctx.res.setHeader("Vary", "Accept-Encoding")
+      })
+      app.register(corsPlugin({ origin: "https://example.com" }))
+      const res = await testRequest(app, {
+        path: "/api/resource",
+        headers: { origin: "https://example.com" },
+      })
+      expect(res.headers.Vary).toBe("Accept-Encoding, Origin")
+    })
+
+    it("does not duplicate Origin and leaves Vary: * alone", async () => {
+      const app = makeApp()
+      app.on("onRequest", (ctx) => {
+        ctx.res.setHeader("Vary", "*")
+      })
+      app.register(corsPlugin({ origin: "https://example.com" }))
+      const res = await testRequest(app, {
+        path: "/api/resource",
+        headers: { origin: "https://example.com" },
+      })
+      expect(res.headers.Vary).toBe("*")
+    })
+
+    it("adds Access-Control-Request-Headers to Vary when a preflight reflects them", async () => {
+      const app = makeApp("/api", "POST")
+      app.register(corsPlugin({ origin: "https://example.com" }))
+      const res = await testRequest(app, {
+        path: "/api/resource",
+        method: "OPTIONS",
+        headers: {
+          origin: "https://example.com",
+          "access-control-request-headers": "x-token",
+        },
+      })
+      expect(res.headers["Access-Control-Allow-Headers"]).toBe("x-token")
+      expect(res.headers.Vary).toBe("Origin, Access-Control-Request-Headers")
+    })
+  })
 })

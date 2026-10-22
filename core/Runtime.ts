@@ -47,6 +47,9 @@ function wrapForHead(res: OrvaxisResponse): OrvaxisResponse {
       res.setHeader(name, value)
       return wrapper
     },
+    getHeader(name) {
+      return res.getHeader?.(name)
+    },
     json(body) {
       const serialized = JSON.stringify(body)
       res.setHeader("Content-Type", "application/json")

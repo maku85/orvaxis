@@ -34,6 +34,10 @@ function wrapExpressResponse(res: Response, onStreamStart: () => void): OrvaxisR
       res.set(name, value as string | string[])
       return wrapped
     },
+    getHeader(name) {
+      const value = res.get(name)
+      return typeof value === "number" ? String(value) : value
+    },
     write(chunk) {
       onStreamStart()
       wrapped.sent = true

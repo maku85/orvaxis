@@ -57,6 +57,8 @@ export interface OrvaxisResponse {
   json(body: unknown): void
   send(body: unknown): void
   setHeader(name: string, value: string | string[]): OrvaxisResponse
+  /** Current value of a header already set on this response, when the adapter can report it. */
+  getHeader?(name: string): string | string[] | undefined
   write(chunk: unknown): void
   end(chunk?: unknown): void
   pipe(stream: import("node:stream").Readable): void

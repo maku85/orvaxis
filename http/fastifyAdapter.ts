@@ -51,6 +51,10 @@ function wrapFastifyResponse(
       reply.header(name, value)
       return wrapped
     },
+    getHeader(name) {
+      const value = reply.getHeader(name)
+      return typeof value === "number" ? String(value) : value
+    },
     write(chunk) {
       wrapped.sent = true
       startStream()

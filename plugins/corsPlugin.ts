@@ -22,6 +22,16 @@ function resolveOrigin(
   return null
 }
 
+function appendVary(ctx: OrvaxisContext, token: string): void {
+  const existing = ctx.res.getHeader?.("Vary")
+  const tokens = (Array.isArray(existing) ? existing.join(",") : (existing ?? ""))
+    .split(",")
+    .map((t) => t.trim())
+    .filter(Boolean)
+  if (tokens.includes("*") || tokens.some((t) => t.toLowerCase() === token.toLowerCase())) return
+  ctx.res.setHeader("Vary", [...tokens, token].join(", "))
+}
+
 export function corsPlugin(options: CorsOptions = {}): Plugin {
   const {
     origin = "*",
@@ -32,6 +42,15 @@ export function corsPlugin(options: CorsOptions = {}): Plugin {
     maxAge,
   } = options
 
+  // Browsers reject `Access-Control-Allow-Origin: *` on credentialed requests, so this
+  // combination can never work; fail at registration instead of at the first browser request.
+  if (credentials && (!origin || origin === "*")) {
+    throw new TypeError(
+      'corsPlugin: credentials: true requires an explicit origin (string, array or RegExp); "*" is rejected by browsers'
+    )
+  }
+  const dynamicOrigin = !!origin && origin !== "*"
+
   return {
     name: "cors",
 
@@ -39,12 +58,12 @@ export function corsPlugin(options: CorsOptions = {}): Plugin {
       runtime.hooks.on("onRequest", (ctx: OrvaxisContext) => {
         const requestOrigin = ctx.req.headers.origin as string | undefined
         const allowedOrigin = resolveOrigin(origin, requestOrigin)
+        // The response depends on Origin whenever the allowed origin is not fixed, including
+        // when this origin is refused: a cache must not serve that answer to an allowed one.
+        if (dynamicOrigin) appendVary(ctx, "Origin")
         if (!allowedOrigin) return
 
         ctx.res.setHeader("Access-Control-Allow-Origin", allowedOrigin)
-        if (allowedOrigin !== "*") {
-          ctx.res.setHeader("Vary", "Origin")
-        }
         if (credentials) {
           ctx.res.setHeader("Access-Control-Allow-Credentials", "true")
         }
@@ -62,6 +81,9 @@ export function corsPlugin(options: CorsOptions = {}): Plugin {
             | undefined
           const allow = allowedHeaders?.join(", ") ?? requestedHeaders
           if (allow) ctx.res.setHeader("Access-Control-Allow-Headers", allow)
+          if (!allowedHeaders?.length && requestedHeaders) {
+            appendVary(ctx, "Access-Control-Request-Headers")
+          }
           if (maxAge !== undefined) ctx.res.setHeader("Access-Control-Max-Age", String(maxAge))
         }
       })

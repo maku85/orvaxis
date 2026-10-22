@@ -37,6 +37,10 @@ export function createMockResponse(): MockResponse {
       mock.sentHeaders[name] = value
       return mock
     },
+    getHeader(name) {
+      const key = Object.keys(mock.sentHeaders).find((k) => k.toLowerCase() === name.toLowerCase())
+      return key === undefined ? undefined : mock.sentHeaders[key]
+    },
     write(chunk) {
       mock.sent = true
       mock.chunks.push(chunk)
