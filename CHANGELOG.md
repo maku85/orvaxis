@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Request timeouts answered `408`** — a deadline expiring on the server was reported as `408 Request Timeout`, which says the client was slow and invites blind retries. The adapters now answer `503` and the new `timeoutStatus` option sets another status (for example `504`). Clients or alerts that match on `408` must be updated.
 - **Express adapter did not parse request bodies, unlike Fastify** — with the app created by `createExpressServer(app)`, `ctx.req.body` was always `undefined`, so the same code behaved differently per adapter and a typed `body` schema failed every request. The adapter now registers `express.json()` when it creates the Express app, with a new `bodyParser` option (`{ limit }` or `false`). An Express app you pass in is untouched unless you set `bodyParser`, so existing setups behave as before. A route that relied on receiving no body from the default app now receives the parsed JSON.
 - **Request IDs were unvalidated and, on Fastify, not unique** — the adapters used the incoming `X-Request-ID` as is, with no length or character limit, and it then reached logs, traces, OpenTelemetry attributes and the response header; Fastify fell back to its per-process counter (`req-1`, `req-2`, …), which repeats across instances and restarts. An incoming ID is now used only when it is 1–128 characters of `A-Za-z0-9._-`; otherwise, and when absent, a UUID is generated. New `trustRequestId: false` option ignores incoming IDs entirely. `resolveRequestId` is exported for custom adapters.
 - **Fastify adapter merged several `Set-Cookie` headers into one** — `ctx.res.setHeader(name, [..])` joined array values with `", "`, so two cookies became a single malformed header and browsers kept at most one. Array values are now passed through, as the Express adapter already did.
@@ -52,6 +53,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Request timeouts answered `408`** — a deadline expiring on the server was reported as `408 Request Timeout`, which says the client was slow and invites blind retries. The adapters now answer `503` and the new `timeoutStatus` option sets another status (for example `504`). Clients or alerts that match on `408` must be updated.
 - **`examples/graceful-shutdown.ts` was cut off under `tsx` on Node 24** — it registered its signal handlers with `process.once`; under `tsx` the process was then exited with status 143 right after the first handler ran, before `close()` could end the in-flight stream. It uses `process.on` (the `closing` flag already prevents a second close), and the guide says why.
 - **`examples/schema-validation.ts` rejected every valid request** — the example never registered a JSON body parser, so `ctx.req.body` was undefined and `curl -d '{"name":"Alice","age":30}'` returned 422 instead of the documented 201. It now registers `express.json()` before the adapter.
 - **Fastify shutdown now honors `shutdownTimeout` for streamed responses** — Fastify stops tracking a response once the adapter hijacks it to stream, so `close()` returned at once and never cut off a stream that outlived the deadline (a stream that took four seconds simply kept going). Fastify's `close()` also did not wait for a request that was still running and started streaming later. The adapter now tracks its own in-flight requests and streams: `close()` waits for them and destroys any stream still open at `shutdownTimeout`, like the Express adapter.
@@ -97,6 +99,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Request timeouts answered `408`** — a deadline expiring on the server was reported as `408 Request Timeout`, which says the client was slow and invites blind retries. The adapters now answer `503` and the new `timeoutStatus` option sets another status (for example `504`). Clients or alerts that match on `408` must be updated.
 - **Strict response streaming checks** — keep rejecting unsupported streaming attempts when a handler catches the first validation error, instead of allowing subsequent writes to bypass the declared contract.
 - **Native Node.js ESM imports** — add explicit `.js` specifiers and directory index paths to internal imports so the ESM distribution and its declarations resolve without a bundler. CI and publication now check CJS/ESM consumption and NodeNext types in an isolated project without optional peer dependencies.
 - **Detailed trace redaction failures** — omit the original denial reason when the redactor throws.
@@ -119,6 +122,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Request timeouts answered `408`** — a deadline expiring on the server was reported as `408 Request Timeout`, which says the client was slow and invites blind retries. The adapters now answer `503` and the new `timeoutStatus` option sets another status (for example `504`). Clients or alerts that match on `408` must be updated.
 - **`scripts/release.sh` no longer silently skips the CHANGELOG stamp when `## [Unreleased]` is missing** — the previous `sed` substitution matched nothing and exited 0 if that heading wasn't present (e.g. because a prior release already consumed it), leaving the CHANGELOG without a section for the new version and causing `.github/workflows/release.yml` to fail on the following tag push. The script now errors out up front if `## [Unreleased]` is missing, and after stamping the current release it re-inserts a fresh, empty `## [Unreleased]` heading above it — so the next release always has one to consume.
 
 ## [0.3.1] - 2026-07-23
@@ -135,6 +139,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Request timeouts answered `408`** — a deadline expiring on the server was reported as `408 Request Timeout`, which says the client was slow and invites blind retries. The adapters now answer `503` and the new `timeoutStatus` option sets another status (for example `504`). Clients or alerts that match on `408` must be updated.
 - **Errors from the underlying framework's own request-parsing layer now go through the standard `ErrorResponse` envelope** — a malformed JSON body rejected by `express.json()`, or a request exceeding Fastify's `bodyLimit` (or its native content-type/JSON validation), happens before Orvaxis's routing and policies ever run, so these errors previously bypassed the adapter's error handling entirely: Express fell through to its own default HTML error page, and Fastify returned its native `{ statusCode, code, error, message }` shape with no `requestId`. Both adapters now register a dedicated error handler — a 4-arg error-handling middleware on Express, `fastify.setErrorHandler` on Fastify — that formats these the same way as errors thrown inside the Orvaxis runtime: `{ error, code?, requestId, details? }`, with the same `requestIdHeader` applied. This was a real gap in a documented, README-recommended setup (`express.json({ limit })` / `Fastify({ bodyLimit })`), not a hypothetical one.
 
 - **`onListen` callback now reports the real OS-assigned port instead of echoing `listen(0)`'s literal argument** — both `createExpressServer` and `createFastifyServer` previously called `onListen(port)` with whatever value was passed to `listen()`, so `listen(0, onListen)` — the standard way to let the OS pick a free port — reported back `0` instead of the actual bound port. Anything logging or reacting to the reported port (`console.log(\`listening on ${port}\`)`, wiring up a client against it) got the wrong value. Both adapters now read the real port off the underlying server's `.address()` after `listen` resolves, falling back to the requested port only if the server doesn't expose one (e.g. Unix sockets, custom adapters passed in tests).
@@ -227,6 +232,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Request timeouts answered `408`** — a deadline expiring on the server was reported as `408 Request Timeout`, which says the client was slow and invites blind retries. The adapters now answer `503` and the new `timeoutStatus` option sets another status (for example `504`). Clients or alerts that match on `408` must be updated.
 - **Validation errors now include structured `details`** — `HttpError` gains an optional `details?: unknown` field. `schemaValidationPlugin` populates it by extracting `{ path, message }` pairs from the validator's error cause (any object whose `.issues` is an array — compatible with Zod, and any library that follows the same convention). The adapter error response now carries `details` alongside `error` when present: `{ error: "Validation failed: body", details: [{ path: ["name"], message: "Required" }, ...] }`. Validators that do not expose `.issues` are unaffected — `details` is omitted. A new `buildErrorBody(err)` utility in `http/timeout.ts` consolidates response construction in both adapters; `sanitizeErrorMessage` remains exported for custom adapters.
 
 - **405 Method Not Allowed** — when a request path is registered but the incoming HTTP method is not, the runtime now responds with `405 Method Not Allowed` instead of `404 Not Found`. The response includes an `Allow` header listing every method registered on that path; `HEAD` is added automatically whenever `GET` is registered, consistent with the existing `HEAD → GET` fallback. `Router` exposes a new `allowedMethods(path): string[]` method for adapters and tooling that need the same information.
@@ -261,6 +267,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Request timeouts answered `408`** — a deadline expiring on the server was reported as `408 Request Timeout`, which says the client was slow and invites blind retries. The adapters now answer `503` and the new `timeoutStatus` option sets another status (for example `504`). Clients or alerts that match on `408` must be updated.
 - **`query` typed on `OrvaxisRequest`** — a new `query?: Record<string, string | string[]>` field is now part of the `OrvaxisRequest` interface. Both built-in adapters populate it from the framework's already-parsed query object (`req.query` on Express, `req.query` on Fastify). `TestRequestInit` exposes the same field so query params can be passed directly to `testRequest`. `schemaValidationPlugin` correctly assigns the validated value back to the typed field. Custom adapters can populate `req.query` by parsing `req.url` or forwarding from their underlying framework.
 
 - **Automatic HEAD → GET fallback** — `HEAD` requests now automatically fall back to the matching `GET` route when no dedicated `HEAD` route is registered. The `GET` handler runs in full (policies, middleware, hooks), but the response body is suppressed: `json()`, `send()`, and `pipe()` call `res.end()` without writing bytes, and `write()` is a no-op. Response headers set by the handler (e.g. `Content-Type`, `X-Version`) are forwarded to the client normally. A dedicated `HEAD` route always takes priority over the fallback. The fallback also works with param and wildcard routes.
@@ -294,6 +301,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Request timeouts answered `408`** — a deadline expiring on the server was reported as `408 Request Timeout`, which says the client was slow and invites blind retries. The adapters now answer `503` and the new `timeoutStatus` option sets another status (for example `504`). Clients or alerts that match on `408` must be updated.
 - **Error response sanitization** — adapter error responses no longer leak internal error messages to the client when `NODE_ENV=production`. Generic errors return `{ error: "Internal Server Error" }`; `HttpError` messages are always forwarded as-is since they are intentional user-facing responses. Outside production all messages are preserved for debugging. `sanitizeErrorMessage` is exported for custom adapters.
 - **Hardcoded secret in example** — `examples/policy-server.ts` now reads the admin key from `process.env.ADMIN_API_KEY` instead of the literal string `"admin-secret"`.
 
@@ -313,6 +321,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Request timeouts answered `408`** — a deadline expiring on the server was reported as `408 Request Timeout`, which says the client was slow and invites blind retries. The adapters now answer `503` and the new `timeoutStatus` option sets another status (for example `504`). Clients or alerts that match on `408` must be updated.
 - **`schemaValidationPlugin`** — `headers` schema validation result is now applied back to `ctx.req.headers`. Previously the parsed/transformed value was discarded.
 - **`HookSystem.trigger`** — all hooks in a trigger call now run even when an earlier one throws. The first error is collected and re-thrown after the loop completes, preventing cleanup hooks from being silently skipped.
 - **`createExpressServer`** — errors caught after the response is already sent are now logged via `console.error` instead of being silently swallowed. `listen()` now rejects immediately if the server is already listening, and resets the internal reference on bind failure, preventing a leaked server from blocking future calls.

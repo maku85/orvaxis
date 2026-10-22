@@ -196,7 +196,7 @@ describe.each(kinds)("%s adapter behavior", (kind) => {
     expect(probe.handlerCalls).toBe(1)
   })
 
-  it("answers 408 on timeout and neither responds twice nor runs the handler when the policy ends later", async () => {
+  it("answers 503 on timeout and neither responds twice nor runs the handler when the policy ends later", async () => {
     const probe = makeProbe()
     const app = makeApp(kind, probe, (async (ctx: { req: { signal?: AbortSignal } }) => {
       probe.signal = ctx.req.signal
@@ -207,7 +207,7 @@ describe.each(kinds)("%s adapter behavior", (kind) => {
     const { url } = await start(kind, app, probe, { timeout: 30 })
 
     const response = await fetch(`${url}/api/documents/1`)
-    expect(response.status).toBe(408)
+    expect(response.status).toBe(503)
     expect(probe.signal?.aborted).toBe(true)
 
     probe.gate.resolve()

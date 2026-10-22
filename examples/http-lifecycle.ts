@@ -151,7 +151,7 @@ export async function runLifecycle(adapter: AdapterName) {
     result["sse-longer-than-timeout"] = plain(await read(url("/sse")))
     result["silent-handler"] = plain(await read(url("/silent")))
     await sleep(350)
-    result["silent-handler-after-408"] = {
+    result["silent-handler-after-timeout"] = {
       signalAborted: probe.aborted.includes("silent"),
       handlerFinished: probe.finished.includes("silent"),
     }

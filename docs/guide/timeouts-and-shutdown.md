@@ -20,7 +20,7 @@ const server = createExpressServer(app, undefined, { timeout: 10_000, shutdownTi
 
 | Reason | What the adapter does besides |
 |---|---|
-| the deadline passes | sends `408` with the error envelope |
+| the deadline passes | sends `503` (`timeoutStatus`) with the error envelope |
 | the client disconnects | nothing to send; the runtime also stops before its next stage (middleware, handler) |
 | `close()` is called (shutdown) | nothing; requests already running are allowed to finish |
 
@@ -33,7 +33,7 @@ handler: async (ctx) => {
 }
 ```
 
-**The signal is a notification, not a kill switch.** Nothing interrupts your code: a handler that does not look at the signal keeps running. In the observed run below, a handler that ignored the signal was answered with `408` after 100 ms, its signal was aborted, and it nevertheless ran to its end 300 ms later. Libraries that ignore `AbortSignal` are not cancelled. The only thing the adapter does by force is close connections at the shutdown deadline.
+**The signal is a notification, not a kill switch.** Nothing interrupts your code: a handler that does not look at the signal keeps running. In the observed run below, a handler that ignored the signal was answered with `503` after 100 ms, its signal was aborted, and it nevertheless ran to its end 300 ms later. Libraries that ignore `AbortSignal` are not cancelled. The only thing the adapter does by force is close connections at the shutdown deadline.
 
 ## What was observed
 
@@ -47,10 +47,10 @@ The same application on both adapters (timeout 100 ms, shutdown deadline 200–3
     "body": "data: one\n\ndata: two\n\n"
   },
   "silent-handler": {
-    "status": 408,
+    "status": 503,
     "body": "{\"error\":\"Request Timeout\",\"requestId\":\"<id>\"}"
   },
-  "silent-handler-after-408": {
+  "silent-handler-after-timeout": {
     "signalAborted": true,
     "handlerFinished": true
   },
@@ -78,7 +78,7 @@ The same application on both adapters (timeout 100 ms, shutdown deadline 200–3
 Read them like this:
 
 - **`sse-longer-than-timeout`**: a handler that writes before the deadline is not cut off. The first `write` stops the request timer, so a stream that keeps going for minutes does not need `timeout: 0`. A handler that may sit idle before its first write does.
-- **`silent-handler`**: no write and no return within the deadline gives `408` with `{ error: "Request Timeout", requestId }`. The handler is not stopped (`silent-handler-after-408`).
+- **`silent-handler`**: no write and no return within the deadline gives `503` with `{ error: "Request Timeout", requestId }`. The handler is not stopped (`silent-handler-after-timeout`).
 - **`pipe-longer-than-timeout`**: `ctx.res.pipe(stream)` returns at once, so the timer ends when the handler returns; the stream may take longer.
 - **`disconnect`**: when the client goes away, a handler waiting on the signal stops.
 - **`shutdown-cooperative`**: a stream that listens for the signal ends itself, the client receives its farewell, and `close()` returns promptly.

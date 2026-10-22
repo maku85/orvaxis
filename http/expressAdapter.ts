@@ -118,9 +118,15 @@ export function createExpressServer(
     try {
       const handlePromise = app.handle(adapted, wrapped)
       if (timeoutMs > 0) {
-        await withTimeout(handlePromise, timeoutMs, controller, (cancel) => {
-          cancelTimer = cancel
-        })
+        await withTimeout(
+          handlePromise,
+          timeoutMs,
+          controller,
+          (cancel) => {
+            cancelTimer = cancel
+          },
+          options.timeoutStatus
+        )
       } else {
         await handlePromise
       }
@@ -247,9 +253,15 @@ export function createExpressPolicyGuard(
     const authorize = app.authorize(adapted, wrapped)
     const pending =
       timeoutMs > 0
-        ? withTimeout(authorize, timeoutMs, controller, (cancel) => {
-            cancelTimer = cancel
-          })
+        ? withTimeout(
+            authorize,
+            timeoutMs,
+            controller,
+            (cancel) => {
+              cancelTimer = cancel
+            },
+            options.timeoutStatus
+          )
         : authorize
 
     void pending

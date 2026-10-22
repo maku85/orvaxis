@@ -4,6 +4,12 @@ import type { Logger } from "../types/index.js"
 
 export type AdapterOptions = {
   timeout?: number
+  /**
+   * HTTP status sent when the deadline passes. Default: `503`. A server-side deadline is not
+   * the client being slow, so the usual `408` would be misleading (clients may retry it blindly);
+   * use `504` when Orvaxis sits behind your own gateway semantics.
+   */
+  timeoutStatus?: number
   shutdownTimeout?: number
   logger?: Logger
   /** Header used to read/propagate the request ID. Default: "X-Request-ID". */
@@ -81,7 +87,8 @@ export function withTimeout<T>(
   promise: Promise<T>,
   ms: number,
   controller?: AbortController,
-  onCancel?: (cancel: () => void) => void
+  onCancel?: (cancel: () => void) => void,
+  status = 503
 ): Promise<T> {
   let timer: ReturnType<typeof setTimeout>
   const racePromise = Promise.race([
@@ -90,7 +97,7 @@ export function withTimeout<T>(
       // Promise executor runs synchronously — timer is set before onCancel fires
       timer = setTimeout(() => {
         if (controller) abandonRequest(controller, "timeout")
-        reject(new HttpError(408, "Request Timeout"))
+        reject(new HttpError(status, "Request Timeout"))
       }, ms)
     }),
   ]).finally(() => clearTimeout(timer))

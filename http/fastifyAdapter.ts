@@ -134,9 +134,15 @@ export function createFastifyServer(
     try {
       const handlePromise = app.handle(adapted, wrapped)
       if (timeoutMs > 0) {
-        await withTimeout(handlePromise, timeoutMs, controller, (cancel) => {
-          cancelTimer = cancel
-        })
+        await withTimeout(
+          handlePromise,
+          timeoutMs,
+          controller,
+          (cancel) => {
+            cancelTimer = cancel
+          },
+          options.timeoutStatus
+        )
       } else {
         await handlePromise
       }

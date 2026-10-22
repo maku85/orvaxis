@@ -39,6 +39,7 @@ Run a complete example from a checkout: `pnpm exec tsx examples/express-server.t
 | Option (`AdapterOptions`) | Default | Meaning |
 |---|---|---|
 | `timeout` | 30 000 ms | per-request deadline; `0` disables it. See [Timeouts](/guide/timeouts-and-shutdown) |
+| `timeoutStatus` | `503` | status sent when the deadline passes (`504` is the other common choice) |
 | `shutdownTimeout` | 10 000 ms | how long `close()` waits before cutting connections; `0` waits indefinitely |
 | `logger` | `console` | receives errors that happen after a response was sent |
 | `requestIdHeader` | `X-Request-ID` | header read for the request ID and set on the response |

@@ -21,14 +21,14 @@ describe("withTimeout", () => {
     expect(result).toBe("ok")
   })
 
-  it("rejects with HttpError 408 when the deadline expires", async () => {
+  it("rejects with HttpError 503 when the deadline expires", async () => {
     const pending = new Promise<never>(() => {})
     const race = withTimeout(pending, 500)
     const errPromise = race.catch((e) => e)
     await vi.advanceTimersByTimeAsync(501)
     const err = await errPromise
     expect(err).toBeInstanceOf(HttpError)
-    expect(err.status).toBe(408)
+    expect(err.status).toBe(503)
     expect(err.message).toBe("Request Timeout")
   })
 
@@ -85,7 +85,7 @@ describe("withTimeout", () => {
     expect(typeof cancel).toBe("function")
   })
 
-  it("cancelling via onCancel prevents the 408 rejection", async () => {
+  it("cancelling via onCancel prevents the timeout rejection", async () => {
     let cancel: (() => void) | undefined
     const pending = new Promise<string>(() => {})
     const errors: unknown[] = []
@@ -105,7 +105,7 @@ describe("withTimeout", () => {
     await vi.advanceTimersByTimeAsync(501)
     const err = await race
     expect(err).toBeInstanceOf(HttpError)
-    expect(err.status).toBe(408)
+    expect(err.status).toBe(503)
   })
 })
 
@@ -233,6 +233,19 @@ describe("abandoned requests keep a standard AbortError reason", () => {
     const plain = new AbortController()
     plain.abort()
     expect(isRequestAbandoned(plain.signal)).toBe(false)
+  })
+})
+
+describe("withTimeout status", () => {
+  it("uses the configured status", async () => {
+    const err = await withTimeout(
+      new Promise<never>(() => {}),
+      10,
+      undefined,
+      undefined,
+      504
+    ).catch((e) => e)
+    expect(err.status).toBe(504)
   })
 })
 

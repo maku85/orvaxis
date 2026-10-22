@@ -1,6 +1,6 @@
 /**
  * Marks a request's `AbortSignal` as aborted by an adapter because nobody is waiting for the
- * result anymore: the deadline expired (a 408 is sent) or the client went away. Shutdown aborts are
+ * result anymore: the deadline expired (a 503 is sent) or the client went away. Shutdown aborts are
  * deliberately different (a plain abort): requests already running are allowed to finish.
  *
  * The abort reason stays a standard `AbortError` DOMException, so code that checks
