@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from "vitest"
 import { createContext } from "../core/Context"
 import { createMockResponse } from "../core/mockResponse"
+import { Orvaxis } from "../core/Orvaxis"
+import { testRequest } from "../core/testHarness"
 import type { OrvaxisRequest } from "../types"
 
 const emptyReq: OrvaxisRequest = { path: "/", method: "GET", headers: {} }
@@ -131,5 +133,60 @@ describe("ctx.params", () => {
     expect(ctx.params.id).toBe("first")
     ctx.meta.route.params = { id: "second" }
     expect(ctx.params.id).toBe("second")
+  })
+
+  describe("cap warning goes through the configured logger", () => {
+    const req = { path: "/", method: "GET", headers: {} }
+    const res = createMockResponse()
+
+    it("uses logger.warn and not console.warn", () => {
+      const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {})
+      const warn = vi.fn()
+      const ctx = createContext(req, res, 1, { info() {}, error() {}, warn })
+      ctx.logs.push("a", "b")
+      expect(warn).toHaveBeenCalledOnce()
+      expect(String(warn.mock.calls[0][0])).toContain("ctx.logs")
+      expect(consoleSpy).not.toHaveBeenCalled()
+      consoleSpy.mockRestore()
+    })
+
+    it("falls back to logger.error when the logger has no warn", () => {
+      const error = vi.fn()
+      const ctx = createContext(req, res, 1, { info() {}, error })
+      ctx.logs.push("a", "b")
+      expect(error).toHaveBeenCalledOnce()
+    })
+
+    it("does not throw when the logger throws", () => {
+      const ctx = createContext(req, res, 1, {
+        info() {},
+        error() {},
+        warn() {
+          throw new Error("logger down")
+        },
+      })
+      expect(() => ctx.logs.push("a", "b")).not.toThrow()
+      expect(ctx.logs).toEqual(["a"])
+    })
+
+    it("is wired from OrvaxisOptions.logger by the runtime", async () => {
+      const warn = vi.fn()
+      const app = new Orvaxis({ logsMaxSize: 1, logger: { info() {}, error() {}, warn } })
+      app.group({
+        prefix: "/",
+        routes: [
+          {
+            method: "GET",
+            path: "/x",
+            handler: (ctx) => {
+              ctx.logs.push("a", "b")
+              ctx.res.json({})
+            },
+          },
+        ],
+      })
+      await testRequest(app, { path: "/x" })
+      expect(warn).toHaveBeenCalledOnce()
+    })
   })
 })

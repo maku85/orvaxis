@@ -3,6 +3,7 @@ import type {
   AroundFunction,
   AroundStage,
   Authenticator,
+  Logger,
   Middleware,
   OrvaxisContext,
   OrvaxisOptions,
@@ -99,11 +100,13 @@ export class Runtime {
   private authenticator: Authenticator | undefined
   private readonly wrappers: Record<AroundStage, AroundFunction[]> = { request: [], handler: [] }
   private closeHandlers: Array<() => Promise<void> | void> = []
+  private readonly logger: Logger
   private readonly logsMaxSize: number | undefined
   private readonly policyTrace: PolicyTraceOptions
 
   constructor(options: OrvaxisOptions = {}) {
-    this.hooks = new HookSystem(options.logger)
+    this.logger = options.logger ?? console
+    this.hooks = new HookSystem(this.logger)
     this.logsMaxSize = options.logsMaxSize
     const traceOptions = options.policyTrace
     const requestedLimit = traceOptions?.maxEvents ?? 100
@@ -401,7 +404,7 @@ export class Runtime {
     req: OrvaxisRequest,
     res: OrvaxisResponse
   ): { ctx: OrvaxisContext; tracer: Tracer } {
-    const ctx = createContext(req, res, this.logsMaxSize)
+    const ctx = createContext(req, res, this.logsMaxSize, this.logger)
     captureContext(ctx)
     initPolicyTrace(ctx, this.policyTrace)
     const tracer = new Tracer(req.id ?? generateId())

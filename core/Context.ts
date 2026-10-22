@@ -1,18 +1,24 @@
-import type { OrvaxisContext, OrvaxisRequest, OrvaxisResponse } from "../types/index.js"
+import type { Logger, OrvaxisContext, OrvaxisRequest, OrvaxisResponse } from "../types/index.js"
 
 const DEFAULT_LOGS_MAX_SIZE = 1000
 
-function createBoundedLogs(cap: number): string[] {
+function createBoundedLogs(cap: number, logger: Logger): string[] {
   const arr: string[] = []
   let warned = false
 
   function warnOnce() {
     if (!warned) {
       warned = true
-      console.warn(
-        `[orvaxis] ctx.logs cap (${cap}) reached — further entries are dropped. ` +
-          "ctx.logs is designed for short debug trails, not high-volume logging."
-      )
+      try {
+        const warn = logger.warn ?? logger.error
+        warn.call(
+          logger,
+          `[orvaxis] ctx.logs cap (${cap}) reached — further entries are dropped. ` +
+            "ctx.logs is designed for short debug trails, not high-volume logging."
+        )
+      } catch {
+        // A failing logger must not turn a dropped debug entry into a request error.
+      }
     }
   }
 
@@ -40,14 +46,15 @@ function createBoundedLogs(cap: number): string[] {
 export function createContext(
   req: OrvaxisRequest,
   res: OrvaxisResponse,
-  logsMaxSize = DEFAULT_LOGS_MAX_SIZE
+  logsMaxSize = DEFAULT_LOGS_MAX_SIZE,
+  logger: Logger = console
 ): OrvaxisContext {
   const ctx: OrvaxisContext = {
     req,
     res,
     state: {},
     meta: {},
-    logs: createBoundedLogs(logsMaxSize),
+    logs: createBoundedLogs(logsMaxSize, logger),
     get params() {
       return (ctx.meta.route?.params ?? {}) as Record<string, string>
     },

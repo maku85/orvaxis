@@ -11,6 +11,8 @@ export type DebugInfo = {
 export interface Logger {
   info(...args: unknown[]): void
   error(...args: unknown[]): void
+  /** Used for runtime warnings (for example a full `ctx.logs`); `error` is used when absent. */
+  warn?(...args: unknown[]): void
 }
 
 type PolicyTraceBase = {

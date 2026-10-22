@@ -78,7 +78,7 @@ The context is stored with `AsyncLocalStorage`, so concurrent requests each see 
 
 ## `ctx.logs`
 
-`ctx.logs` is a bounded `string[]` for short audit trails and test assertions. It holds at most 1,000 entries by default; pushing beyond that drops the entry and writes one `console.warn` per request. Change the cap with `new Orvaxis({ logsMaxSize: 5000 })`. It is not a logger: nothing reads it unless your code does (for example in an `afterPipeline` hook), and it is not forwarded to traces, logs or spans. For volume, use a real logger ([Observability](/guide/observability)).
+`ctx.logs` is a bounded `string[]` for short audit trails and test assertions. It holds at most 1,000 entries by default; pushing beyond that drops the entry and reports it once per request through the `logger` passed to `new Orvaxis({ logger })` (its `warn` method, or `error` when it has none; `console` by default). Change the cap with `new Orvaxis({ logsMaxSize: 5000 })`. It is not a logger: nothing reads it unless your code does (for example in an `afterPipeline` hook), and it is not forwarded to traces, logs or spans. For volume, use a real logger ([Observability](/guide/observability)).
 
 ## Examples
 

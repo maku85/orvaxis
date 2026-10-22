@@ -654,7 +654,7 @@ app.on("afterPipeline", (ctx) => {
 
 The array is initialised as `[]` by the framework. Nothing in the framework writes to it — it is entirely user-owned.
 
-`ctx.logs` is capped at **1 000 entries** by default. Pushes beyond the cap are dropped and `console.warn` fires once per request context. For high-volume output use a dedicated logger instead. The cap is configurable via `OrvaxisOptions`:
+`ctx.logs` is capped at **1 000 entries** by default. Pushes beyond the cap are dropped and one warning per request context goes to the configured `logger` (`console` by default). For high-volume output use a dedicated logger instead. The cap is configurable via `OrvaxisOptions`:
 
 ```ts
 // raise the cap
