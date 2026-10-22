@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **README reorganized around verifiable authorization** — it now opens with what you can see, test and diff (protected routes, regressions against a baseline, why a request was denied), then the quickstart, guarding an existing Express route, the CI check and server-less testing; the full runtime is a compact reference. Removed the repository tree and the duplicated capability tables, fixed the Fastify example to read `ctx.params`, and replaced "Not yet recommended for production" with a pre-1.0 stability statement. The tagline and package description are unchanged.
 - **Internal: one middleware runner and one request setup** — `Pipeline` and the group/route middleware chains shared two identical copies of the `next()` runner; both now use `composeMiddleware`. `Runtime.execute` and `Runtime.authorize` shared the request setup and the global, group and route policy evaluation; each now has a single implementation. No behavior change.
 
 ### Fixed

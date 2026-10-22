@@ -19,27 +19,21 @@
 
 ---
 
-## What Orvaxis does
+Orvaxis makes the authorization of a Node.js API something you can **see, test and diff**. Declare policies per route, and Orvaxis tells you which routes each policy protects, which policy stopped a request and which stages never ran, and whether a pull request weakened a protection, all without starting a server.
 
-Orvaxis is a framework-agnostic execution runtime for Node.js APIs. It coordinates routing, policies, middleware, validation, lifecycle hooks, and handlers in an explicit request flow. Express and Fastify adapters provide the HTTP transport; the core has no mandatory runtime dependencies.
+## What you get
 
-Use it to organize how requests run, enforce input and response contracts, observe execution, and test behavior without starting an HTTP server. Named policy decisions also explain why a request was blocked and which stages were never reached.
+| Question | How Orvaxis answers it |
+|---|---|
+| **Which routes are protected, and by what?** | `app.inspectRoutes()` lists every route with its policies, layer, phase and whether each always, sometimes or never applies. `checkPolicyRequirements()` fails CI when a route lacks a required policy. |
+| **Did a change weaken a protection?** | `buildProtectionReport()` produces deterministic JSON; `diffProtectionReports()` compares it with a committed baseline and can fail on `policy-removed` or `policy-weakened`. |
+| **Why was this request denied?** | Every request carries a trace. `formatExecutionSummary(ctx)` names the terminal policy and the stages that never ran; `buildRequestReport(ctx)` gives the same as JSON that excludes request values. |
+| **Does it behave as intended?** | `testRequest()` runs the full lifecycle without a server, and `testPolicyMatrix()` checks identities against routes. |
 
-| Capability | What you can do | Learn more |
-|---|---|---|
-| **Routing and lifecycle** | Declare route groups, parameters and wildcards; compose global, group and route middleware with lifecycle hooks | [How a request runs](docs/guide/execution-model.md), [routing](docs/guide/routing-and-groups.md), [middleware and hooks](docs/guide/middleware-and-hooks.md), [lifecycle reference](docs/reference/lifecycle.md) |
-| **Declarative policies** | Apply named rules by scope and priority, before or after input validation; implement permissions, feature gates or other request conditions | [Policies](docs/reference/core-concepts.md#policies), [cookbook](docs/cookbook.md), [403 diagnostics](docs/guide/diagnose-403.md) |
-| **Validated, typed input** | Parse and transform body, params, query and headers; infer handler types from validator outputs with `defineRoute()` | [Typed input validation](docs/guide/typed-validation.md), [working example](examples/typed-schema.ts) |
-| **Response contracts and OpenAPI** | Validate declared responses by status in strict or warning mode; generate OpenAPI 3.1 using your schema converter | [Response contracts](docs/guide/response-contracts.md), [OpenAPI export](docs/guide/openapi.md) |
-| **Observability** | Inspect request traces and debug timelines, emit custom events, use structured logging and export spans through OpenTelemetry | [Observability](docs/guide/observability.md), [OpenTelemetry](docs/guide/opentelemetry.md), [OpenTelemetry example](examples/otel-plugin.ts) |
-| **Testing and inspection** | Execute requests without a server, test permission matrices, inspect route declarations and check required policies in CI | [Testing](docs/guide/testing.md), [route inspection](docs/guide/testing.md#route-introspection) |
-| **HTTP and streaming** | Use Express or Fastify transport, stream SSE/files, propagate request IDs and handle cancellation, timeouts and graceful shutdown | [Adapters](docs/guide/http-adapters.md), [streaming](docs/guide/streaming.md), [shutdown](docs/guide/timeouts-and-shutdown.md#graceful-shutdown) |
-| **Extensibility and context** | Register opt-in plugins, use CORS and logging plugins, and access isolated request context across async calls | [Plugins](docs/guide/plugins.md), [request context](docs/guide/request-context.md) |
+Two ways to adopt it:
 
-Choose the integration that fits your application:
-
-- **Full runtime:** declare routes and handlers in Orvaxis and use an Express or Fastify adapter. Orvaxis owns routing and execution within the mounted API.
-- **Incremental Express guard:** add pre-validation policies to selected existing Express routes while keeping their handlers in Express. This mode evaluates policies; it does not run the full middleware, validation and handler lifecycle. See the [integration guide](docs/guide/integrate-existing-route.md).
+- **Guard an existing Express route.** Keep your handlers in Express and add `createExpressPolicyGuard()` in front of the ones you want protected. It evaluates pre-validation policies only; see below.
+- **Run the full runtime.** Declare routes and handlers in Orvaxis, with middleware, typed input validation, response contracts, OpenAPI export, OpenTelemetry and streaming, served through Express or Fastify.
 
 ## Quickstart
 
@@ -113,61 +107,67 @@ Express supplies HTTP transport in this example; Orvaxis matches the declared ro
 
 ---
 
-## Why Orvaxis
+## Guard an existing Express route
 
-Orvaxis gives requests a shared execution model: explicit policy phases, composable middleware, validation boundaries, lifecycle hooks, and a trace of what ran. This structure supports reusable rules and plugins, consistent diagnostics, and tests against the same runtime used by the HTTP adapters.
+Mirror the protected method and path in an `Orvaxis` instance and leave the handler in Express. The guard runs the matching policies and calls `next()` only when they all allow the request:
 
-Authorization is one practical use case. Other uses include feature gates, validated request transformations, response contract checks, streaming APIs, and request-scoped observability. Application-specific policies and integrations remain under your control.
+<!-- snippet: examples/express-existing-route.ts#imports,guard -->
+```ts
+import express, { type Application } from "express"
+import { createExpressPolicyGuard } from "orvaxis/express"
+import { formatExecutionSummary, Orvaxis, type Policy } from "orvaxis"
+import { testRequest } from "orvaxis/testing"
 
-[See a concrete side-by-side comparison →](docs/why-orvaxis.md)
+const documentOwner: Policy = {
+  name: "document-owner",
+  evaluate(ctx) {
+    return ctx.req.headers["x-user-id"] === ctx.params.id
+      ? { allow: true, modify: { authorizedUserId: ctx.params.id } }
+      : { allow: false, reason: "You cannot access this document", status: 403 }
+  },
+}
 
----
+// Mirror the protected method and path here; the real handler stays in Express.
+export const security = new Orvaxis()
+security.group({
+  prefix: "/api",
+  routes: [{ method: "GET", path: "/documents/:id", policies: [documentOwner], handler: () => {} }],
+})
 
-## Architecture Overview
-For a matched request, the main execution stages are:
-
-```text
-onRequest → route match → pre-validation policies
-          → beforePipeline → global/group/route middleware
-          → input validation → post-validation policies
-          → beforeHandler → handler → afterHandler
-          → trace finalization → afterPipeline
+export function createExistingRouteDemo(): Application {
+  const server = express()
+  server.get("/api/documents/:id", createExpressPolicyGuard(security), (req, res) =>
+    res.json({ documentId: req.params.id })
+  )
+  return server
+}
 ```
 
-Request validation and response validation are opt-in plugins. Response contracts are checked when handlers send values through the Orvaxis response API. Denials, errors and successful short-circuits stop later stages; errors finalize the trace before `onError`. The [lifecycle reference](docs/reference/lifecycle.md) documents the complete order and hook contracts.
+The guard does not run middleware, validation or handlers, and it supports pre-validation policies only. The [integration guide](docs/guide/integrate-existing-route.md) ends with the denial explained from its trace.
 
----
+## Check protections in CI
 
-## Core Concepts
+Authorization tests cover the requests someone remembered to write. A static check adds a different guardrail: it fails when a route that must be protected is declared without the policy that protects it. It reads route declarations; no policy or handler is executed:
 
-Orvaxis groups policies, middleware, hooks, and route handlers into a predictable request flow. Route declarations inherit policies and middleware from their group. Typed request context carries application state through async work; validators and plugins add opt-in behavior.
+```ts
+import { checkPolicyRequirements } from "orvaxis/testing"
 
-The [core concepts reference](docs/reference/core-concepts.md) covers the router, policy scopes and priority, hook contracts, plugins, traces, debugging, and typed context. The [lifecycle reference](docs/reference/lifecycle.md) shows the actual execution order.
+const report = checkPolicyRequirements(app.inspectRoutes(), [
+  {
+    name: "task access requires authentication, tenant and ownership checks",
+    paths: ["/api/tenants/:tenantId/tasks/:taskId"],
+    requirePolicies: ["authenticate", "tenant-access", "task-owner-or-admin"],
+  },
+])
 
----
+if (!report.passed) process.exitCode = 1
+```
 
-## HTTP Adapters
+Declared configuration does not prove the policy decides correctly, so keep a permission matrix next to it. [Authorization requirements in CI](docs/articles/authorization-requirements-in-ci.md) combines the two, and `examples/protection-report.ts` shows the baseline workflow with `diffProtectionReports()`.
 
-Orvaxis is not tied to any HTTP framework: adapters are thin wrappers that normalize the incoming request and delegate to the runtime. Two are included.
+## Testing without a server
 
-| Adapter | Import | Peer dependency |
-|---|---|---|
-| Express | `createExpressServer` from `orvaxis/express` | `express ^4.20 \|\| ^5` (types: `@types/express`) |
-| Fastify | `createFastifyServer` from `orvaxis/fastify` | `fastify ^5` |
-
-Both peers are optional and each adapter has its own subpath, so `orvaxis`, `orvaxis/testing` and `orvaxis/openapi` never need either. Importing `orvaxis/express`, `orvaxis/fastify` or `orvaxis/otel` without its peer fails immediately with a module-not-found error that names the package. Both full-runtime adapters mount Orvaxis as a catch-all, so routing, hooks and declared validation come from the Orvaxis runtime; benchmark your application before drawing performance conclusions. To protect one existing Express route without moving its handler, use the [existing route guide](docs/guide/integrate-existing-route.md).
-
-Adapter details are in the documentation:
-
-- [HTTP adapters](docs/guide/http-adapters.md) — installing and creating a server, mounting next to Express or Fastify, query-string parsing differences, body size limits, the error response envelope, request IDs, custom adapters
-- [Timeouts and graceful shutdown](docs/guide/timeouts-and-shutdown.md) — per-request deadlines, `ctx.req.signal` for timeout, disconnect and shutdown, SIGTERM handling, observed results on both adapters
-- [Streaming](docs/guide/streaming.md) — SSE, files and `pipe`
-
----
-
-## Testing
-
-`testRequest` runs the full lifecycle (policies, middleware, validation, handler) against an `Orvaxis` instance without starting a server, so tests exercise the runtime the adapters use:
+`testRequest` runs the full lifecycle (policies, middleware, validation, handler) against an `Orvaxis` instance, so tests exercise the runtime the adapters use:
 
 ```ts
 import { testRequest } from "orvaxis/testing"
@@ -176,92 +176,49 @@ const result = await testRequest(app, { path: "/api/reports/alice", headers: { "
 // result.status === 403; result.ctx holds the trace for diagnostics
 ```
 
-The [testing guide](docs/guide/testing.md) covers the response shape, permission matrices (`testPolicyMatrix`), static policy requirements for CI (`checkPolicyRequirements`) and route introspection (`app.inspectRoutes()`), and why the matrix and the static check answer different questions. Its tests are real and runnable: `pnpm exec vitest run examples/testing`. Every example, with its command, port and expected output, is in the [examples catalog](docs/examples/index.md).
+The [testing guide](docs/guide/testing.md) covers permission matrices (`testPolicyMatrix`), static policy requirements and route introspection.
 
 ---
 
-## Documentation
+## The full runtime
 
-This README and the documentation site describe version 0.5.0, the latest release. Changes made on `main` since then are listed under *Unreleased* in the [changelog](CHANGELOG.md) and on [Changes after 0.5.0](docs/migration/next.md). Upgrading? See [Migrating from 0.4.0 to 0.5.0](docs/migration/0.4.0-to-0.5.0.md) or, from 0.3.1, [Migrating from 0.3.1 to 0.4.0](docs/migration/0.3.1-to-0.4.0.md).
+For a matched request the stages run in this order:
 
-Browse the [Orvaxis documentation site](https://maku85.github.io/orvaxis/) for the getting-started guide, navigable references, examples, and articles. The Markdown sources remain available below and in `docs/`.
-
-[Explore the recorded allow, deny, and handler-error traces](docs/demo/policy-traces.md) in the static documentation demo.
-
-- [Get started](docs/guide/getting-started.md) — the quickstart as a guide: protect one route and see the allowed/denied result
-- [Add Orvaxis to an existing Express route](docs/guide/integrate-existing-route.md) — add policy checks without moving the handler
-- [Multi-tenant task demo](docs/guide/multi-tenant-demo.md) — runnable tenant, ownership, roles, traces, permission matrix, and CI checks
-- [Diagnose a 403](docs/guide/diagnose-403.md) — find the terminal policy and verify skipped stages
-- [How a request runs](docs/guide/execution-model.md), [routing and groups](docs/guide/routing-and-groups.md), and [middleware and hooks](docs/guide/middleware-and-hooks.md) — the lifecycle explained with observed orders
-- [Request lifecycle reference](docs/reference/lifecycle.md) — hook, middleware, validation, and policy order
-- [Core concepts reference](docs/reference/core-concepts.md) — router, policies, hooks, plugins, tracing, and context
-- [Typed input validation](docs/guide/typed-validation.md) — parse request fields, infer handler types, post-validation policies, and the 422 error
-- [Response contracts](docs/guide/response-contracts.md) — validate outgoing values by status, strict and warn modes, streaming
-- [OpenAPI export](docs/guide/openapi.md) — generate an OpenAPI 3.1 document from route declarations
-- [Contracts API reference](docs/reference/contracts.md)
-- [Observability](docs/guide/observability.md) — traces, custom events, debug timelines, structured logs and request IDs, and what each one records
-- [Request context](docs/guide/request-context.md) — `ctx.state`, `ctx.meta`, `ctx.logs`, `getContext()` and isolation
-- [Plugins](docs/guide/plugins.md) — the plugin contract and the built-in plugins
-- [OpenTelemetry](docs/guide/opentelemetry.md) — span structure, attributes and export
-- [HTTP adapters](docs/guide/http-adapters.md), [streaming](docs/guide/streaming.md), and [timeouts and graceful shutdown](docs/guide/timeouts-and-shutdown.md) — request and connection lifecycle in the HTTP adapters
-- [Testing](docs/guide/testing.md) — `testRequest`, permission matrices, static policy requirements and route introspection
-- [Diagnosing an API 403](docs/articles/diagnosing-a-403.md) — trace a denial to its terminal policy
-- [Tenant authorization](docs/articles/tenant-authorization.md) — separate tenant access, ownership, and roles
-- [Authorization requirements in CI](docs/articles/authorization-requirements-in-ci.md) — combine static route checks with permission tests
-- [Why Orvaxis](docs/why-orvaxis.md) — side-by-side comparison with plain Express: auth, rate limiting, and observability with and without Orvaxis
-- [Cookbook](docs/cookbook.md) — practical use cases with working examples (authentication, RBAC, rate limiting, tracing, feature flags, and more)
-- [Benchmarks](docs/benchmarks.md) — microbenchmark results for each execution layer, plus instructions to run them locally
-
----
-
-## Example Usage
-
-The [multi-tenant task demo](docs/guide/multi-tenant-demo.md) includes runnable server commands, fixture identities, expected responses, permission traces, and the CI check. Its fixture storage is in-memory and local to the process.
-
-### Express
-```ts
-import { Orvaxis } from "orvaxis"
-import { createExpressServer } from "orvaxis/express"
-import type { Policy } from "orvaxis"
-
-const app = new Orvaxis()
-
-const requireApiKey: Policy = {
-  name: "require-api-key",
-  priority: 100,
-  evaluate(ctx) {
-    const key = ctx.req.headers["x-api-key"]
-    if (!key) return { allow: false, reason: "Missing X-API-Key header" }
-    return { allow: true }
-  }
-}
-
-app.policy(requireApiKey)
-
-app.group({
-  prefix: "/api",
-  routes: [
-    {
-      method: "GET",
-      path: "/users",
-      handler: async (ctx) => {
-        ctx.res.json({ users: [] })
-      }
-    }
-  ]
-})
-
-const server = createExpressServer(app)
-server.listen(3000)
+```text
+onRequest → route match → authenticate → pre-validation policies
+          → beforePipeline → global/group/route middleware
+          → input validation → post-validation policies
+          → beforeHandler → handler → afterHandler
+          → trace finalization → afterPipeline
 ```
 
-### Fastify
+Denials, errors and short-circuits stop later stages. The [lifecycle reference](docs/reference/lifecycle.md) documents the complete order and hook contracts.
+
+| Capability | Where to read |
+|---|---|
+| Routing, groups, wildcards, middleware and lifecycle hooks | [How a request runs](docs/guide/execution-model.md), [routing](docs/guide/routing-and-groups.md), [middleware and hooks](docs/guide/middleware-and-hooks.md) |
+| Identity with `app.authenticate()` and `ctx.identity`; policies by scope and priority, before or after validation | [Core concepts](docs/reference/core-concepts.md#policies), [cookbook](docs/cookbook.md) |
+| Typed, validated input with `defineRoute()`; response contracts; OpenAPI 3.1 export | [Typed validation](docs/guide/typed-validation.md), [response contracts](docs/guide/response-contracts.md), [OpenAPI](docs/guide/openapi.md) |
+| Traces, debug timelines, structured logging, OpenTelemetry spans | [Observability](docs/guide/observability.md), [OpenTelemetry](docs/guide/opentelemetry.md) |
+| SSE and file streaming, request IDs, cancellation, timeouts, graceful shutdown | [Adapters](docs/guide/http-adapters.md), [streaming](docs/guide/streaming.md), [shutdown](docs/guide/timeouts-and-shutdown.md) |
+| Plugins (hooks, policies, middleware, `around`, `onClose`), CORS, request context | [Plugins](docs/guide/plugins.md), [request context](docs/guide/request-context.md) |
+
+### HTTP adapters
+
+Adapters are thin wrappers that normalize the request and delegate to the runtime.
+
+| Adapter | Import | Peer dependency |
+|---|---|---|
+| Express | `createExpressServer` from `orvaxis/express` | `express ^4.20 \|\| ^5` (types: `@types/express`) |
+| Fastify | `createFastifyServer` from `orvaxis/fastify` | `fastify ^5` |
+
+Both peers are optional and each adapter has its own subpath, so `orvaxis`, `orvaxis/testing` and `orvaxis/openapi` never need either. The core has no runtime dependencies. Details: [HTTP adapters](docs/guide/http-adapters.md).
+
 ```ts
 import { Orvaxis } from "orvaxis"
 import { createFastifyServer } from "orvaxis/fastify"
 
 const app = new Orvaxis()
-
 app.group({
   prefix: "/api",
   routes: [
@@ -269,120 +226,34 @@ app.group({
       method: "GET",
       path: "/users/:id",
       handler: async (ctx) => {
-        ctx.res.send({ id: ctx.meta.route?.params.id })
-      }
-    }
-  ]
+        ctx.res.send({ id: ctx.params.id })
+      },
+    },
+  ],
 })
 
-const server = createFastifyServer(app)
-server.listen(3000)
+createFastifyServer(app).listen(3000)
 ```
 
 ---
 
-## Project Structure
-```
-orvaxis/
-  index.ts                   entry point, public API (no optional peer dependencies)
-  express.ts                 orvaxis/express entry point (server adapter and policy guard)
-  fastify.ts                 orvaxis/fastify entry point (createFastifyServer)
-  otel.ts                    orvaxis/otel entry point (otelPlugin)
-  openapi.ts                 orvaxis/openapi entry point (generateOpenApiDocument)
-  testing.ts                 orvaxis/testing entry point
+## Documentation
 
-  core/
-    Orvaxis.ts               public-facing class
-    Runtime.ts               execution engine
-    Router.ts                route matching, groups, and introspection (routes())
-    Pipeline.ts              global middleware chain
-    PolicyEngine.ts          policy evaluation
-    Hook.ts                  hook system
-    Tracer.ts                per-request trace
-    Debugger.ts              debug timeline
-    Context.ts               context factory
-    contextStore.ts          AsyncLocalStorage store (getContext)
-    HttpError.ts             HttpError class (status + message + cause)
-    testHarness.ts           testRequest and policy-matrix helpers for unit testing
-    policyRequirements.ts    static route-policy checks for CI (exported via orvaxis/testing)
-    mockResponse.ts          createMockResponse (exported via orvaxis/testing)
-    utils.ts                 shared utilities (mergeSafe, UNSAFE_KEYS)
+Browse the [documentation site](https://maku85.github.io/orvaxis/) or the Markdown sources in `docs/`. Good places to start:
 
-  debug/
-    buildExecutionSummary.ts combined trace + debug summary
-    traceEvent.ts            emit custom trace events without ctx
+- [Get started](docs/guide/getting-started.md) and [Add Orvaxis to an existing Express route](docs/guide/integrate-existing-route.md)
+- [Diagnose a 403](docs/guide/diagnose-403.md) and the [recorded policy traces](docs/demo/policy-traces.md)
+- [Multi-tenant task demo](docs/guide/multi-tenant-demo.md): tenant, ownership and roles, with permission matrix and CI check
+- [Why Orvaxis](docs/why-orvaxis.md), [cookbook](docs/cookbook.md) and [benchmarks](docs/benchmarks.md)
+- [Changelog](CHANGELOG.md) and the migration guides: [0.4.0 → 0.5.0](docs/migration/0.4.0-to-0.5.0.md), [0.3.1 → 0.4.0](docs/migration/0.3.1-to-0.4.0.md)
 
-  http/
-    expressAdapter.ts        Express adapter (exported via orvaxis/express)
-    fastifyAdapter.ts        Fastify adapter (exported via orvaxis/fastify)
-    timeout.ts               withTimeout helper and AdapterOptions type
-
-  middleware/
-    traceMiddleware.ts       trace timing around middleware execution
-
-  plugins/
-    PluginManager.ts         plugin registry (Plugin type + PluginManager class)
-    loggerPlugin.ts          built-in logger plugin
-    corsPlugin.ts            configurable CORS and preflight handling
-    otelPlugin.ts            OpenTelemetry SERVER span per request + orvaxis.pipeline/orvaxis.handler child spans (exported via orvaxis/otel, requires @opentelemetry/api)
-    schemaValidationPlugin.ts body/params/query/headers validation via route.schema
-    responseValidationPlugin.ts status-specific handler response validation; streaming is not buffered
-
-  openapi/
-    generateOpenApiDocument.ts  optional-converter OpenAPI 3.1 generation from inspected routes (orvaxis/openapi)
-
-  types/
-    index.ts                 all shared types
-
-  examples/
-    express-server.ts        minimal Express setup
-    policy-server.ts         global and route-level policies
-    policy-matrix.ts         identity, ownership, tenant, and admin test scenarios
-    policy-ci-check.ts       static policy requirements plus dynamic permission checks
-    tenant-tasks.ts          shared multi-tenant task fixtures, policies, and permission matrix
-    tenant-tasks-server.ts   runnable Express API for the multi-tenant task example
-    tenant-tasks-check.ts    CI policy requirements, matrix assertions, and decision traces
-    quickstart.ts            protected-route Express quickstart
-    typed-schema.ts          inferred body, params, query, and header outputs
-    hooks-and-plugins.ts     lifecycle hooks and plugin registration
-    debug-trace.ts           debugger, traceEvent, and buildExecutionSummary
-    typed-context.ts         typed OrvaxisContext, getContext, traceEvent
-    otel-plugin.ts           otelPlugin with child spans + custom span enrichment
-    fastify-server.ts        Fastify adapter with policies and param routing
-    wildcard-routing.ts      named wildcard (/*filepath), unnamed catch-all (/*), priority demo
-    streaming.ts             SSE, NDJSON, and file streaming via write/end/pipe
-```
+Every example, with its command, port and expected output, is in the [examples catalog](docs/examples/index.md).
 
 ---
 
-## Design Philosophy
+## Status
 
-Orvaxis is built around a few key ideas:
-
-- __Separation of concerns at runtime level__
-- __Declarative control of execution__
-- __Transparent request lifecycle__
-- __Composable system primitives instead of monolithic abstractions__
-
-It favors:
-
-- explicitness over magic
-- composition over inheritance
-- observability over hidden behavior
-
----
-
-## Current Status
-
-The core execution model is covered by runtime, adapter, public API type, and example tests. CI runs the suite with coverage checks.
-
-Not yet recommended for production. Known gaps before production use:
-
-| Gap | Detail |
-|-----|--------|
-| **API stability** | Pre-1.0 — breaking changes may occur between minor versions. |
-
-Graceful shutdown is supported via `server.close()` on the `ServerAdapter`. Both built-in adapters enforce a `shutdownTimeout` (default 10 s) so the process exits cleanly even when active connections stall.
+Orvaxis is **pre-1.0**: minor versions may contain breaking changes, which the [changelog](CHANGELOG.md) lists. The runtime, adapters, public types and examples are covered by automated tests, and CI runs them on Node.js 22.13 and 24 against Express 4, Express 5 and Fastify 5. Read the changelog before upgrading, and test your own policies with `testRequest` and a permission matrix before relying on them in production.
 
 ---
 
