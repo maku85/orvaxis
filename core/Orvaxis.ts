@@ -70,6 +70,24 @@ export class Orvaxis {
     await this.runtime.close()
   }
 
+  /** Routes that are neither `public: true` nor covered by a policy that always applies. */
+  unprotectedRoutes() {
+    return this.runtime.unprotectedRoutes()
+  }
+
+  /**
+   * Throws, naming the routes, when any route is unprotected. With `denyByDefault: true` the
+   * adapters call this from `listen()`; call it yourself in a CI test or at startup otherwise.
+   */
+  assertProtected() {
+    this.runtime.assertProtected()
+  }
+
+  /** Whether `denyByDefault` was enabled in the options. */
+  get denyByDefault() {
+    return this.runtime.enforcesDenyByDefault
+  }
+
   routes() {
     return this.runtime.router.routes()
   }

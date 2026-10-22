@@ -194,6 +194,7 @@ export function createFastifyServer(
       if (listening) {
         throw new Error("Server is already listening. Call close() first.")
       }
+      if (app.denyByDefault) app.assertProtected()
       try {
         await fastify.listen({ port })
         listening = true

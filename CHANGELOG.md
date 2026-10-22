@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Deny by default** — `new Orvaxis({ denyByDefault: true })` makes a route that is not `public: true` and has no policy that always applies an error: `listen()` on the Express and Fastify adapters rejects with a `TypeError` listing the routes, and a request that reaches one anyway fails with `500` (`ROUTE_UNPROTECTED`) without running its handler. Routes accept `public: true` (reported by `inspectRoutes()`), and `app.unprotectedRoutes()` / `app.assertProtected()` run the same check without enabling the option. Coverage uses the static policy analysis of `inspectRoutes()`: a policy whose scope depends on the request does not count. Off by default.
+
 - **Plugins can wrap a request or its handler (`ctx.around`)** — `PluginContext.around("request" | "handler", fn)` runs `fn(ctx, next)` around the whole execution or only the route handler, so a plugin can keep an `AsyncLocalStorage`-based context active while the stage runs. A wrapper that does not call `next()`, or calls it twice, fails the request with a clear error.
 
 ### Changed

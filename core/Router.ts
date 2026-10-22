@@ -292,6 +292,7 @@ export class Router {
   group(group: Group) {
     validateGroup(group)
     this.groups.push(group)
+    this.generation++
 
     for (const route of group.routes) {
       this.trie.insert(route.method, group.prefix + route.path, route, group)
@@ -309,37 +310,76 @@ export class Router {
     return result
   }
 
+  /** Bumped whenever a group is added, so cached per-route results can be discarded. */
+  generation = 0
+
   inspectRoutes(globalPolicies: readonly Policy[] = []): RouteInspection[] {
     const result: RouteInspection[] = []
     for (const group of this.groups) {
       for (const route of group.routes) {
-        const path = fullRoutePath(group.prefix, route.path)
-        const headFallbackAvailable =
-          route.method === "GET" &&
-          !this.groups.some((candidateGroup) =>
-            candidateGroup.routes.some(
-              (candidateRoute) =>
-                candidateRoute.method === "HEAD" &&
-                fullRoutePath(candidateGroup.prefix, candidateRoute.path) === path
-            )
-          )
+        result.push(this.inspectRoute(group, route, globalPolicies))
+      }
+    }
+    return result
+  }
+
+  private inspectRoute(
+    group: Group,
+    route: Route,
+    globalPolicies: readonly Policy[]
+  ): RouteInspection {
+    const path = fullRoutePath(group.prefix, route.path)
+    const headFallbackAvailable =
+      route.method === "GET" &&
+      !this.groups.some((candidateGroup) =>
+        candidateGroup.routes.some(
+          (candidateRoute) =>
+            candidateRoute.method === "HEAD" &&
+            fullRoutePath(candidateGroup.prefix, candidateRoute.path) === path
+        )
+      )
+    return {
+      method: route.method,
+      path,
+      prefix: group.prefix,
+      ...(route.public ? { public: true } : {}),
+      ...(route.schema ? { schema: route.schema } : {}),
+      ...(route.responses ? { responses: route.responses } : {}),
+      ...(route.openapi ? { openapi: route.openapi } : {}),
+      policies: inspectPolicies(
+        {
+          global: [...globalPolicies],
+          group: group.policies ?? [],
+          route: route.policies ?? [],
+        },
+        route.method,
+        path,
+        headFallbackAvailable
+      ),
+    }
+  }
+
+  /**
+   * A route is covered when it is declared public, or when some policy applies to it
+   * unconditionally. A policy whose scope depends on the request (a predicate, a RegExp, a path
+   * under a parameter) does not count: it may not run for this route.
+   */
+  isCovered(group: Group, route: Route, globalPolicies: readonly Policy[]): boolean {
+    if (route.public) return true
+    return this.inspectRoute(group, route, globalPolicies).policies.some(
+      (policy) => policy.applicability.status === "always"
+    )
+  }
+
+  unprotectedRoutes(globalPolicies: readonly Policy[] = []): RouteInfo[] {
+    const result: RouteInfo[] = []
+    for (const group of this.groups) {
+      for (const route of group.routes) {
+        if (this.isCovered(group, route, globalPolicies)) continue
         result.push({
           method: route.method,
-          path,
+          path: fullRoutePath(group.prefix, route.path),
           prefix: group.prefix,
-          ...(route.schema ? { schema: route.schema } : {}),
-          ...(route.responses ? { responses: route.responses } : {}),
-          ...(route.openapi ? { openapi: route.openapi } : {}),
-          policies: inspectPolicies(
-            {
-              global: [...globalPolicies],
-              group: group.policies ?? [],
-              route: route.policies ?? [],
-            },
-            route.method,
-            path,
-            headFallbackAvailable
-          ),
         })
       }
     }

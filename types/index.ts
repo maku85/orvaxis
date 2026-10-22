@@ -29,6 +29,14 @@ export type PolicyTraceOptions =
     })
 
 export type OrvaxisOptions = {
+  /**
+   * Refuse to serve a route that no policy is guaranteed to cover. A route is covered when it is
+   * `public: true` or when at least one policy applies to it unconditionally (a policy without a
+   * scope, or whose scope statically matches the route). With this on, the Express and Fastify
+   * adapters reject `listen()` listing the uncovered routes, and a request that reaches one anyway
+   * (custom adapters, tests) fails with 500 instead of running its handler. Default: `false`.
+   */
+  denyByDefault?: boolean
   logger?: Logger
   logsMaxSize?: number
   /** Policy decision collection defaults to a bounded, privacy-safe summary. */
@@ -134,6 +142,8 @@ export type PolicyInspection = {
 }
 
 export type RouteInspection = RouteInfo & {
+  /** The route was declared `public: true`. */
+  public?: boolean
   /** Static policy configuration only; no policy, predicate, or handler is executed. */
   policies: PolicyInspection[]
   schema?: RouteSchema
@@ -269,6 +279,11 @@ export type Route<
   schema?: RouteSchema
   responses?: RouteResponseSchemas
   openapi?: RouteOpenApiMetadata
+  /**
+   * Declares that the route is intentionally reachable without a policy. Only consulted by
+   * `denyByDefault`, `app.unprotectedRoutes()` and `app.assertProtected()`.
+   */
+  public?: boolean
 }
 
 export type ServerAdapter = {

@@ -14,6 +14,7 @@ const docsSidebar = [
       { text: "Get started", link: "/guide/getting-started" },
       { text: "Integrate an existing route", link: "/guide/integrate-existing-route" },
       { text: "Diagnose a 403", link: "/guide/diagnose-403" },
+      { text: "Deny by default", link: "/guide/deny-by-default" },
       { text: "Why Orvaxis", link: "/why-orvaxis" },
     ],
   },

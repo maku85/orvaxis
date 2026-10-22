@@ -178,6 +178,11 @@ export function createExpressServer(
         if (httpServer) {
           return reject(new Error("Server is already listening. Call close() first."))
         }
+        try {
+          if (app.denyByDefault) app.assertProtected()
+        } catch (err) {
+          return reject(err)
+        }
         httpServer = server
           .listen(port)
           .once("listening", () => {

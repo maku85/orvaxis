@@ -13,6 +13,8 @@ import type {
   Policy,
   PolicyPhase,
   PolicyTraceOptions,
+  Route,
+  RouteInfo,
   RouteMatch,
 } from "../types/index.js"
 import { createContext } from "./Context.js"
@@ -101,11 +103,15 @@ export class Runtime {
   private readonly wrappers: Record<AroundStage, AroundFunction[]> = { request: [], handler: [] }
   private closeHandlers: Array<() => Promise<void> | void> = []
   private readonly logger: Logger
+  private readonly denyByDefault: boolean
+  private coverage = new WeakMap<Route, boolean>()
+  private coverageKey = ""
   private readonly logsMaxSize: number | undefined
   private readonly policyTrace: PolicyTraceOptions
 
   constructor(options: OrvaxisOptions = {}) {
     this.logger = options.logger ?? console
+    this.denyByDefault = options.denyByDefault === true
     this.hooks = new HookSystem(this.logger)
     this.logsMaxSize = options.logsMaxSize
     const traceOptions = options.policyTrace
@@ -252,6 +258,7 @@ export class Runtime {
         }
 
         ctx.meta.route = match
+        this.assertRouteCovered(match)
 
         if (
           isTypedRoute(match.route) &&
@@ -354,6 +361,7 @@ export class Runtime {
           throw new HttpError(404, "No matching Orvaxis route for the Express policy guard")
         }
         ctx.meta.route = match
+        this.assertRouteCovered(match)
 
         if (isTypedRoute(match.route)) {
           throw new HttpError(
@@ -397,6 +405,46 @@ export class Runtime {
         throw err
       }
     })
+  }
+
+  /** Routes that are neither `public: true` nor covered by a policy that always applies. */
+  unprotectedRoutes(): RouteInfo[] {
+    return this.router.unprotectedRoutes(this.policies.list())
+  }
+
+  /** Throws a `TypeError` naming every unprotected route; adapters call it from `listen()` when `denyByDefault` is on. */
+  assertProtected(): void {
+    const routes = this.unprotectedRoutes()
+    if (routes.length === 0) return
+    throw new TypeError(
+      `denyByDefault: ${routes.length} route(s) have no policy that always applies and are not public: ` +
+        `${routes.map((r) => `${r.method} ${r.path}`).join(", ")}. ` +
+        "Add a policy, or declare the route with public: true."
+    )
+  }
+
+  get enforcesDenyByDefault(): boolean {
+    return this.denyByDefault
+  }
+
+  /** Fail closed for a route that reached the runtime without coverage (custom adapters, tests). */
+  private assertRouteCovered(match: RouteMatch): void {
+    if (!this.denyByDefault) return
+    const key = `${this.router.generation}:${this.policies.generation}`
+    if (key !== this.coverageKey) {
+      this.coverage = new WeakMap()
+      this.coverageKey = key
+    }
+    let covered = this.coverage.get(match.route)
+    if (covered === undefined) {
+      covered = this.router.isCovered(match.group, match.route, this.policies.list())
+      this.coverage.set(match.route, covered)
+    }
+    if (!covered) {
+      throw new HttpError(500, "Route protection is not configured", {
+        code: "ROUTE_UNPROTECTED",
+      })
+    }
   }
 
   /** The context and tracer every request, full or policy-only, starts from. */

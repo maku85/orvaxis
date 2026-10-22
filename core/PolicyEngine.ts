@@ -295,8 +295,12 @@ export async function evaluatePolicies(
 export class PolicyEngine {
   private policies: Policy[] = []
 
+  /** Bumped whenever a global policy is added, so cached per-route results can be discarded. */
+  generation = 0
+
   register(policy: Policy) {
     this.policies.push(policy)
+    this.generation++
   }
 
   list(): readonly Policy[] {

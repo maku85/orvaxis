@@ -26,6 +26,7 @@ Orvaxis makes the authorization of a Node.js API something you can **see, test a
 | Question | How Orvaxis answers it |
 |---|---|
 | **Which routes are protected, and by what?** | `app.inspectRoutes()` lists every route with its policies, layer, phase and whether each always, sometimes or never applies. `checkPolicyRequirements()` fails CI when a route lacks a required policy. |
+| **Can a route ship without any policy?** | With `denyByDefault: true`, a route that no policy is guaranteed to cover (and that is not `public: true`) makes `listen()` fail, listing it. See [deny by default](docs/guide/deny-by-default.md). |
 | **Did a change weaken a protection?** | `buildProtectionReport()` produces deterministic JSON; `diffProtectionReports()` compares it with a committed baseline and can fail on `policy-removed` or `policy-weakened`. |
 | **Why was this request denied?** | Every request carries a trace. `formatExecutionSummary(ctx)` names the terminal policy and the stages that never ran; `buildRequestReport(ctx)` gives the same as JSON that excludes request values. |
 | **Does it behave as intended?** | `testRequest()` runs the full lifecycle without a server, and `testPolicyMatrix()` checks identities against routes. |
