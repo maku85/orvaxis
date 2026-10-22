@@ -1,5 +1,6 @@
 import { type Plugin, PluginManager } from "../plugins/PluginManager.js"
 import type {
+  Authenticator,
   Middleware,
   OrvaxisContext,
   OrvaxisOptions,
@@ -91,6 +92,7 @@ export class Runtime {
   readonly policies = new PolicyEngine()
   readonly router = new Router()
 
+  private authenticator: Authenticator | undefined
   private readonly logsMaxSize: number | undefined
   private readonly policyTrace: PolicyTraceOptions
 
@@ -107,6 +109,29 @@ export class Runtime {
     } else {
       this.policyTrace = { mode: traceOptions?.mode ?? "summary", maxEvents }
     }
+  }
+
+  setAuthenticator(fn: Authenticator) {
+    if (typeof fn !== "function") throw new TypeError("authenticate() requires a function")
+    if (this.authenticator) throw new TypeError("An authenticator is already registered")
+    this.authenticator = fn
+  }
+
+  private async runAuthenticator(ctx: OrvaxisContext, tracer: Tracer): Promise<void> {
+    if (!this.authenticator) return
+    this.debugger.log(ctx, "AUTHENTICATE_START")
+    try {
+      const identity = await this.authenticator(ctx)
+      if (identity != null) ctx.identity = identity
+      tracer.event("AUTHENTICATE", { outcome: identity != null ? "identified" : "anonymous" })
+    } catch (err) {
+      tracer.event("AUTHENTICATE", {
+        outcome: "error",
+        errorName: err instanceof Error ? err.name : "NonErrorThrown",
+      })
+      throw err
+    }
+    this.debugger.log(ctx, "AUTHENTICATE_END")
   }
 
   addPlugin(plugin: Plugin) {
@@ -182,6 +207,9 @@ export class Runtime {
         if (req.method.toUpperCase() === "HEAD" && match.route.method === "GET") {
           ctx.res = wrapForHead(res)
         }
+
+        await this.runAuthenticator(ctx, tracer)
+        if (this.isSettled(ctx)) return await this.finishRequest(ctx, tracer)
 
         this.debugger.log(ctx, "POLICY_START")
         await this.policies.evaluate(ctx, "preValidation", {
@@ -290,6 +318,7 @@ export class Runtime {
           )
         }
 
+        await this.runAuthenticator(ctx, tracer)
         await this.policies.evaluate(ctx, "preValidation", {
           layer: "global",
           trace: this.policyTrace,

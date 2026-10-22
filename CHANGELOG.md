@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`app.authenticate()` and `ctx.identity`** — one function that identifies the caller runs after routing and before every policy (also in `app.authorize()` and the Express policy guard). Return the identity, `null` for anonymous, or throw an `HttpError` to reject. Policies and handlers read `ctx.identity`, whose fields you declare by augmenting the exported `OrvaxisIdentity` interface, instead of an untyped value copied into `ctx.meta` by an earlier policy. The trace gains an `AUTHENTICATE` event (outcome only). Purely additive: policies that use `modify` keep working.
+
 ### Fixed
 
 - **`corsPlugin` accepted an unusable configuration and mishandled `Vary`** — `credentials: true` with the default or `"*"` origin produced responses browsers always reject; it now throws a `TypeError` at registration. `Vary: Origin` replaced any `Vary` set earlier and was missing when the request origin was refused, which lets a shared cache serve a refused answer to an allowed origin; it is now appended, always present with a non-wildcard origin, and a reflected `Access-Control-Request-Headers` is added too. `OrvaxisResponse` gains an optional `getHeader(name)`, implemented by both adapters and `createMockResponse`; custom adapters without it fall back to setting `Vary` alone.

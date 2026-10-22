@@ -36,6 +36,7 @@ export {
 } from "./plugins/responseValidationPlugin.js"
 export { schemaValidationPlugin } from "./plugins/schemaValidationPlugin.js"
 export type {
+  Authenticator,
   ContextMeta,
   DebugEntry,
   DebugInfo,
@@ -46,6 +47,7 @@ export type {
   Middleware,
   NextFunction,
   OrvaxisContext,
+  OrvaxisIdentity,
   OrvaxisOptions,
   OrvaxisRequest,
   OrvaxisResponse,

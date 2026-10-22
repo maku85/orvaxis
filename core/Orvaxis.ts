@@ -1,5 +1,6 @@
 import type { Plugin } from "../plugins/PluginManager.js"
 import type {
+  Authenticator,
   Group,
   HookName,
   Middleware,
@@ -21,6 +22,15 @@ export class Orvaxis {
 
   get debugger() {
     return this.runtime.debugger
+  }
+
+  /**
+   * Register the function that identifies the caller. It runs once per matched request, after
+   * routing and before every policy, and its result is available as `ctx.identity`.
+   */
+  authenticate(fn: Authenticator) {
+    this.runtime.setAuthenticator(fn)
+    return this
   }
 
   use(fn: Middleware) {

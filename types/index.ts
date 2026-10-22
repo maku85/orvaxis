@@ -153,6 +153,26 @@ export type ContextMeta = {
   [key: string]: unknown
 }
 
+/**
+ * The authenticated caller, set by the function registered with `app.authenticate()`. Declare
+ * your own fields by augmenting this interface, the way Express augments `Request`:
+ *
+ *     declare module "orvaxis" {
+ *       interface OrvaxisIdentity { userId: string; roles: string[] }
+ *     }
+ */
+export interface OrvaxisIdentity {
+  readonly [key: string]: unknown
+}
+
+/**
+ * Resolves the caller before any policy runs. Return the identity, or `null`/`undefined` for an
+ * anonymous request (policies then decide), or throw an `HttpError` (typically 401) to reject.
+ */
+export type Authenticator = (
+  ctx: OrvaxisContext
+) => OrvaxisIdentity | null | undefined | Promise<OrvaxisIdentity | null | undefined>
+
 export type OrvaxisContext<
   TState extends Record<string, unknown> = Record<string, unknown>,
   TMeta extends Record<string, unknown> = Record<never, never>,
@@ -160,6 +180,8 @@ export type OrvaxisContext<
   req: OrvaxisRequest
   res: OrvaxisResponse
   state: TState
+  /** Set by `app.authenticate()`; `undefined` for an anonymous request or when none is registered. */
+  identity?: OrvaxisIdentity
   meta: ContextMeta & TMeta
   logs: string[]
   error?: Error

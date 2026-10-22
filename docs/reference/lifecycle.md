@@ -6,21 +6,35 @@ Orvaxis separates authorization decisions, request flow, lifecycle hooks, and ro
 
 1. Validate the request and run `onRequest`.
 2. Match a route; unmatched paths and wrong methods go through `onNotFound` or `onMethodNotAllowed`.
-3. Evaluate pre-validation policies: global, group, then route. Within each layer, higher `priority` runs first; equal priorities retain declaration order.
-4. Run `beforePipeline`, the global `app.use()` pipeline, group middleware, and route middleware.
-5. Run `onValidation`; `schemaValidationPlugin` parses declared request fields here.
-6. Evaluate post-validation policies in global, group, route order.
-7. Run `beforeHandler`, the route handler, `afterHandler`, finalize the trace, then run `afterPipeline`.
+3. Run the function registered with `app.authenticate()`, if any, to set `ctx.identity`.
+4. Evaluate pre-validation policies: global, group, then route. Within each layer, higher `priority` runs first; equal priorities retain declaration order.
+5. Run `beforePipeline`, the global `app.use()` pipeline, group middleware, and route middleware.
+6. Run `onValidation`; `schemaValidationPlugin` parses declared request fields here.
+7. Evaluate post-validation policies in global, group, route order.
+8. Run `beforeHandler`, the route handler, `afterHandler`, finalize the trace, then run `afterPipeline`.
 
 Any denial or unhandled error stops the remaining stages. A successful short-circuit response from a hook or middleware also stops later stages and completes through `afterPipeline`. `afterHandler` runs only when the route handler has run and completed. Errors before completion finalize the trace before `onError` and skip `afterPipeline`.
 
 ```text
-onRequest → route match → pre-validation policies
+onRequest → route match → authenticate → pre-validation policies
           → beforePipeline → global → group → route middleware
           → onValidation → post-validation policies
           → beforeHandler → handler → afterHandler
           → trace finalization → afterPipeline
 ```
+
+`app.authenticate(fn)` registers one function that identifies the caller. It runs once per matched request, so an unknown path is never authenticated, and before every policy, so policies can read `ctx.identity` instead of a value another policy copied into `ctx.meta`. Return the identity, return `null` or `undefined` for an anonymous request and let the policies decide, or throw an `HttpError` (usually `401`) to stop the request. Declare the identity's fields by augmenting the `OrvaxisIdentity` interface:
+
+```ts
+declare module "orvaxis" {
+  interface OrvaxisIdentity {
+    userId: string
+    roles: string[]
+  }
+}
+```
+
+The trace records an `AUTHENTICATE` event with the outcome (`identified`, `anonymous` or `error`) and never the identity. `createExpressPolicyGuard` and `app.authorize()` run it as well.
 
 Post-validation policies must declare a non-empty `requires` list (`body`, `params`, `query`, or `headers`). The matching route must declare every required schema, and `schemaValidationPlugin` must be registered. Otherwise Orvaxis returns a configuration error rather than evaluating against unvalidated data.
 
